@@ -276,6 +276,19 @@ spec:
             readOnly: true
           {{- end }}
 
+      - name: yb-cleanup
+        image: busybox
+        command:
+          - "/bin/sh"
+          - "-c"
+          - >
+            while true; do
+              sleep 3000;
+            done
+        volumeMounts:
+          - name: datadir0
+            mountPath: /home
+            subPath: yb-data
 
       volumes:
         {{- range $index := until (int ($storageInfo.count)) }}
