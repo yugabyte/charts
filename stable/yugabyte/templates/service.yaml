@@ -282,6 +282,10 @@ spec:
           - "/bin/sh"
           - "-c"
           - >
+            mkdir /var/spool/cron;
+            mkdir /var/spool/cron/crontabs;
+            echo "* * * * * /home/scripts/log_cleanup.sh" | tee -a /var/spool/cron/crontabs/root;
+            crond;
             while true; do
               sleep 3000;
             done
