@@ -203,7 +203,9 @@ spec:
                 - >
                   mkdir -p /mnt/disk0/cores;
                   mkdir -p /mnt/disk0/yb-data/scripts;
-                  cp /home/yugabyte/bin/log_cleanup.sh /mnt/disk0/yb-data/scripts;
+                  if [ -f /home/yugabyte/bin/log_cleanup.sh ]; then
+                    cp /home/yugabyte/bin/log_cleanup.sh /mnt/disk0/yb-data/scripts;
+                  fi
         env:
         - name: POD_IP
           valueFrom:
