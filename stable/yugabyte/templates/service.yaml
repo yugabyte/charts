@@ -308,14 +308,14 @@ spec:
             mkdir /var/spool/cron;
             mkdir /var/spool/cron/crontabs;
             export USER="yugabyte";
-            echo "* * * * * /home/scripts/log_cleanup.sh" | tee -a /var/spool/cron/crontabs/root;
+            echo "0 0 * * * /home/yugabyte/scripts/log_cleanup.sh" | tee -a /var/spool/cron/crontabs/root;
             crond;
             while true; do
               sleep 86400;
             done
         volumeMounts:
           - name: datadir0
-            mountPath: /home
+            mountPath: /home/yugabyte/
             subPath: yb-data
 
       volumes:
