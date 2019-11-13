@@ -301,13 +301,15 @@ spec:
 
       - name: yb-cleanup
         image: busybox:1.31
+        env:
+        - name: USER
+          value: "yugabyte"
         command:
           - "/bin/sh"
           - "-c"
           - >
             mkdir /var/spool/cron;
             mkdir /var/spool/cron/crontabs;
-            export USER="yugabyte";
             echo "0 0 * * * /home/yugabyte/scripts/log_cleanup.sh" | tee -a /var/spool/cron/crontabs/root;
             crond;
             while true; do
