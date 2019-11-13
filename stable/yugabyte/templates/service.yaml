@@ -179,10 +179,33 @@ spec:
                   values:
                   - "{{ .label }}"
               topologyKey: kubernetes.io/hostname
+      initContainers:
+        - name: init-sysctl
+          image: busybox
+          command:
+          - /bin/sh
+          - -c
+          - |
+            sysctl -w vm.swappiness=0
+            sysctl -w kernel.core_pattern="/home/yugabyte/cores/core_%e.%p"
+          securityContext:
+            privileged: true
       containers:
       - name: "{{ .label }}"
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
         imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - "sh"
+                - "-c"
+                - >
+                  mkdir -p /mnt/disk0/cores;
+                  mkdir -p /mnt/disk0/yb-data/scripts;
+                  if [ -f /home/yugabyte/bin/log_cleanup.sh ]; then
+                    cp /home/yugabyte/bin/log_cleanup.sh /mnt/disk0/yb-data/scripts;
+                  fi
         env:
         - name: POD_IP
           valueFrom:
@@ -276,6 +299,26 @@ spec:
             readOnly: true
           {{- end }}
 
+      - name: yb-cleanup
+        image: busybox:1.31
+        env:
+        - name: USER
+          value: "yugabyte"
+        command:
+          - "/bin/sh"
+          - "-c"
+          - >
+            mkdir /var/spool/cron;
+            mkdir /var/spool/cron/crontabs;
+            echo "0 0 * * * /home/yugabyte/scripts/log_cleanup.sh" | tee -a /var/spool/cron/crontabs/root;
+            crond;
+            while true; do
+              sleep 86400;
+            done
+        volumeMounts:
+          - name: datadir0
+            mountPath: /home/yugabyte/
+            subPath: yb-data
 
       volumes:
         {{- range $index := until (int ($storageInfo.count)) }}
