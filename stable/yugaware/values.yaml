@@ -26,3 +26,5 @@ yugaware:
 helm:
   timeout: 900
   package: "/opt/yugabyte/helm/yugabyte-latest.tgz"
+
+domainName: "cluster.local"
