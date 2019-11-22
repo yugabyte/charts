@@ -141,6 +141,7 @@ spec:
                   - '/third-party-deps'
         - name: yugaware
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: [ "/bin/bash", "-c"]
           args:
             - "bin/yugaware -Dconfig.file=/data/application.docker.conf"

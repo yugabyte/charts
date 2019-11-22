@@ -191,6 +191,24 @@ data:
             target_label: "saved_name"
             replacement: "$1"
 
+      - job_name: 'kube-state-metrics'
+        static_configs:
+        - targets: ['kube-state-metrics.kube-system.svc.{{.Values.domainName}}:8080']
+        metric_relabel_configs:
+        # Save the name of the metric so we can group_by since we cannot by __name__ directly...
+        - source_labels: ["__name__"]
+          regex: "(.*)"
+          target_label: "saved_name"
+          replacement: "$1"
+        - source_labels: [pod]
+          regex: "(.*)"
+          target_label: "pod_name"
+          replacement: "$1"
+        - source_labels: [pod]
+          regex: "(yb-[^-]*)-(.*)"
+          target_label: "container_name"
+          replacement: "$1"
+
       - job_name: 'kubernetes-cadvisor'
 
         scheme: https
