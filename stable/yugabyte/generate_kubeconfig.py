@@ -21,7 +21,7 @@ def run_command(command_args, namespace=None, as_json=True):
         command.extend(['-o', 'json'])
         return json.loads(check_output(command))
     else:
-        return check_output(command)
+        return check_output(command).decode('utf8')
 
 
 parser = argparse.ArgumentParser(description='Generate KubeConfig with Token')
