@@ -61,8 +61,6 @@ spec:
           emptyDir: {}
         - name: thirdparty-deps
           emptyDir: {}
-        - name: prometheus-storage
-          emptyDir: {}
         - name: yugaware-config
           configMap:
             name: {{ .Release.Name }}-yugaware-app-config
@@ -111,10 +109,12 @@ spec:
               subPath: postgres_data
         - name: prometheus
           image: prom/prometheus:v2.2.1
+          securityContext:
+            runAsUser: 0
           volumeMounts:
           - name: prometheus-config
             mountPath: /etc/prometheus/
-          - name: prometheus-storage
+          - name: yugaware-storage
             mountPath: /prometheus/
           - name: yugaware-storage
             mountPath: /opt/swamper_targets/
