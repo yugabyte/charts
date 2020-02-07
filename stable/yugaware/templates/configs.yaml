@@ -68,6 +68,24 @@ data:
       health.ses_email_username = "{{ .Values.yugaware.health.username }}"
       health.ses_email_password = "{{ .Values.yugaware.health.password }}"
     }
+
+{{- if .Values.tls.enabled }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-yugaware-tls-cert
+  labels:
+    app: "{{ template "yugaware.name" . }}"
+    chart: "{{ template "yugaware.chart" . }}"
+    release: {{ .Release.Name | quote }}
+    heritage: {{ .Release.Service | quote }}
+type: Opaque
+data:
+  server.crt: {{ .Values.tls.certificate }}
+  server.key: {{ .Values.tls.key }}
+{{- end }}
+
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -81,9 +99,15 @@ metadata:
 data:
   default.conf: |
     server {
+{{- if .Values.tls.enabled }}
+      listen       443 ssl;
+      ssl_certificate /opt/certs/server.crt;
+      ssl_certificate_key /opt/certs/server.key;
+      server_name  {{ .Values.tls.hostname }};
+{{- else }}
       listen       80;
-      server_name  localhost;
-
+      server_name  {{ .Values.tls.hostname }};
+{{- end }}
       proxy_http_version 1.1;
       proxy_set_header X-Real-IP  $remote_addr;
       proxy_set_header X-Forwarded-For $remote_addr;

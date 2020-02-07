@@ -19,7 +19,11 @@ spec:
   clusterIP:
   ports:
   - name: ui
+{{- if .Values.tls.enabled }}
+    port: 443
+{{- else }}
     port: 80
+{{- end }}
   - name: metrics
     port: 9090
   selector:
@@ -79,6 +83,12 @@ spec:
             items:
               - key: prometheus.yml
                 path: prometheus.yml
+
+        {{- if .Values.tls.enabled }}
+        - name: {{  .Release.Name }}-yugaware-tls-cert
+          secret:
+            secretName: {{ .Release.Name }}-yugaware-tls-cert
+        {{- end }}
       containers:
         - image: postgres:11.5
           name: postgres
@@ -190,6 +200,11 @@ spec:
           volumeMounts:
           - mountPath: /etc/nginx/conf.d/
             name: nginx-config
+          {{- if .Values.tls.enabled }}
+          - name: {{  .Release.Name }}-yugaware-tls-cert
+            mountPath: /opt/certs/
+            readOnly: true
+          {{- end }}
         - name: dnsmasq
           image: "janeczku/go-dnsmasq:release-1.0.7"
           args:
