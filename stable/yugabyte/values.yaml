@@ -92,3 +92,6 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+serviceAccount:
+  Name: yugabyte-helm
