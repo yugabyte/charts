@@ -13,7 +13,7 @@ Server: &version.Version{SemVer:"v2.9.1", GitCommit:"20adb27c7c5868466912eebdf66
 ```
 
 ## Create Kubernetes clusters and node pools created
-Inorder for you to install YugaByte db using helm you need have a kubernetes cluster created and make sure it has node pools created as well.
+In order for you to install YugabyteDB using helm you need have a kubernetes cluster created and make sure it has node pools created as well.
 
 #### Creating new cluster
 If not already created, you can create a new kubernetes cluster by running the below command:
@@ -27,7 +27,7 @@ Fetch the credentials for the newly created kubernetes cluster by running the be
 gcloud container clusters get-credentials yugabyte-demo --zone us-west1-b
 ```
 
-## Deploying YugabyteDB using helm charts
+## Deploying YugabyteDB using Helm Charts
 
 ### Creating YugabyteDB RBAC on your kubernetes cluster
 In order to install helm package you need to have a service account with certain cluster role binding, if you don't already have such service account
@@ -73,7 +73,7 @@ helm install yugabyte --set gflags.tserver.use_cassandra_authentication=true --n
 ```
 
 #### Create YugabyteDB cluster with larger disk.
-The default helm chart brings up a YugaByte DB with 10Gi for master nodes and 10Gi for tserver nodes. You override those defaults as below.
+The default helm chart brings up a YugabyteDB with 10Gi for master nodes and 10Gi for tserver nodes. You override those defaults as below.
 ```
 helm install yugabyte --set storage.tserver.size=100Gi --namespace yb-demo --name yb-demo --wait
 ```
@@ -84,7 +84,7 @@ helm install yugabyte --set storage.tserver.storageClass=custom-storage,storage.
 ```
 
 ### Exposing YugabyteDB service endpoints using LoadBalancer
-By default YugabyteDB helm would expose the master ui endpoint alone via LoadBalancer. If you wish to expose ysql, ycql, yedis services via LoadBalancer for your app to use, you could do that in couple of different ways.
+By default YugabyteDB helm would expose all the API services via a shared LoadBalancer on the yb-tserver as well as the master ui service via another LoadBalancer. If you wish to expose ysql, ycql, yedis services via independent LoadBalancers for your app to use, do the following.
 
 #### Exposing individual service endpoint
 If you want individual LoadBalancer endpoint for each of the services (YSQL, YCQL, YEDIS), run the following command
@@ -92,11 +92,6 @@ If you want individual LoadBalancer endpoint for each of the services (YSQL, YCQ
 helm install yugabyte -f expose-all.yaml --namespace yb-demo --name yb-demo --wait
 ```
 
-#### Exposing shared service endpoint
-If you want to create a shared LoadBalancer endpoint for all the services (YSQL, YCQL, YEDIS), run the following command
-```
-helm install yugabyte -f expose-all-shared.yaml --namespace yb-demo --name yb-demo --wait
-```
 #### Enable TLS for YugabyteDB (Note: This is only available for Yugabyte Platform)
 The assumption here is you already have the pull secret installed to pull from our private Yugabyte Platform registry
 YugabyteDB has three gflags that help build the level on encryption you need,
