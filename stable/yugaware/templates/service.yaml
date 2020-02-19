@@ -152,6 +152,10 @@ spec:
         - name: yugaware
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{ if .Values.yugaware.resources }}
+          resources:
+{{ toYaml .Values.yugaware.resources | indent 12 }}
+          {{- end }}
           command: [ "/bin/bash", "-c"]
           args:
             - "bin/yugaware -Dconfig.file=/data/application.docker.conf"
