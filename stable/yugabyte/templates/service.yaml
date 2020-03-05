@@ -330,6 +330,7 @@ spec:
         - name: {{ .label }}-yugabyte-tls-cert
           secret:
             secretName: {{ .label }}-yugabyte-tls-cert
+            defaultMode: 256
         {{- end }}
 {{- if eq $root.Values.isMultiAz false }}
 ---
