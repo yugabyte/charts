@@ -201,6 +201,9 @@ spec:
                   values:
                   - "{{ .label }}"
               topologyKey: kubernetes.io/hostname
+    {{- if ne $root.Release.Service "Tiller" }}
+      serviceAccountName: "{{ $root.Values.serviceAccount.Name }}-{{ $root.Release.Name }}"
+    {{ end }}
       initContainers:
         - name: init-sysctl
           image: busybox
@@ -373,4 +376,26 @@ spec:
     matchLabels:
       app: {{ .label }}
 {{- end }}
+{{- end }}
+
+{{- if ne $root.Release.Service "Tiller" }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $root.Values.serviceAccount.Name }}-{{ $root.Release.Name }}
+  namespace: {{ $root.Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $root.Values.serviceAccount.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: {{ $root.Values.serviceAccount.Name }}-{{ $root.Release.Name }}
+    namespace: {{ $root.Release.Namespace }}
 {{- end }}

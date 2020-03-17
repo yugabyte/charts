@@ -100,3 +100,6 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+serviceAccount:
+  Name: yugabyte-service-account
