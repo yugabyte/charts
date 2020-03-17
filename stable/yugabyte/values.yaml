@@ -102,4 +102,4 @@ tolerations: []
 affinity: {}
 
 serviceAccount:
-  Name: yugabyte-priv-sa
+  Name: yugabyte-service-account
