@@ -228,8 +228,10 @@ spec:
                 - >
                   mkdir -p /mnt/disk0/cores;
                   mkdir -p /mnt/disk0/yb-data/scripts;
-                  if [ -f /home/yugabyte/bin/log_cleanup.sh ]; then
-                    cp /home/yugabyte/bin/log_cleanup.sh /mnt/disk0/yb-data/scripts;
+                  if [ ! -f /mnt/disk0/yb-data/scripts/log_cleanup.sh ]; then
+                    if [ -f /home/yugabyte/bin/log_cleanup.sh ]; then
+                      cp /home/yugabyte/bin/log_cleanup.sh /mnt/disk0/yb-data/scripts;
+                    fi;
                   fi
         env:
         - name: POD_IP
@@ -338,7 +340,7 @@ spec:
           - >
             mkdir /var/spool/cron;
             mkdir /var/spool/cron/crontabs;
-            echo "0 0 * * * /home/yugabyte/scripts/log_cleanup.sh" | tee -a /var/spool/cron/crontabs/root;
+            echo "0 * * * * /home/yugabyte/scripts/log_cleanup.sh" | tee -a /var/spool/cron/crontabs/root;
             crond;
             while true; do
               sleep 86400;
