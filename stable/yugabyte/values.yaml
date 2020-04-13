@@ -8,6 +8,7 @@ Image:
   pullPolicy: IfNotPresent
 
 storage:
+  ephemeral: false  # will not allocate PVs when true
   master:
     count: 2
     size: 10Gi

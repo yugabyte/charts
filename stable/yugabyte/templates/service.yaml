@@ -124,8 +124,9 @@ spec:
   {{ else }}
   replicas: {{ $root.Values.replicas.tserver  }}
   {{ end }}
+  {{- $storageInfo := (eq .name "yb-masters") | ternary $root.Values.storage.master $root.Values.storage.tserver -}}
+  {{ if not $root.Values.storage.ephemeral }}
   volumeClaimTemplates:
-    {{- $storageInfo := (eq .name "yb-masters") | ternary $root.Values.storage.master $root.Values.storage.tserver -}}
     {{- range $index := until (int ($storageInfo.count )) }}
     - metadata:
         name: datadir{{ $index }}
@@ -146,6 +147,7 @@ spec:
           requests:
             storage: {{ $storageInfo.size }}
     {{- end }}
+  {{- end }}
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -255,7 +257,11 @@ spec:
         command:
         {{ if eq .name "yb-masters" }}
           - "/home/yugabyte/bin/yb-master"
+          {{ if not $root.Values.storage.ephemeral }}
           - "--fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }}"
+          {{ else }}
+          - "--fs_data_dirs=/var/yugabyte"
+          {{- end }}
           - "--rpc_bind_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}"
           - "--server_broadcast_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}:7100"
           {{ if $root.Values.isMultiAz }}
@@ -316,9 +322,11 @@ spec:
             name: {{ $label | quote }}
           {{- end}}
         volumeMounts:
+          {{ if not $root.Values.storage.ephemeral }}
           {{- range $index := until (int ($storageInfo.count)) }}
           - name: datadir{{ $index }}
             mountPath: /mnt/disk{{ $index }}
+          {{- end }}
           {{- end }}
           {{- if $root.Values.tls.enabled }}
           - name: {{ .label }}-yugabyte-tls-cert
@@ -329,6 +337,7 @@ spec:
             readOnly: true
           {{- end }}
 
+      {{ if not $root.Values.storage.ephemeral }}
       - name: yb-cleanup
         image: busybox:1.31
         env:
@@ -349,12 +358,15 @@ spec:
           - name: datadir0
             mountPath: /home/yugabyte/
             subPath: yb-data
+      {{- end }}
 
       volumes:
+        {{ if not $root.Values.storage.ephemeral }}
         {{- range $index := until (int ($storageInfo.count)) }}
         - name: datadir{{ $index }}
           hostPath:
             path: /mnt/disks/ssd{{ $index }}
+        {{- end }}
         {{- end }}
         {{- if $root.Values.tls.enabled }}
         - name: {{ .label }}-yugabyte-tls-cert
