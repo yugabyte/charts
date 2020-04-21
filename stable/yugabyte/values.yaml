@@ -52,13 +52,13 @@ gflags:
   master:
     default_memory_limit_to_ram_ratio: 0.85
   tserver:
-    use_cassandra_authentication: False
+    use_cassandra_authentication: false
 
 PodManagementPolicy: Parallel
 
-enableLoadBalancer: True
+enableLoadBalancer: true
 
-isMultiAz: False
+isMultiAz: false
 
 domainName: "cluster.local"
 
