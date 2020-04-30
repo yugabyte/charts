@@ -8,7 +8,7 @@ metadata:
   name: yugabyte-tls-client-cert
   namespace: "{{ $root.Release.Namespace }}"
   labels:
-    heritage: {{ $root.Release.Service | quote }}
+    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
     release: {{ $root.Release.Name | quote }}
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
@@ -34,7 +34,7 @@ metadata:
   namespace: "{{ $root.Release.Namespace }}"
   labels:
     app: "{{ $service.label }}"
-    heritage: {{ $root.Release.Service | quote }}
+    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
     release: {{ $root.Release.Name | quote }}
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
@@ -60,7 +60,7 @@ metadata:
   name: "{{ .name }}"
   labels:
     app: "{{ .label }}"
-    heritage: {{ $root.Release.Service | quote }}
+    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
     release: {{ $root.Release.Name | quote }}
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
@@ -86,7 +86,7 @@ metadata:
 {{ toYaml $endpoint.annotations | indent 4 }}
   labels:
     app: "{{ $endpoint.app }}"
-    heritage: {{ $root.Release.Service | quote }}
+    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
     release: {{ $root.Release.Name | quote }}
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
@@ -112,7 +112,7 @@ metadata:
   namespace: "{{ $root.Release.Namespace }}"
   labels:
     app: "{{ .label }}"
-    heritage: {{ $root.Release.Service | quote }}
+    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
     release: {{ $root.Release.Name | quote }}
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
@@ -133,7 +133,7 @@ spec:
         annotations:
           volume.beta.kubernetes.io/storage-class: {{ $storageInfo.storageClass }}
         labels:
-          heritage: {{ $root.Release.Service | quote }}
+          heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
           release: {{ $root.Release.Name | quote }}
           chart: "{{ $root.Chart.Name }}"
           component: "{{ $root.Values.Component }}"
@@ -167,7 +167,7 @@ spec:
       {{ end }}
       labels:
         app: "{{ .label }}"
-        heritage: {{ $root.Release.Service | quote }}
+        heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
         release: {{ $root.Release.Name | quote }}
         chart: "{{ $root.Chart.Name }}"
         component: "{{ $root.Values.Component }}"
@@ -401,9 +401,10 @@ metadata:
   namespace: {{ $root.Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: {{ $root.Values.serviceAccount.Name }}
+  namespace: {{ $root.Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
