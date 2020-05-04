@@ -102,7 +102,4 @@ tolerations: []
 
 affinity: {}
 
-serviceAccount:
-  Name: yugabyte-service-account
-
 helm2Legacy: false

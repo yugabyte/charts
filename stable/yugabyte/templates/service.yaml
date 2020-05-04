@@ -203,20 +203,6 @@ spec:
                   values:
                   - "{{ .label }}"
               topologyKey: kubernetes.io/hostname
-    {{- if ne $root.Release.Service "Tiller" }}
-      serviceAccountName: "{{ $root.Values.serviceAccount.Name }}-{{ $root.Release.Name }}"
-    {{ end }}
-      initContainers:
-        - name: init-sysctl
-          image: busybox
-          command:
-          - /bin/sh
-          - -c
-          - |
-            sysctl -w vm.swappiness=0
-            sysctl -w kernel.core_pattern="/home/yugabyte/cores/core_%e.%p"
-          securityContext:
-            privileged: true
       containers:
       - name: "{{ .label }}"
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
@@ -390,27 +376,4 @@ spec:
     matchLabels:
       app: {{ .label }}
 {{- end }}
-{{- end }}
-
-{{- if ne $root.Release.Service "Tiller" }}
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ $root.Values.serviceAccount.Name }}-{{ $root.Release.Name }}
-  namespace: {{ $root.Release.Namespace }}
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: RoleBinding
-metadata:
-  name: {{ $root.Values.serviceAccount.Name }}
-  namespace: {{ $root.Release.Namespace }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-  - kind: ServiceAccount
-    name: {{ $root.Values.serviceAccount.Name }}-{{ $root.Release.Name }}
-    namespace: {{ $root.Release.Namespace }}
 {{- end }}
