@@ -14,7 +14,10 @@
   kubectl exec --namespace {{ .Release.Namespace }} -it yb-tserver-0 /home/yugabyte/bin/ysqlsh -- -h yb-tserver-0.yb-tservers.{{ .Release.Namespace }}
 
 6. Cleanup YugabyteDB Pods
+  For helm 2:
   helm delete {{ .Release.Name }} --purge
+  For helm 3:
+  helm delete {{ .Release.Name }} -n {{ $root.Release.Namespace }}
   NOTE: You need to manually delete the persistent volume
   {{- $root := . -}}
   {{- range .Values.Services }}
