@@ -17,7 +17,7 @@
   For helm 2:
   helm delete {{ .Release.Name }} --purge
   For helm 3:
-  helm delete {{ .Release.Name }} -n {{ $root.Release.Namespace }}
+  helm delete {{ .Release.Name }} -n {{ .Release.Namespace }}
   NOTE: You need to manually delete the persistent volume
   {{- $root := . -}}
   {{- range .Values.Services }}
