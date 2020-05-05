@@ -4,7 +4,7 @@
 Component: "yugabytedb"
 Image:
   repository: "yugabytedb/yugabyte"
-  tag: 2.1.4.0-b5
+  tag: 2.1.5.0-b17
   pullPolicy: IfNotPresent
 
 storage:
@@ -102,5 +102,4 @@ tolerations: []
 
 affinity: {}
 
-serviceAccount:
-  Name: yugabyte-service-account
+helm2Legacy: false

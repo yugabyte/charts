@@ -8,7 +8,7 @@ metadata:
   name: yugabyte-tls-client-cert
   namespace: "{{ $root.Release.Namespace }}"
   labels:
-    heritage: {{ $root.Release.Service | quote }}
+    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
     release: {{ $root.Release.Name | quote }}
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
@@ -34,7 +34,7 @@ metadata:
   namespace: "{{ $root.Release.Namespace }}"
   labels:
     app: "{{ $service.label }}"
-    heritage: {{ $root.Release.Service | quote }}
+    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
     release: {{ $root.Release.Name | quote }}
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
@@ -60,7 +60,7 @@ metadata:
   name: "{{ .name }}"
   labels:
     app: "{{ .label }}"
-    heritage: {{ $root.Release.Service | quote }}
+    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
     release: {{ $root.Release.Name | quote }}
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
@@ -86,7 +86,7 @@ metadata:
 {{ toYaml $endpoint.annotations | indent 4 }}
   labels:
     app: "{{ $endpoint.app }}"
-    heritage: {{ $root.Release.Service | quote }}
+    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
     release: {{ $root.Release.Name | quote }}
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
@@ -112,7 +112,7 @@ metadata:
   namespace: "{{ $root.Release.Namespace }}"
   labels:
     app: "{{ .label }}"
-    heritage: {{ $root.Release.Service | quote }}
+    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
     release: {{ $root.Release.Name | quote }}
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
@@ -133,7 +133,7 @@ spec:
         annotations:
           volume.beta.kubernetes.io/storage-class: {{ $storageInfo.storageClass }}
         labels:
-          heritage: {{ $root.Release.Service | quote }}
+          heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
           release: {{ $root.Release.Name | quote }}
           chart: "{{ $root.Chart.Name }}"
           component: "{{ $root.Values.Component }}"
@@ -167,7 +167,7 @@ spec:
       {{ end }}
       labels:
         app: "{{ .label }}"
-        heritage: {{ $root.Release.Service | quote }}
+        heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
         release: {{ $root.Release.Name | quote }}
         chart: "{{ $root.Chart.Name }}"
         component: "{{ $root.Values.Component }}"
@@ -203,20 +203,6 @@ spec:
                   values:
                   - "{{ .label }}"
               topologyKey: kubernetes.io/hostname
-    {{- if ne $root.Release.Service "Tiller" }}
-      serviceAccountName: "{{ $root.Values.serviceAccount.Name }}-{{ $root.Release.Name }}"
-    {{ end }}
-      initContainers:
-        - name: init-sysctl
-          image: busybox
-          command:
-          - /bin/sh
-          - -c
-          - |
-            sysctl -w vm.swappiness=0
-            sysctl -w kernel.core_pattern="/home/yugabyte/cores/core_%e.%p"
-          securityContext:
-            privileged: true
       containers:
       - name: "{{ .label }}"
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
@@ -390,26 +376,4 @@ spec:
     matchLabels:
       app: {{ .label }}
 {{- end }}
-{{- end }}
-
-{{- if ne $root.Release.Service "Tiller" }}
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: {{ $root.Values.serviceAccount.Name }}-{{ $root.Release.Name }}
-  namespace: {{ $root.Release.Namespace }}
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  name: {{ $root.Values.serviceAccount.Name }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-  - kind: ServiceAccount
-    name: {{ $root.Values.serviceAccount.Name }}-{{ $root.Release.Name }}
-    namespace: {{ $root.Release.Namespace }}
 {{- end }}
