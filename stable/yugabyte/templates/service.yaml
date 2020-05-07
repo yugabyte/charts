@@ -91,7 +91,6 @@ metadata:
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
 spec:
-  clusterIP:
   ports:
     {{- range $label, $port := $endpoint.ports }}
     - name: {{ $label | quote }}
