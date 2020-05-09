@@ -4,7 +4,7 @@
 Component: "yugabytedb"
 Image:
   repository: "yugabytedb/yugabyte"
-  tag: 2.1.5.0-b17
+  tag: 2.1.6.0-b17
   pullPolicy: IfNotPresent
 
 storage:
