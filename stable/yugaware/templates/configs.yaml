@@ -8,7 +8,7 @@ metadata:
     app: {{ template "yugaware.name" . }}
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 data:
   postgres_user: "postgres"
   postgres_password: "{{ b64enc (randAlphaNum 8) }}"
@@ -24,7 +24,7 @@ metadata:
     app: {{ template "yugaware.name" . }}
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 data:
   application.docker.conf: |
     play.crypto.secret=${APP_SECRET}
@@ -95,7 +95,7 @@ metadata:
     app: {{ template "yugaware.name" . }}
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 data:
   default.conf: |
     server {
@@ -147,7 +147,7 @@ metadata:
     app: {{ template "yugaware.name" . }}
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 data:
   prometheus.yml: |
     global:
