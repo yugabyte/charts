@@ -6,15 +6,15 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Release.Name }}-yugaware-ui
+  {{- if .Values.yugaware.service.annotations }}
+  annotations:
+{{ toYaml .Values.yugaware.service.annotations | indent 4 }}
+  {{- end }}
   labels:
     app: {{ .Release.Name }}-yugaware
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
-    {{- if .Values.yugaware.service.annotations }}
-    annotations:
-{{ toYaml .Values.yugaware.service.annotations | indent 6 }}
-    {{- end }}
 spec:
   clusterIP:
   ports:
