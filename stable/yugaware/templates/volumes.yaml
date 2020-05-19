@@ -7,7 +7,7 @@ metadata:
     app: {{ template "yugaware.name" . }}
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 spec:
   accessModes:
     - ReadWriteOnce

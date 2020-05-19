@@ -91,6 +91,13 @@ metadata:
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
 spec:
+  {{ if eq $root.Release.Service "Tiller" }}
+  clusterIP:
+  {{ else }}
+  {{ if $endpoint.clusterIP }}
+  clusterIP: {{ $endpoint.clusterIP }}
+  {{- end }}
+  {{- end }}
   ports:
     {{- range $label, $port := $endpoint.ports }}
     - name: {{ $label | quote }}
