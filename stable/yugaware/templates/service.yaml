@@ -16,7 +16,13 @@ metadata:
     release: {{ .Release.Name }}
     heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 spec:
+{{- if eq .Release.Service "Tiller" }}
   clusterIP:
+{{- else }}
+{{- if .Values.yugaware.service.clusterIP }}
+  clusterIP: .Values.yugaware.service.clusterIP
+{{- end }}
+{{- end }}
   ports:
   - name: ui
 {{- if .Values.tls.enabled }}
