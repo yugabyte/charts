@@ -17,10 +17,10 @@ if [[ $# -ne 1 ]]; then
 fi
 
 release_version="$1"
-# Version mentioned in Charts.yaml
-current_version="$(grep -r "^version" "stable/yugabyte/Chart.yaml" | awk '{ print $2 }')"
-if ! version_gt "${release_version%.*}" "${current_version}" ; then
-  echo "Release version is either older or equal to the current version: '${release_version%.*}' <= '${current_version}'" 1>&2
+# appVersion mentioned in Charts.yaml
+current_version="$(grep -r "^appVersion" "stable/yugabyte/Chart.yaml" | awk '{ print $2 }')"
+if ! version_gt "${release_version}" "${current_version%-b*}" ; then
+  echo "Release version is either older or equal to the current version: '${release_version}' <= '${current_version%-b*}'" 1>&2
   exit 1
 fi
 
