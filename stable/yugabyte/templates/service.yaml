@@ -64,6 +64,7 @@ metadata:
     release: {{ $root.Release.Name | quote }}
     chart: "{{ $root.Chart.Name }}"
     component: "{{ $root.Values.Component }}"
+    service-type: "headless"
 spec:
   clusterIP: None
   ports:
