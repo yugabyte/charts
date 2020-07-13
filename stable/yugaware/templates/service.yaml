@@ -63,6 +63,10 @@ spec:
       serviceAccountName: {{ .Release.Name }}
       imagePullSecrets:
       - name: {{ .Values.image.pullSecret }}
+      {{- if .Values.securityContext.enabled }}
+      securityContext:
+        fsGroup: {{ .Values.securityContext.fsGroup }}
+      {{- end }}
       volumes:
         - name: yugaware-storage
           persistentVolumeClaim:
@@ -157,6 +161,10 @@ spec:
                   - '/third-party-deps'
         - name: yugaware
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          {{- if .Values.securityContext.enabled }}
+          securityContext:
+            runAsUser: {{ .Values.securityContext.runAsUser }}
+          {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{ if .Values.yugaware.resources }}
           resources:
