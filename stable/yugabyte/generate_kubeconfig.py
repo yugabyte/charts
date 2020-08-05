@@ -63,7 +63,7 @@ with tempfile.NamedTemporaryFile() as ca_crt_file:
                        '--certificate-authority={}'.format(ca_crt_file.name)]
     run_command(set_cluster_cmd, as_json=False)
 
-user_token = base64.b64decode(secret_data['data']['token'])
+user_token = base64.b64decode(secret_data['data']['token']).decode('utf-8')
 set_credentials_cmd = ['config', 'set-credentials', context_name,
                        '--token={}'.format(user_token),
                        '--kubeconfig={}'.format(kube_config)]
