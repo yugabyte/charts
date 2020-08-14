@@ -100,6 +100,12 @@ Services:
       http-yedis-met: "11000"
       http-ysql-met: "13000"
 
+## Should be set to true only if Istio is being used.
+## TODO: remove this once
+## https://github.com/yugabyte/yugabyte-db/issues/5641 is fixed.
+##
+istioCompatibility:
+  enabled: false
 
 serviceMonitor:
   ## If true, two ServiceMonitor CRs are created. One for yb-master

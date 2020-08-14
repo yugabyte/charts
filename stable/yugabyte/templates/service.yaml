@@ -260,7 +260,11 @@ spec:
           {{ else }}
           - "--fs_data_dirs=/var/yugabyte"
           {{- end }}
+          {{- if $root.Values.istioCompatibility.enabled }}
+          - "--rpc_bind_addresses=0.0.0.0:7100"
+          {{- else }}
           - "--rpc_bind_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}"
+          {{- end }}
           - "--server_broadcast_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}:7100"
           - "--webserver_interface=0.0.0.0"
           {{ if $root.Values.isMultiAz }}
@@ -292,8 +296,16 @@ spec:
           - "/home/yugabyte/bin/yb-tserver"
           - "--fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }}"
           - "--server_broadcast_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}:9100"
+          {{- if $root.Values.istioCompatibility.enabled }}
+          - "--rpc_bind_addresses=0.0.0.0:9100"
+          {{- else }}
           - "--rpc_bind_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}"
+          {{- end }}
+          {{- if $root.Values.istioCompatibility.enabled }}
+          - "--cql_proxy_bind_address=0.0.0.0:9042"
+          {{- else }}
           - "--cql_proxy_bind_address={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}"
+          {{- end }}
           - "--webserver_interface=0.0.0.0"
           {{ if not $root.Values.disableYsql }}
           - "--enable_ysql=true"
