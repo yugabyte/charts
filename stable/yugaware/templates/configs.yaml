@@ -69,6 +69,26 @@ data:
       health.ses_email_password = "{{ .Values.yugaware.health.password }}"
     }
 
+    play.filters {
+      # CSRF config
+      csrf {
+        cookie {
+          # If non null, the CSRF token will be placed in a cookie with this name
+          name = "csrfCookie"
+          # Whether the cookie should be set to secure
+          secure = false
+          # Whether the cookie should have the HTTP only flag set
+          httpOnly = false
+        }
+        # Whether to bypass CSRF check if CORS check is satisfied
+        bypassCorsTrustedOrigins = false
+        header {
+          # The name of the header to accept CSRF tokens from.
+          name = "Csrf-Token"
+        }
+      }
+    }
+
 {{- if .Values.tls.enabled }}
 ---
 apiVersion: v1
