@@ -284,6 +284,8 @@ spec:
           {{- end}}
           {{ if $root.Values.tls.enabled }}
           - "--certs_dir=/opt/certs/yugabyte"
+          - "--use_node_to_node_encryption=true"
+          - "--allow_insecure_connections={{ $root.Values.tls.insecure }}"
           {{- end }}
         {{ else }}
           - "/home/yugabyte/bin/yb-tserver"
@@ -293,7 +295,7 @@ spec:
           - "--cql_proxy_bind_address={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}"
           {{ if not $root.Values.disableYsql }}
           - "--enable_ysql=true"
-          - "--pgsql_proxy_bind_address={{ printf "$(POD_IP)" }}:5433"
+          - "--pgsql_proxy_bind_address=0.0.0.0:5433"
           {{ else }}
           - "--enable_ysql=false"
           {{ end }}
@@ -312,6 +314,10 @@ spec:
           {{- end }}
           {{ if $root.Values.tls.enabled }}
           - "--certs_dir=/opt/certs/yugabyte"
+          - "--use_node_to_node_encryption=true"
+          - "--allow_insecure_connections={{ $root.Values.tls.insecure }}"
+          - "--use_client_to_server_encryption=true"
+          - "--certs_for_client_dir=/opt/certs/yugabyte"
           {{- end }}
         {{ end }}
         ports:
