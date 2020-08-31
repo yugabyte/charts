@@ -309,7 +309,7 @@ spec:
           {{ if $root.Values.tls.enabled }}
           - "--certs_dir=/opt/certs/yugabyte"
           - "--use_node_to_node_encryption=true"
-          - "--allow_insecure_connections={{ $root.Values.tls.insecureClient }}"
+          - "--allow_insecure_connections={{ $root.Values.tls.insecure }}"
           - "--use_client_to_server_encryption=true"
           - "--certs_for_client_dir=/opt/certs/yugabyte"
           {{- end }}
