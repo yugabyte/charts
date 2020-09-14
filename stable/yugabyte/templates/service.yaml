@@ -262,6 +262,7 @@ spec:
           {{- end }}
           - "--rpc_bind_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}"
           - "--server_broadcast_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}:7100"
+          - "--webserver_interface=0.0.0.0"
           {{ if $root.Values.isMultiAz }}
           - "--master_addresses={{ $root.Values.masterAddresses}}"
           - "--replication_factor={{ $root.Values.replicas.totalMasters }}"
@@ -293,6 +294,7 @@ spec:
           - "--server_broadcast_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}:9100"
           - "--rpc_bind_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}"
           - "--cql_proxy_bind_address={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}"
+          - "--webserver_interface=0.0.0.0"
           {{ if not $root.Values.disableYsql }}
           - "--enable_ysql=true"
           - "--pgsql_proxy_bind_address=0.0.0.0:5433"
