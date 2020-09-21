@@ -73,8 +73,6 @@ spec:
             claimName: {{ .Release.Name }}-yugaware-storage
         - name: yugaware-ui
           emptyDir: {}
-        - name: thirdparty-deps
-          emptyDir: {}
         - name: yugaware-config
           configMap:
             name: {{ .Release.Name }}-yugaware-app-config
@@ -144,21 +142,6 @@ spec:
             - --storage.tsdb.path=/prometheus/
           ports:
             - containerPort: 9090
-        - name: thirdparty-deps
-          image: quay.io/yugabyte/thirdparty-deps:latest
-          command: [ "/bin/sh", "-c", "--" ]
-          args:  [ "while true; do sleep 30; done;" ]
-          volumeMounts:
-          - mountPath: /third-party-deps
-            name: thirdparty-deps
-          lifecycle:
-            postStart:
-              exec:
-                command:
-                  - 'cp'
-                  - '-fr'
-                  - '/opt/third-party'
-                  - '/third-party-deps'
         - name: yugaware
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
           {{- if .Values.securityContext.enabled }}
@@ -206,8 +189,6 @@ spec:
           - name: yugaware-storage
             mountPath: /opt/releases/
             subPath: releases
-          - name: thirdparty-deps
-            mountPath: /opt/third-party
           - name: yugaware-storage
             mountPath: /opt/swamper_targets/
             subPath: swamper_targets
