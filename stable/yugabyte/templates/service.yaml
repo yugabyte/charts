@@ -187,6 +187,10 @@ spec:
       nodeSelector:
       {{ toYaml $root.Values.nodeSelector | indent 8 }}
       {{- end }}
+      {{- if $root.Values.tolerations }}
+      tolerations:
+{{ toYaml $root.Values.tolerations | indent 8 }}
+      {{- end }}
       affinity:
         # Set the anti-affinity selector scope to YB masters.
         {{ if $root.Values.AZ }}
