@@ -227,7 +227,7 @@ spec:
           image: "janeczku/go-dnsmasq:release-1.0.7"
           args:
             - --listen
-            - "127.0.0.1:53"
+            - "{{ eq .Values.ip_version_support "v6_only" | ternary "[::1]:53"  "127.0.0.1:53" }}"
             - --default-resolver
             - --append-search-domains
             - --hostsfile=/etc/hosts
