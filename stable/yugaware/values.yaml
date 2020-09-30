@@ -8,7 +8,26 @@ image:
   pullPolicy: IfNotPresent
   pullSecret: yugabyte-k8s-pull-secret
 
+postgres:
+  repository: postgres
+  tag: 11.5
+
+prometheus:
+  repository: prom/prometheus
+  tag: v2.2.1
+
+nginx:
+  repository: nginx
+  tag: 1.17.4
+
+dnsmasq:
+  repository: janeczku/go-dnsmasq
+  tag: release-1.0.7
+  
 yugaware:
+  thirdparty-deps:
+    repository: quay.io/yugabyte/thirdparty-deps
+    tag: latest
   replicas: 1
   storage: 100Gi
   storageClass: standard

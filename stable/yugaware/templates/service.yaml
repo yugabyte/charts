@@ -100,7 +100,7 @@ spec:
             secretName: {{ .Release.Name }}-yugaware-tls-cert
         {{- end }}
       containers:
-        - image: postgres:11.5
+        - image: {{ .Values.postgres.repository }}:{{ .Values.postgres.tag }}
           name: postgres
           env:
             - name: POSTGRES_USER
@@ -128,7 +128,7 @@ spec:
               mountPath: /var/lib/postgresql/data
               subPath: postgres_data
         - name: prometheus
-          image: prom/prometheus:v2.2.1
+          image: {{ .Values.prometheus.repository }}:{{ .Values.prometheus.tag }}
           securityContext:
             runAsUser: 0
           volumeMounts:
@@ -145,7 +145,7 @@ spec:
           ports:
             - containerPort: 9090
         - name: thirdparty-deps
-          image: quay.io/yugabyte/thirdparty-deps:latest
+          image: {{ .Values.yugaware.thirdparty-deps.repository }}:{{ .Values.yugaware.thirdparty-deps.tag }}
           command: [ "/bin/sh", "-c", "--" ]
           args:  [ "while true; do sleep 30; done;" ]
           volumeMounts:
@@ -212,7 +212,7 @@ spec:
             mountPath: /opt/swamper_targets/
             subPath: swamper_targets
         - name: nginx
-          image: nginx:1.17.4
+          image: {{ .Values.nginx.repository }}:{{ .Values.nginx.tag }}
           ports:
           - containerPort: 80
           volumeMounts:
@@ -224,7 +224,7 @@ spec:
             readOnly: true
           {{- end }}
         - name: dnsmasq
-          image: "janeczku/go-dnsmasq:release-1.0.7"
+          image: {{ .Values.dnsmasq.repository }}:{{ .Values.dnsmasq.tag }}
           args:
             - --listen
             - "{{ eq .Values.ip_version_support "v6_only" | ternary "[::1]:53"  "127.0.0.1:53" }}"
