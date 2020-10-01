@@ -145,7 +145,7 @@ spec:
           ports:
             - containerPort: 9090
         - name: thirdparty-deps
-          image: {{ .Values.yugaware.thirdparty-deps.repository }}:{{ .Values.yugaware.thirdparty-deps.tag }}
+          image: {{ .Values.yugaware.thirdpartydeps.repository }}:{{ .Values.yugaware.thirdpartydeps.tag }}
           command: [ "/bin/sh", "-c", "--" ]
           args:  [ "while true; do sleep 30; done;" ]
           volumeMounts:
