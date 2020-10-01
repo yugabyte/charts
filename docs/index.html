@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>YugabyteDB charts repository</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+  <style>
+      .container p {
+	font-weight: 500;
+      }
+      .code-block {
+	padding: 10px 0 !important;
+      }
+
+  </style>
+</head>
+<body>
+  <div class="jumbotron text-center">
+    <h1>YugabyteDB charts repository</h1>
+    <p>Add the charts repository by running the below command</p>
+    <code>helm repo add yugabytedb https://charts.yugabyte.com</code>
+  </div>
+  <div class="container">
+    <div class="row">
+      <div class="col-sm-6">
+	<h3>YugabyteDB</h3>
+	<div class="row code-block">
+	  <p>Search YugabyteDB chart version</p>
+	  <code>helm search yugabytedb/yugabyte -l</code>
+	</div>
+	<div class="row code-block">
+	  <p>To install YugabyteDB</p>
+	  <code>helm install yugabytedb/yugabyte --version (version)</code>
+	</div>
+	<div class="row code-block">
+	  <p>To download YugabyteDB chart locally</p>
+	  <code>helm fetch yugabytedb/yugabyte --version (version)</code>
+	</div>
+      </div>
+      <div class="col-sm-6">
+	<h3>YugaWare</h3>
+	<div class="row code-block">
+	  <p>Search YugaWare chart version</p>
+	  <code>helm search yugabytedb/yugaware -l</code>
+	</div>
+	<div class="row code-block">
+	  <p>To install YugaWare chart</p>
+	  <code>helm install yugabytedb/yugaware --version (version)</code>
+	</div>
+	<div class="row code-block">
+	  <p>To download YugaWare chart locally</p>
+	  <code>helm fetch yugabytedb/yugaware --version (version)</code>
+	</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
