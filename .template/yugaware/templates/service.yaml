@@ -1,0 +1,234 @@
+# Copyright (c) YugaByte, Inc.
+
+{{- if .Values.yugaware.service.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-yugaware-ui
+  {{- if .Values.yugaware.service.annotations }}
+  annotations:
+{{ toYaml .Values.yugaware.service.annotations | indent 4 }}
+  {{- end }}
+  labels:
+    app: {{ .Release.Name }}-yugaware
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+spec:
+{{- if eq .Release.Service "Tiller" }}
+  clusterIP:
+{{- else }}
+{{- if .Values.yugaware.service.clusterIP }}
+  clusterIP: .Values.yugaware.service.clusterIP
+{{- end }}
+{{- end }}
+  ports:
+  - name: ui
+{{- if .Values.tls.enabled }}
+    port: 443
+{{- else }}
+    port: 80
+{{- end }}
+  - name: metrics
+    port: 9090
+  selector:
+    app: {{ .Release.Name }}-yugaware
+  type: "{{ .Values.yugaware.service.type }}"
+  {{- if and (eq .Values.yugaware.service.type "LoadBalancer") (.Values.yugaware.service.ip) }}
+  loadBalancerIP: "{{ .Values.yugaware.service.ip }}"
+  {{- end }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-yugaware
+  labels:
+    app: {{ .Release.Name }}-yugaware
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+spec:
+  serviceName: {{ .Release.Name }}-yugaware
+  replicas: {{ .Values.yugaware.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-yugaware
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-yugaware
+    spec:
+      serviceAccountName: {{ .Release.Name }}
+      imagePullSecrets:
+      - name: {{ .Values.image.pullSecret }}
+      {{- if .Values.securityContext.enabled }}
+      securityContext:
+        fsGroup: {{ .Values.securityContext.fsGroup }}
+      {{- end }}
+      volumes:
+        - name: yugaware-storage
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-yugaware-storage
+        - name: yugaware-ui
+          emptyDir: {}
+        - name: thirdparty-deps
+          emptyDir: {}
+        - name: yugaware-config
+          configMap:
+            name: {{ .Release.Name }}-yugaware-app-config
+            items:
+              - key: application.docker.conf
+                path: application.docker.conf
+        - name: nginx-config
+          configMap:
+            name: {{ .Release.Name }}-yugaware-nginx-config
+            items:
+              - key: default.conf
+                path: default.conf
+        - name: prometheus-config
+          configMap:
+            name: {{ .Release.Name }}-yugaware-prometheus-config
+            items:
+              - key: prometheus.yml
+                path: prometheus.yml
+
+        {{- if .Values.tls.enabled }}
+        - name: {{  .Release.Name }}-yugaware-tls-cert
+          secret:
+            secretName: {{ .Release.Name }}-yugaware-tls-cert
+        {{- end }}
+      containers:
+        - image: postgres:11.5
+          name: postgres
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_password
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_db
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: yugaware-storage
+              mountPath: /var/lib/postgresql/data
+              subPath: postgres_data
+        - name: prometheus
+          image: prom/prometheus:v2.2.1
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+          - name: prometheus-config
+            mountPath: /etc/prometheus/
+          - name: yugaware-storage
+            mountPath: /prometheus/
+          - name: yugaware-storage
+            mountPath: /opt/swamper_targets/
+            subPath: swamper_targets
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus/
+          ports:
+            - containerPort: 9090
+        - name: thirdparty-deps
+          image: quay.io/yugabyte/thirdparty-deps:latest
+          command: [ "/bin/sh", "-c", "--" ]
+          args:  [ "while true; do sleep 30; done;" ]
+          volumeMounts:
+          - mountPath: /third-party-deps
+            name: thirdparty-deps
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - 'cp'
+                  - '-fr'
+                  - '/opt/third-party'
+                  - '/third-party-deps'
+        - name: yugaware
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          {{- if .Values.securityContext.enabled }}
+          securityContext:
+            runAsUser: {{ .Values.securityContext.runAsUser }}
+          {{- end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{ if .Values.yugaware.resources }}
+          resources:
+{{ toYaml .Values.yugaware.resources | indent 12 }}
+          {{- end }}
+          command: [ "/bin/bash", "-c"]
+          args:
+            - "bin/yugaware -Dconfig.file=/data/application.docker.conf"
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_password
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_db
+            - name: APP_SECRET
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: app_secret
+          ports:
+            - containerPort: 9000
+              name: yugaware
+          volumeMounts:
+          - name: yugaware-config
+            mountPath: /data
+          - name: yugaware-storage
+            mountPath: /opt/yugaware_data/
+            subPath: data
+          - name: yugaware-storage
+            mountPath: /opt/releases/
+            subPath: releases
+          - name: thirdparty-deps
+            mountPath: /opt/third-party
+          - name: yugaware-storage
+            mountPath: /opt/swamper_targets/
+            subPath: swamper_targets
+        - name: nginx
+          image: nginx:1.17.4
+          ports:
+          - containerPort: 80
+          volumeMounts:
+          - mountPath: /etc/nginx/conf.d/
+            name: nginx-config
+          {{- if .Values.tls.enabled }}
+          - name: {{  .Release.Name }}-yugaware-tls-cert
+            mountPath: /opt/certs/
+            readOnly: true
+          {{- end }}
+        - name: dnsmasq
+          image: "janeczku/go-dnsmasq:release-1.0.7"
+          args:
+            - --listen
+            - "{{ eq .Values.ip_version_support "v6_only" | ternary "[::1]:53"  "127.0.0.1:53" }}"
+            - --default-resolver
+            - --append-search-domains
+            - --hostsfile=/etc/hosts
+            - --verbose
