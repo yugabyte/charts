@@ -3,6 +3,8 @@ on:
   repository_dispatch:
     types:
     - update-on-release
+env:
+  CURRENT_STABLE: 2.3
 jobs:
   update-version:
     if: github.event.client_payload.prerelease == 'false'
@@ -30,6 +32,22 @@ jobs:
         fi
         echo "Extracted the version number '${version_number}'."
         echo "::set-output name=yb_version::${version_number}"
+    - name: "Switch to correct branch"
+      run: |
+        rel=${{steps.extract-version.outputs.yb_version}}
+        a=( ${rel//./ } )
+        branch_name="${a[0]}.${a[1]}"
+        if [[ "${branch_name}" == "${CURRENT_STABLE}" ]]; then # 2.3 is the latest "master" release
+          branch_name='master'
+        fi
+        if git branch | grep -qE "^${branch_name}$"; then
+          # branch laready exists so check it out
+          git checkout ${branch_name}
+        else
+          # First time creating charts for this release
+          # This won't start working 'correctly' till 2.4
+          git checkout -b ${branch_name} origin/master
+        fi
     - name: "Check python version and install dependencies"
       run: |
         python3 --version
