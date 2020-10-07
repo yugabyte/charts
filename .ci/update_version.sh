@@ -9,7 +9,6 @@ function version_gt() {
   test "$(echo -e "$1\n$2" | sort -V | head -n 1)" != "$1"
 }
 
-
 if [[ $# -ne 1 ]]; then
   echo "No arguments supplied. Please provide the release version" 1>&2
   echo "Terminating the script execution." 1>&2
@@ -17,8 +16,29 @@ if [[ $# -ne 1 ]]; then
 fi
 
 release_version="$1"
+
+current_stable=2.3
+
+# We have multiple parallel release trains.
+# Each train is described by its <major>.<minor> number
+# We use this release train name as the parent directory for the corresponding helm charts
+a=( ${release_version//./ } )
+yb_release="${a[0]}.${a[1]}"
+
+# If the yb_release is the latest (currently 2.3), use the keyword 'stable' instead
+if [[ "${yb_release}" == "${current_stable}" ]]; then
+  yb_release='stable'
+fi
+
+# If our yb_release dir doesn't exist, copy it from the template at .template
+if [[ ! -d "${yb_release}" ]]; then
+  echo "First release for ${yb_release}!"
+  echo "Creating new release directory"
+  cp -r .template "${yb_release}"
+fi
+
 # appVersion mentioned in Charts.yaml
-current_version="$(grep -r "^appVersion" "stable/yugabyte/Chart.yaml" | awk '{ print $2 }')"
+current_version="$(grep -r "^appVersion" "${yb_release}/yugabyte/Chart.yaml" | awk '{ print $2 }')"
 if ! version_gt "${release_version}" "${current_version%-b*}" ; then
   echo "Release version is either older or equal to the current version: '${release_version}' <= '${current_version%-b*}'" 1>&2
   exit 1
@@ -35,14 +55,14 @@ else
 fi
 
 # Following parameters will be updated in the below-mentioned files:
-#  1. ./stable/yugabyte/Chart.yaml	 -   version, appVersion
-#  2. ./stable/yugabyte/values.yaml	 -   tag
-#  3. ./stable/yugaware/Chart.yaml	 -   version, appVersion
-#  4. ./stable/yugaware/values.yaml	 -   tag
-#  5. ./stable/yugabyte/app-readme.md	 -   *.*.*.*-b*
+#  1. ./${yb_release}/yugabyte/Chart.yaml	 -   version, appVersion
+#  2. ./${yb_release}/yugabyte/values.yaml	 -   tag
+#  3. ./${yb_release}/yugaware/Chart.yaml	 -   version, appVersion
+#  4. ./${yb_release}/yugaware/values.yaml	 -   tag
+#  5. ./${yb_release}/yugabyte/app-readme.md	 -   *.*.*.*-b*
 
-files_to_update_version=("stable/yugabyte/Chart.yaml" "stable/yugaware/Chart.yaml")
-files_to_update_tag=("stable/yugabyte/values.yaml" "stable/yugaware/values.yaml")
+files_to_update_version=("${yb_release}/yugabyte/Chart.yaml" "${yb_release}/yugaware/Chart.yaml")
+files_to_update_tag=("${yb_release}/yugabyte/values.yaml" "${yb_release}/yugaware/values.yaml")
 chart_release_version="$(echo "${release_version}" | grep -o '[0-9]\+.[0-9]\+.[0-9]\+')"
 
 # Update appVersion and version in Chart.yaml
@@ -58,6 +78,6 @@ for file in "${files_to_update_tag[@]}"; do
   sed -i "s/^  tag: .*/  tag: ${docker_image_tag}/g" "${file}"
 done
 
-# Update version number in stable/yugabyte/app-readme.md
-echo "Updating file: 'stable/yugabyte/app-readme.md' with version: '${docker_image_tag}'"
-sed -i "s/[0-9]\+.[0-9]\+.[0-9]\+.[0-9]\+-b[0-9]\+/${docker_image_tag}/g" "stable/yugabyte/app-readme.md"
+# Update version number in ${yb_release}/yugabyte/app-readme.md
+echo "Updating file: '${yb_release}/yugabyte/app-readme.md' with version: '${docker_image_tag}'"
+sed -i "s/[0-9]\+.[0-9]\+.[0-9]\+.[0-9]\+-b[0-9]\+/${docker_image_tag}/g" "${yb_release}/yugabyte/app-readme.md"
