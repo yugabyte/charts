@@ -44,8 +44,7 @@ jobs:
       run: |
         git status
         git diff
-        git add ./stable/yugabyte/Chart.yaml ./stable/yugaware/Chart.yaml \
-                ./stable/yugabyte/values.yaml ./stable/yugaware/values.yaml ./stable/yugabyte/app-readme.md
+        git add .
         git commit -m "Update the version to ${{steps.extract-version.outputs.yb_version}}"
         git push origin ${{ github.ref }}
     - name: "Show git status in case of failure"
