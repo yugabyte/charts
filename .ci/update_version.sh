@@ -10,13 +10,14 @@ function version_gt() {
 }
 
 
-if [[ $# -ne 1 ]]; then
-  echo "No arguments supplied. Please provide the release version" 1>&2
+if [[ $# < 1 || $# > 2 ]]; then
+  echo "Incorrect number of arguments. Usage: ${0%*/} <version> [<docker-tag>]" 1>&2
   echo "Terminating the script execution." 1>&2
   exit 1
 fi
 
 release_version="$1"
+docker_image_tag="$2"
 # appVersion mentioned in Charts.yaml
 current_version="$(grep -r "^appVersion" "stable/yugabyte/Chart.yaml" | awk '{ print $2 }')"
 if ! version_gt "${release_version}" "${current_version%-b*}" ; then
@@ -24,14 +25,16 @@ if ! version_gt "${release_version}" "${current_version%-b*}" ; then
   exit 1
 fi
 
-# Find Docker image tag respective to YugabyteDB release version
-docker_image_tag_regex=[0-9]\+.[0-9]\+.[0-9]\+.[0-9]\+-b[0-9]\+
-docker_image_tag="$(python3 ".ci/find_docker_tag.py" "-r" "${release_version}")"
-if [[ "${docker_image_tag}" =~ ${docker_image_tag_regex} ]]; then
-  echo "Latest Docker image tag for '${release_version}': '${docker_image_tag}'."
-else
-  echo "Failed to parse the Docker image tag: '${docker_image_tag}'" 1>&2
-  exit 1
+if [[ -z "$docker_image_tag" ]]; then
+  # Find Docker image tag respective to YugabyteDB release version
+  docker_image_tag_regex=[0-9]\+.[0-9]\+.[0-9]\+.[0-9]\+-b[0-9]\+
+  docker_image_tag="$(python3 ".ci/find_docker_tag.py" "-r" "${release_version}")"
+  if [[ "${docker_image_tag}" =~ ${docker_image_tag_regex} ]]; then
+    echo "Latest Docker image tag for '${release_version}': '${docker_image_tag}'."
+  else
+    echo "Failed to parse the Docker image tag: '${docker_image_tag}'" 1>&2
+    exit 1
+  fi
 fi
 
 # Following parameters will be updated in the below-mentioned files:
