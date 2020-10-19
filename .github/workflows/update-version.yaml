@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+      fetch-depth: 1
     - name: "Configure git"
       run: |
         git config user.name 'YugaByte CI'
@@ -30,6 +31,24 @@ jobs:
         fi
         echo "Extracted the version number '${version_number}'."
         echo "::set-output name=yb_version::${version_number}"
+    - name: "Switch to correct branch"
+      id: switch-branch
+      run: |
+        # We use the yb_release_train as the branch in this repo
+        # This allows us to map multiple '2.2' release branches to a single set of helm charts
+        branch_name="${{github.events.client_payload.yb_release_train}}"
+        if git branch | grep -qE "^${branch_name}$"; then
+          # branch already exists so check it out
+          git checkout ${branch_name}
+        else
+          # First time creating charts for this release
+          # This won't start working 'correctly' till 2.4
+          # till then, we will need to manually create the new branches and seed them with
+          # sufficiently old version numbers (the update script won't go down versions)
+          git checkout -b ${branch_name} origin/master
+        fi
+        echo "Extracted the branch: '${branch_name}'"
+        echo "::set-output name=yb_branch::${branch_name}"
     - name: "Check python version and install dependencies"
       run: |
         python3 --version
@@ -47,7 +66,7 @@ jobs:
         git add ./stable/yugabyte/Chart.yaml ./stable/yugaware/Chart.yaml \
                 ./stable/yugabyte/values.yaml ./stable/yugaware/values.yaml ./stable/yugabyte/app-readme.md
         git commit -m "Update the version to ${{steps.extract-version.outputs.yb_version}}"
-        git push origin ${{ github.ref }}
+        git push
     - name: "Show git status in case of failure"
       if: steps.update-version.outcome == 'failure'
       run: |
