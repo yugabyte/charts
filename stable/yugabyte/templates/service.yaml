@@ -237,10 +237,19 @@ spec:
           postStart:
             exec:
               command:
-                - "sh"
+                - "bash"
                 - "-c"
                 - >
                   mkdir -p /mnt/disk0/cores;
+                  pattern="$(sysctl kernel.core_pattern --values || true)";
+                  core_dir="${pattern%/*}";
+                  if [ "${core_dir:0:1}" = "/" ]; then
+                    if [ ! -d "${core_dir}" ]; then
+                      # create the parent directory
+                      mkdir -p "${core_dir%/*}" || true;
+                      ln -s "/mnt/disk0/cores" "${core_dir}" || true;
+                    fi;
+                  fi;
                   mkdir -p /mnt/disk0/yb-data/scripts;
                   if [ ! -f /mnt/disk0/yb-data/scripts/log_cleanup.sh ]; then
                     if [ -f /home/yugabyte/bin/log_cleanup.sh ]; then
