@@ -54,8 +54,6 @@ tls:
 gflags:
   master:
     default_memory_limit_to_ram_ratio: 0.85
-  tserver:
-    use_cassandra_authentication: false
 
 PodManagementPolicy: Parallel
 
@@ -185,3 +183,14 @@ affinity: {}
 helm2Legacy: false
 
 ip_version_support: "v4_only" # v4_only, v6_only are the only supported values at the moment
+
+# For more https://docs.yugabyte.com/latest/reference/configuration/yugabyted/#environment-variables
+authCredentials:
+  ysql:
+    user: ""
+    password: ""
+    database: ""
+  ycql:
+    user: ""
+    password: ""
+    keyspace: ""
