@@ -37,7 +37,7 @@ jobs:
       run: |
         # We use the yb_release_train as the branch in this repo
         # This allows us to map multiple '2.2' release branches to a single set of helm charts
-        branch_name="${{github.events.client_payload.yb_release_train}}"
+        branch_name="${{github.event.client_payload.yb_release_train}}"
         if git branch | grep -qE "^${branch_name}$"; then
           # branch already exists so check it out
           git checkout ${branch_name}
