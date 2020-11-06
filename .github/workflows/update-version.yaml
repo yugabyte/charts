@@ -67,7 +67,7 @@ jobs:
         git add ./stable/yugabyte/Chart.yaml ./stable/yugaware/Chart.yaml \
                 ./stable/yugabyte/values.yaml ./stable/yugaware/values.yaml ./stable/yugabyte/app-readme.md
         git commit -m "Update the version to ${{steps.extract-version.outputs.yb_version}}"
-        git push
+        git push origin ${{steps.switch-branch.yb_branch}}
     - name: "Show git status in case of failure"
       if: steps.update-version.outcome == 'failure'
       run: |
