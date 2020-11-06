@@ -4,7 +4,7 @@
 
 image:
   repository: quay.io/yugabyte/yugaware
-  tag: 2.3.2.0-b37
+  tag: 2.3.3.0-b106
   pullPolicy: IfNotPresent
   pullSecret: yugabyte-k8s-pull-secret
 
