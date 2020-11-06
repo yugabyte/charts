@@ -9,7 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-      fetch-depth: 1
+      with:
+        fetch-depth: 1
     - name: "Configure git"
       run: |
         git config user.name 'YugaByte CI'
