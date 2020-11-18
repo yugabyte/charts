@@ -67,6 +67,8 @@ data:
       health.default_email = "{{ .Values.yugaware.health.email }}"
       health.ses_email_username = "{{ .Values.yugaware.health.username }}"
       health.ses_email_password = "{{ .Values.yugaware.health.password }}"
+      taskGC.gc_check_interval = 1 day
+      taskGC.task_retention_duration = 30 days
     }
 
     play.filters {
