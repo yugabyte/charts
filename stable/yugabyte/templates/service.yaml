@@ -329,6 +329,12 @@ spec:
           - "--stderrthreshold=0"
           - "--num_cpus={{ ceil $root.Values.resource.tserver.requests.cpu }}"
           - "--undefok=num_cpus,enable_ysql"
+          {{- if $root.Values.authCredentials.ysql.password }}
+          - "--ysql_enable_auth=true"
+          {{- end }}
+          {{- if or $root.Values.authCredentials.ycql.user $root.Values.authCredentials.ycql.password }}
+          - "--use_cassandra_authentication=true"
+          {{- end }}
           {{- range $flag, $override := $root.Values.gflags.tserver }}
           - "--{{ $flag }}={{ $override }}"
           {{- end }}
