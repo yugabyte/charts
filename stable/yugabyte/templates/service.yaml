@@ -5,13 +5,10 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: yugabyte-tls-client-cert
+  name: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
   namespace: "{{ $root.Release.Namespace }}"
   labels:
-    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
-    release: {{ $root.Release.Name | quote }}
-    chart: "{{ $root.Chart.Name }}"
-    component: "{{ $root.Values.Component }}"
+    {{- include "yugabyte.labels" $root | indent 4 }}
 type: Opaque
 data:
 {{- $rootCAClient := buildCustomCert $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key -}}
@@ -24,26 +21,26 @@ data:
 
 {{- range .Values.Services }}
 {{- $service := . -}}
+{{- $appLabelArgs := dict "label" .label "root" $root -}}
 
 {{- if $root.Values.tls.enabled }}
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ $service.label }}-yugabyte-tls-cert
+  name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" $service.label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) $service.label) }}
   namespace: "{{ $root.Release.Namespace }}"
   labels:
-    app: "{{ $service.label }}"
-    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
-    release: {{ $root.Release.Name | quote }}
-    chart: "{{ $root.Chart.Name }}"
-    component: "{{ $root.Values.Component }}"
+    {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
+    {{- include "yugabyte.labels" $root | indent 4 }}
 type: Opaque
 data:
 {{- $rootCA := buildCustomCert $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key -}}
 {{- $replicas := (eq .name "yb-masters") | ternary $root.Values.replicas.master $root.Values.replicas.tserver -}}
 {{- range $index := until ( int ( $replicas ) ) }}
-{{- $node := printf "%s-%d.%s.%s.svc.%s" $service.label $index $service.name $root.Release.Namespace $root.Values.domainName }}
+{{- $nodeOldStyle := printf "%s-%d.%s.%s.svc.%s" $service.label $index $service.name $root.Release.Namespace $root.Values.domainName }}
+{{- $nodeNewStyle := printf "%s-%s-%d.%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
+{{- $node := $root.Values.oldNamingStyle | ternary $nodeOldStyle $nodeNewStyle }}
 {{- $dns1 := printf "*.*.%s" $root.Release.Namespace }}
 {{- $dns2 := printf "%s.svc.%s" $dns1 $root.Values.domainName }}
 {{- $server := genSignedCert $node ( default nil ) (list $dns1 $dns2 ) 3650 $rootCA }}
@@ -57,13 +54,10 @@ data:
 apiVersion: v1
 kind: Service
 metadata:
-  name: "{{ .name }}"
+  name: {{ $root.Values.oldNamingStyle | ternary .name (printf "%s-%s" (include "yugabyte.fullname" $root) .name) | quote }}
   labels:
-    app: "{{ .label }}"
-    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
-    release: {{ $root.Release.Name | quote }}
-    chart: "{{ $root.Chart.Name }}"
-    component: "{{ $root.Values.Component }}"
+    {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
+    {{- include "yugabyte.labels" $root | indent 4 }}
     service-type: "headless"
 spec:
   clusterIP: None
@@ -73,7 +67,7 @@ spec:
       port: {{ $port }}
     {{- end}}
   selector:
-    app: "{{ .label }}"
+    {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
 
 {{ if $root.Values.enableLoadBalancer }}
 {{- range $endpoint :=  $root.Values.serviceEndpoints }}
@@ -82,15 +76,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: "{{ $endpoint.name }}"
+  name: {{ $root.Values.oldNamingStyle | ternary $endpoint.name (printf "%s-%s" (include "yugabyte.fullname" $root) $endpoint.name) | quote }}
   annotations:
 {{ toYaml $endpoint.annotations | indent 4 }}
   labels:
-    app: "{{ $endpoint.app }}"
-    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
-    release: {{ $root.Release.Name | quote }}
-    chart: "{{ $root.Chart.Name }}"
-    component: "{{ $root.Values.Component }}"
+    {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
+    {{- include "yugabyte.labels" $root | indent 4 }}
 spec:
   {{ if eq $root.Release.Service "Tiller" }}
   clusterIP:
@@ -105,7 +96,7 @@ spec:
       port: {{ $port }}
     {{- end}}
   selector:
-    app: "{{ $endpoint.app }}"
+    {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
   type: {{ $endpoint.type }}
 {{- end}}
 {{- end}}
@@ -115,16 +106,13 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: "{{ .label }}"
+  name: {{ $root.Values.oldNamingStyle | ternary .label (printf "%s-%s" (include "yugabyte.fullname" $root) .label) | quote }}
   namespace: "{{ $root.Release.Namespace }}"
   labels:
-    app: "{{ .label }}"
-    heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
-    release: {{ $root.Release.Name | quote }}
-    chart: "{{ $root.Chart.Name }}"
-    component: "{{ $root.Values.Component }}"
+    {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
+    {{- include "yugabyte.labels" $root | indent 4 }}
 spec:
-  serviceName: "{{ .name }}"
+  serviceName: {{ $root.Values.oldNamingStyle | ternary .name (printf "%s-%s" (include "yugabyte.fullname" $root) .name) | quote }}
   podManagementPolicy: {{ $root.Values.PodManagementPolicy }}
   {{ if eq .name "yb-masters" }}
   replicas: {{ $root.Values.replicas.master }}
@@ -136,14 +124,11 @@ spec:
   volumeClaimTemplates:
     {{- range $index := until (int ($storageInfo.count )) }}
     - metadata:
-        name: datadir{{ $index }}
+        name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
         annotations:
           volume.beta.kubernetes.io/storage-class: {{ $storageInfo.storageClass }}
         labels:
-          heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
-          release: {{ $root.Release.Name | quote }}
-          chart: "{{ $root.Chart.Name }}"
-          component: "{{ $root.Values.Component }}"
+          {{- include "yugabyte.labels" $root | indent 10 }}
       spec:
         accessModes:
           - "ReadWriteOnce"
@@ -165,7 +150,7 @@ spec:
       {{ end }}
   selector:
     matchLabels:
-      app: "{{ .label }}"
+      {{- include "yugabyte.appselector" ($appLabelArgs) | indent 6 }}
   template:
     metadata:
       {{ if $root.Values.networkAnnotation }}
@@ -173,11 +158,8 @@ spec:
 {{ toYaml $root.Values.networkAnnotation | indent 8}}
       {{ end }}
       labels:
-        app: "{{ .label }}"
-        heritage: {{ $root.Values.helm2Legacy | ternary "Tiller" ($root.Release.Service | quote) }}
-        release: {{ $root.Release.Name | quote }}
-        chart: "{{ $root.Chart.Name }}"
-        component: "{{ $root.Values.Component }}"
+        {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
+        {{- include "yugabyte.labels" $root | indent 8 }}
     spec:
       {{- if $root.Values.Image.pullSecretName }}
       imagePullSecrets:
@@ -205,10 +187,21 @@ spec:
             podAffinityTerm:
               labelSelector:
                 matchExpressions:
+                {{- if $root.Values.oldNamingStyle }}
                 - key: app
                   operator: In
                   values:
                   - "{{ .label }}"
+                {{- else }}
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - "{{ .label }}"
+                - key: release
+                  operator: In
+                  values:
+                  - {{ $root.Release.Name | quote }}
+                {{- end }}
               topologyKey: kubernetes.io/hostname
       containers:
       - name: "{{ .label }}"
@@ -263,9 +256,17 @@ spec:
           {{- if $root.Values.istioCompatibility.enabled }}
           - "--rpc_bind_addresses=0.0.0.0:7100"
           {{- else }}
+          {{- if $root.Values.oldNamingStyle }}
           - "--rpc_bind_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}"
+          {{- else }}
+          - "--rpc_bind_addresses={{ printf "$(HOSTNAME).%s-%s.$(NAMESPACE).svc.%s" (include "yugabyte.fullname" $root) .name $root.Values.domainName }}"
           {{- end }}
+          {{- end }}
+          {{- if $root.Values.oldNamingStyle }}
           - "--server_broadcast_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}:7100"
+          {{- else }}
+          - "--server_broadcast_addresses={{ printf "$(HOSTNAME).%s-%s.$(NAMESPACE).svc.%s" (include "yugabyte.fullname" $root) .name $root.Values.domainName }}:7100"
+          {{- end }}
           - "--webserver_interface={{ eq $root.Values.ip_version_support "v6_only" | ternary "[::]" "0.0.0.0" }}"
           {{ if eq $root.Values.ip_version_support "v6_only"}}
           - "--net_address_filter=ipv6_external,ipv6_non_link_local,ipv6_all,ipv4_external,ipv4_all"
@@ -298,16 +299,28 @@ spec:
         {{ else }}
           - "/home/yugabyte/bin/yb-tserver"
           - "--fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }}"
+          {{- if $root.Values.oldNamingStyle }}
           - "--server_broadcast_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}:9100"
+          {{- else }}
+          - "--server_broadcast_addresses={{ printf "$(HOSTNAME).%s-%s.$(NAMESPACE).svc.%s" (include "yugabyte.fullname" $root) .name $root.Values.domainName }}:9100"
+          {{- end }}
           {{- if $root.Values.istioCompatibility.enabled }}
           - "--rpc_bind_addresses=0.0.0.0:9100"
           {{- else }}
+          {{- if $root.Values.oldNamingStyle }}
           - "--rpc_bind_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}"
+          {{- else }}
+          - "--rpc_bind_addresses={{ printf "$(HOSTNAME).%s-%s.$(NAMESPACE).svc.%s" (include "yugabyte.fullname" $root) .name $root.Values.domainName }}"
+          {{- end }}
           {{- end }}
           {{- if $root.Values.istioCompatibility.enabled }}
           - "--cql_proxy_bind_address=0.0.0.0:9042"
           {{- else }}
+          {{- if $root.Values.oldNamingStyle }}
           - "--cql_proxy_bind_address={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}"
+          {{- else }}
+          - "--cql_proxy_bind_address={{ printf "$(HOSTNAME).%s-%s.$(NAMESPACE).svc.%s" (include "yugabyte.fullname" $root) .name $root.Values.domainName }}"
+          {{- end }}
           {{- end }}
           - "--webserver_interface={{ eq $root.Values.ip_version_support "v6_only" | ternary "[::]" "0.0.0.0" }}"
           {{ if eq $root.Values.ip_version_support "v6_only" }}
@@ -354,15 +367,15 @@ spec:
         volumeMounts:
           {{ if not $root.Values.storage.ephemeral }}
           {{- range $index := until (int ($storageInfo.count)) }}
-          - name: datadir{{ $index }}
+          - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
             mountPath: /mnt/disk{{ $index }}
           {{- end }}
           {{- end }}
           {{- if $root.Values.tls.enabled }}
-          - name: {{ .label }}-yugabyte-tls-cert
+          - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
             mountPath: /opt/certs/yugabyte
             readOnly: true
-          - name: yugabyte-tls-client-cert
+          - name: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
             mountPath: /root/.yugabytedb/
             readOnly: true
           {{- end }}
@@ -385,7 +398,7 @@ spec:
               sleep 86400;
             done
         volumeMounts:
-          - name: datadir0
+          - name: {{ $root.Values.oldNamingStyle | ternary "datadir0" (printf "%s0" (include "yugabyte.volume_name" $root)) }}
             mountPath: /home/yugabyte/
             subPath: yb-data
       {{- end }}
@@ -393,19 +406,19 @@ spec:
       volumes:
         {{ if not $root.Values.storage.ephemeral }}
         {{- range $index := until (int ($storageInfo.count)) }}
-        - name: datadir{{ $index }}
+        - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
           hostPath:
             path: /mnt/disks/ssd{{ $index }}
         {{- end }}
         {{- end }}
         {{- if $root.Values.tls.enabled }}
-        - name: {{ .label }}-yugabyte-tls-cert
+        - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
           secret:
-            secretName: {{ .label }}-yugabyte-tls-cert
+            secretName: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
             defaultMode: 256
-        - name: yugabyte-tls-client-cert
+        - name: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
           secret:
-            secretName: yugabyte-tls-client-cert
+            secretName: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
             defaultMode: 256
         {{- end }}
 {{- if eq $root.Values.isMultiAz false }}
@@ -413,11 +426,11 @@ spec:
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ .label }}-pdb
+  name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-pdb" .label) (printf "%s-%s-pdb" (include "yugabyte.fullname" $root) .name) }}
 spec:
   maxUnavailable: {{ template "yugabyte.max_unavailable_for_quorum" $root }}
   selector:
     matchLabels:
-      app: {{ .label }}
+      {{- include "yugabyte.appselector" ($appLabelArgs) | indent 6 }}
 {{- end }}
 {{- end }}
