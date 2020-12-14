@@ -2,11 +2,41 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+
 image:
+  commonRegistry: ""
+  # Setting commonRegistry to say, quay.io overrides the registry settings for all images
+  # including the yugaware image
+
   repository: quay.io/yugabyte/yugaware
   tag: 2.3.2.0-b37
   pullPolicy: IfNotPresent
   pullSecret: yugabyte-k8s-pull-secret
+
+  thirdparty-deps:
+    registry: quay.io
+    tag: latest
+    name: yugabyte/thirdparty-deps
+
+  postgres:
+    registry: ""
+    tag: 11.5
+    name: postgres
+
+  prometheus:
+    registry: ""
+    tag: v2.2.1
+    name: prom/prometheus
+
+  nginx:
+    registry: ""
+    tag: 1.17.4
+    name: nginx
+
+  dnsmasq:
+    registry: ""
+    tag: release-1.0.7
+    name: janeczku/go-dnsmasq
 
 yugaware:
   replicas: 1
