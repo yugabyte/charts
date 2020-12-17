@@ -89,6 +89,19 @@ data:
           name = "Csrf-Token"
         }
       }
+      # CORS config
+      cors {
+        pathPrefixes = ["/"]
+{{- if .Values.tls.enabled }}
+        allowedOrigins = ["https://{{ .Values.tls.hostname }}"]
+{{- else }}
+        allowedOrigins = ["http://{{ .Values.tls.hostname }}"]
+{{- end }}
+        # Server allows cookies/credentials to be sent with cross-origin requests
+        supportsCredentials=true
+        allowedHttpMethods = ["GET", "POST", "PUT", "OPTIONS", "DELETE"]
+        allowedHttpHeaders = ["Accept", "Origin", "Content-Type", "X-Auth-Token", "X-AUTH-YW-API-TOKEN", ${play.filters.csrf.header.name}]
+      }
     }
 
 {{- if .Values.tls.enabled }}
