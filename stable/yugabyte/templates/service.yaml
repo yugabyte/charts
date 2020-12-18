@@ -377,12 +377,9 @@ spec:
           - "/bin/sh"
           - "-c"
           - >
-            mkdir /var/spool/cron;
-            mkdir /var/spool/cron/crontabs;
-            echo "0 * * * * /home/yugabyte/scripts/log_cleanup.sh" | tee -a /var/spool/cron/crontabs/root;
-            crond;
             while true; do
-              sleep 86400;
+              sleep 3600;
+              /home/yugabyte/scripts/log_cleanup.sh;
             done
         volumeMounts:
           - name: datadir0
