@@ -385,6 +385,9 @@ spec:
           - name: datadir0
             mountPath: /home/yugabyte/
             subPath: yb-data
+          - name: datadir0
+            mountPath: /var/yugabyte/cores
+            subPath: cores
       {{- end }}
 
       volumes:
