@@ -232,6 +232,5 @@ spec:
           args:
             - --listen
             - "{{ eq .Values.ip_version_support "v6_only" | ternary "[::1]:5353"  "127.0.0.1:5353" }}"
-            - --append-search-domains
+            - --enable-search
             - --hostsfile=/etc/hosts
-            - --verbose
