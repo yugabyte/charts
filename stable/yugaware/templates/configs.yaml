@@ -27,6 +27,7 @@ metadata:
     heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 data:
   application.docker.conf: |
+    include classpath("application.common.conf")
     play.crypto.secret=${APP_SECRET}
     play.i18n.langs = [ "en" ]
     pidfile.path = "/dev/null"
