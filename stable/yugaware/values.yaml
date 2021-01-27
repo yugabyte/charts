@@ -33,11 +33,6 @@ image:
     tag: 1.17.4-amd64
     name: nginxinc/nginx-unprivileged
 
-  dnsmasq:
-    registry: ""
-    tag: release-1.0.7
-    name: janeczku/go-dnsmasq
-
 yugaware:
   replicas: 1
   storage: 100Gi
