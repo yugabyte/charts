@@ -30,3 +30,15 @@ Create chart name and version as used by the chart label.
 {{- define "yugaware.chart" -}}
 {{- printf "%s" .Chart.Name | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{/*
+Validate Nginx SSL protocols
+*/}}
+{{- define "validate_nginx_ssl_protocols" -}}
+  {{- $sslProtocolsRegex := `^((TLSv(1|1\.[1-3]))(?: ){0,1}){1,4}$` -}}
+  {{- if not (regexMatch $sslProtocolsRegex .Values.tls.sslProtocols) -}}
+    {{- fail (cat "Please specify valid tls.sslProtocols, must match regex:" $sslProtocolsRegex) -}}
+  {{- else -}}
+    {{- .Values.tls.sslProtocols -}}
+  {{- end -}}
+{{- end -}}
