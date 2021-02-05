@@ -123,6 +123,9 @@ data:
       listen       443 ssl;
       ssl_certificate /opt/certs/server.crt;
       ssl_certificate_key /opt/certs/server.key;
+{{- if .Values.tls.sslProtocols }}
+      ssl_protocols {{ include "validate_nginx_ssl_protocols" . }};
+{{- end }}
       server_name  {{ .Values.tls.hostname }};
 {{- else }}
       listen       {{ eq .Values.ip_version_support "v6_only" | ternary "[::]:80" "80" }};
