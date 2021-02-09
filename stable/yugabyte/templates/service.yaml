@@ -369,7 +369,8 @@ spec:
 
       {{ if not $root.Values.storage.ephemeral }}
       - name: yb-cleanup
-        image: busybox:1.31
+        image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
+        imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
         env:
         - name: USER
           value: "yugabyte"
