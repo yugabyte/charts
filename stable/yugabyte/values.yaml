@@ -196,3 +196,5 @@ authCredentials:
     user: ""
     password: ""
     keyspace: ""
+
+oldNamingStyle: true
