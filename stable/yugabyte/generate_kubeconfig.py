@@ -7,6 +7,7 @@
 
 import argparse
 from subprocess import check_output
+from sys import exit
 import json
 import base64
 import tempfile
@@ -46,8 +47,19 @@ endpoint = run_command(['config', 'view', '-o',
                        args['namespace'], as_json=False)
 service_account_info = run_command(['get', 'sa', args['service_account']],
                                    args['namespace'])
-sa_secret = service_account_info['secrets'][0]['name']
-secret_data = run_command(['get', 'secret', sa_secret], args['namespace'])
+
+# some ServiceAccounts have multiple secrets, and not all them have a
+# ca.crt and a token.
+sa_secrets = [secret['name'] for secret in service_account_info['secrets']]
+secret_data = None
+for secret in sa_secrets:
+    secret_json = run_command(['get', 'secret', secret], args['namespace'])
+    if 'ca.crt' not in secret_json['data'] and 'token' not in secret_json['data']:
+        continue
+    secret_data = secret_json
+if secret_data is None:
+    exit("No usable secret found for '{}'.".format(args['service_account']))
+
 context_name = '{}-{}'.format(args['service_account'], cluster_name)
 kube_config = '/tmp/{}.conf'.format(args['service_account'])
 
