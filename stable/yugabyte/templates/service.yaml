@@ -298,7 +298,11 @@ spec:
           {{- end }}
         {{ else }}
           - "/home/yugabyte/bin/yb-tserver"
+          {{ if not $root.Values.storage.ephemeral }}
           - "--fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }}"
+          {{ else }}
+          - "--fs_data_dirs=/var/yugabyte"
+          {{- end }}
           {{- if $root.Values.oldNamingStyle }}
           - "--server_broadcast_addresses={{ printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .name $root.Values.domainName }}:9100"
           {{- else }}
