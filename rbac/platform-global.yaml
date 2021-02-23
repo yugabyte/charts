@@ -1,0 +1,133 @@
+# yugabyte-helm-operations role has set of permissions required to
+# install, upgrade, delete the yugabyte chart.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: yugabyte-helm-operations
+rules:
+- apiGroups:
+  - "policy"
+  resources:
+  - "poddisruptionbudgets"
+  verbs:
+  - "get"
+  - "create"
+  - "delete"
+  - "patch"
+- apiGroups:
+  - ""
+  resources:
+  - "services"
+  verbs:
+  - "get"
+  - "delete"
+  - "create"
+  - "patch"
+- apiGroups:
+  - "apps"
+  resources:
+  - "statefulsets"
+  verbs:
+  - "get"
+  - "delete"
+  - "create"
+  - "patch"
+- apiGroups:
+  - ""
+  resources:
+  - "secrets"
+  verbs:
+  - "create"
+  - "list"                      # needed by Helm
+  - "get"
+  - "delete"
+  - "update"                    # needed by Helm
+  - "patch"
+## We don't use ServiceMonitor in platform
+# - apiGroups:
+#   - "monitoring.coreos.com"
+#   resources:
+#   - "servicemonitors"
+#   verbs:
+#   - "get"
+#   - "delete"
+#   - "create"
+#   - "patch"
+---
+
+# yugabyte-management role has set of permissions required by
+# platform software to manage YugabyteDB universes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: yugabyte-management
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - "namespaces"
+  verbs:
+  - "delete"
+  - "create"
+- apiGroups:
+  - ""
+  resources:
+  - "pods"
+  verbs:
+  - "get"                       # required for single pod
+  - "list"                      # required for get pods
+- apiGroups:
+  - ""
+  resources:
+  - "services"
+  verbs:
+  - "get"
+  - "list"                      # required for label selectors
+- apiGroups:
+  - ""
+  resources:
+  - "persistentvolumeclaims"
+  verbs:
+  - "list"                      # required for label selectors
+  - "delete"
+- apiGroups:
+  - ""
+  resources:
+  - "pods/exec"
+  verbs:
+  - "create"                      # required for exec and cp
+- apiGroups:
+  - "apps"
+  resources:
+  - "statefulsets/scale"
+  verbs:
+  - "patch"                     # required for scale command
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: yugabyte-helm-operations
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: yugabyte-helm-operations
+subjects:
+  - kind: ServiceAccount
+    name: yugabyte-platform-universe-management
+    namespace: <SA_NAMESPACE>
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: yugabyte-management
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: yugabyte-management
+subjects:
+  - kind: ServiceAccount
+    name: yugabyte-platform-universe-management
+    namespace: <SA_NAMESPACE>
+---
