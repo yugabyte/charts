@@ -234,6 +234,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        {{- if and $root.Values.tls.enabled $root.Values.tls.clientToServer (ne .name "yb-masters") }}
+        - name: SSL_CERTFILE
+          value: /root/.yugabytedb/root.crt
+        {{- end }}
         resources:
         {{ if eq .name "yb-masters" }}
 {{ toYaml $root.Values.resource.master | indent 10 }}
