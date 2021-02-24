@@ -293,7 +293,7 @@ spec:
           {{- end}}
           {{ if $root.Values.tls.enabled }}
           - "--certs_dir=/opt/certs/yugabyte"
-          - "--use_node_to_node_encryption=true"
+          - "--use_node_to_node_encryption={{ $root.Values.tls.nodeToNode }}"
           - "--allow_insecure_connections={{ $root.Values.tls.insecure }}"
           {{- end }}
         {{ else }}
@@ -357,9 +357,9 @@ spec:
           {{- end }}
           {{ if $root.Values.tls.enabled }}
           - "--certs_dir=/opt/certs/yugabyte"
-          - "--use_node_to_node_encryption=true"
+          - "--use_node_to_node_encryption={{ $root.Values.tls.nodeToNode }}"
           - "--allow_insecure_connections={{ $root.Values.tls.insecure }}"
-          - "--use_client_to_server_encryption=true"
+          - "--use_client_to_server_encryption={{ $root.Values.tls.clientToServer }}"
           - "--certs_for_client_dir=/opt/certs/yugabyte"
           {{- end }}
         {{ end }}

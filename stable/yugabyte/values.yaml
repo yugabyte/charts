@@ -45,6 +45,8 @@ partition:
 tls:
   # Set to true to enable the TLS.
   enabled: false
+  nodeToNode: true
+  clientToServer: true
   # Set to false to disallow any service with unencrypted communication from joining this cluster
   insecure: false
   rootCA:
