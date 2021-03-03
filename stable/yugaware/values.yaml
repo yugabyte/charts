@@ -74,9 +74,10 @@ helm2Legacy: false
 ip_version_support: "v4_only" # v4_only, v6_only are the only supported values at the moment
 
 rbac:
-  ## Does not create (Cluster) Role and Binding if false. When set to
-  ## false, some of the graphs from Container section of the Metrics
-  ## UI don't work.
+  ## Set this to false if you don't have enough permissions to create
+  ## ClusterRole and Binding, for example an OpenShift cluster. When
+  ## set to false, some of the graphs from Container section of the
+  ## Metrics UI don't work.
   create: true
 
 ## In order to deploy on OpenShift Container Platform, set this to
