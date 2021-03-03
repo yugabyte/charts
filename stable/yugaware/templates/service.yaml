@@ -73,8 +73,6 @@ spec:
             claimName: {{ .Release.Name }}-yugaware-storage
         - name: yugaware-ui
           emptyDir: {}
-        - name: thirdparty-deps
-          emptyDir: {}
         - name: yugaware-config
           configMap:
             name: {{ .Release.Name }}-yugaware-app-config
@@ -132,33 +130,21 @@ spec:
           securityContext:
             runAsUser: 0
           volumeMounts:
-          - name: prometheus-config
-            mountPath: /etc/prometheus/
+          - name: yugaware-storage
+            mountPath: /prometheus_configs
+            subPath: prometheus.yml
           - name: yugaware-storage
             mountPath: /prometheus/
           - name: yugaware-storage
-            mountPath: /opt/swamper_targets/
+            mountPath: /opt/yugabyte/prometheus/targets
             subPath: swamper_targets
           args:
-            - --config.file=/etc/prometheus/prometheus.yml
+            - --config.file=/prometheus_configs/prometheus.yml
             - --storage.tsdb.path=/prometheus/
+            - --web.enable-admin-api
+            - --web.enable-lifecycle
           ports:
             - containerPort: 9090
-        - name: thirdparty-deps
-          image: quay.io/yugabyte/thirdparty-deps:latest
-          command: [ "/bin/sh", "-c", "--" ]
-          args:  [ "while true; do sleep 30; done;" ]
-          volumeMounts:
-          - mountPath: /third-party-deps
-            name: thirdparty-deps
-          lifecycle:
-            postStart:
-              exec:
-                command:
-                  - 'cp'
-                  - '-fr'
-                  - '/opt/third-party'
-                  - '/third-party-deps'
         - name: yugaware
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
           {{- if .Values.securityContext.enabled }}
@@ -172,7 +158,7 @@ spec:
           {{- end }}
           command: [ "/bin/bash", "-c"]
           args:
-            - "bin/yugaware -Dconfig.file=/data/application.docker.conf"
+            - "cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && bin/yugaware -Dconfig.file=/data/application.docker.conf"
           env:
             - name: POSTGRES_USER
               valueFrom:
@@ -201,16 +187,27 @@ spec:
           - name: yugaware-config
             mountPath: /data
           - name: yugaware-storage
+            mountPath: /opt/yugabyte/yugaware/data/
+            subPath: data
+          # old path for backward compatibility
+          - name: yugaware-storage
             mountPath: /opt/yugaware_data/
             subPath: data
           - name: yugaware-storage
+            mountPath: /opt/yugabyte/releases/
+            subPath: releases
+          # old path for backward compatibility
+          - name: yugaware-storage
             mountPath: /opt/releases/
             subPath: releases
-          - name: thirdparty-deps
-            mountPath: /opt/third-party
           - name: yugaware-storage
-            mountPath: /opt/swamper_targets/
+            mountPath: /opt/yugabyte/prometheus/targets
             subPath: swamper_targets
+          - name: prometheus-config
+            mountPath: /default_prometheus_config
+          - name: yugaware-storage
+            mountPath: /prometheus_configs
+            subPath: prometheus.yml
         - name: nginx
           image: nginx:1.17.4
           ports:
