@@ -134,8 +134,9 @@ spec:
             runAsUser: 0
           {{- end }}
           volumeMounts:
-          - name: prometheus-config
+          - name: yugaware-storage
             mountPath: /prometheus_configs
+            subPath: prometheus.yml
           - name: yugaware-storage
             mountPath: /prometheus/
           - name: yugaware-storage
@@ -161,7 +162,7 @@ spec:
           {{- end }}
           command: [ "/bin/bash", "-c"]
           args:
-            - "ln -s /opt/yugabyte/yugaware/data /opt/yugaware_data && ln -s /opt/yugabyte/releases /opt/releases && bin/yugaware -Dconfig.file=/data/application.docker.conf"
+            - "cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && ln -s /opt/yugabyte/yugaware/data /opt/yugaware_data && ln -s /opt/yugabyte/releases /opt/releases && bin/yugaware -Dconfig.file=/data/application.docker.conf"
           env:
             - name: POSTGRES_USER
               valueFrom:
@@ -199,7 +200,10 @@ spec:
             mountPath: /opt/yugabyte/prometheus/targets
             subPath: swamper_targets
           - name: prometheus-config
+            mountPath: /default_prometheus_config
+          - name: yugaware-storage
             mountPath: /prometheus_configs
+            subPath: prometheus.yml
         - name: nginx
           image: {{ include "full_image" (dict "containerName" "nginx" "root" .) }}
           ports:
