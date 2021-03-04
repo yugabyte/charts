@@ -162,7 +162,7 @@ spec:
           {{- end }}
           command: [ "/bin/bash", "-c"]
           args:
-            - "cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && ln -s /opt/yugabyte/yugaware/data /opt/yugaware_data && ln -s /opt/yugabyte/releases /opt/releases && bin/yugaware -Dconfig.file=/data/application.docker.conf"
+            - "cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && bin/yugaware -Dconfig.file=/data/application.docker.conf"
           env:
             - name: POSTGRES_USER
               valueFrom:
@@ -193,8 +193,16 @@ spec:
           - name: yugaware-storage
             mountPath: /opt/yugabyte/yugaware/data/
             subPath: data
+          # old path for backward compatibility
+          - name: yugaware-storage
+            mountPath: /opt/yugaware_data/
+            subPath: data
           - name: yugaware-storage
             mountPath: /opt/yugabyte/releases/
+            subPath: releases
+          # old path for backward compatibility
+          - name: yugaware-storage
+            mountPath: /opt/releases/
             subPath: releases
           - name: yugaware-storage
             mountPath: /opt/yugabyte/prometheus/targets
