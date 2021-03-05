@@ -175,6 +175,50 @@ data:
         scrape_interval:     10s
         evaluation_interval: 10s
     scrape_configs:
+      {{- if .Values.ocpCompatibility.enabled }}
+      - job_name: "ocp-prometheus-federated"
+        scheme: https
+
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+        honor_labels: true
+        metrics_path: "/federate"
+
+        params:
+          'match[]':
+            # kubelet metrics
+            - 'kubelet_volume_stats_used_bytes{persistentvolumeclaim=~"(.*)-yb-(.*)"}'
+            - 'kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"(.*)-yb-(.*)"}'
+            # kubelet cadvisor metrics
+            - 'container_cpu_usage_seconds_total{pod=~"(.*)yb-(.*)"}'
+            - 'container_memory_working_set_bytes{pod=~"(.*)yb-(.*)"}'
+            # kube-state-metrics
+            - 'kube_pod_container_resource_requests_cpu_cores{pod=~"(.*)yb-(.*)"}'
+
+        static_configs:
+          - targets:
+            - "prometheus-k8s.openshift-monitoring.svc:9091"
+
+        metric_relabel_configs:
+          # Save the name of the metric so we can group_by since we cannot by __name__ directly...
+          - source_labels: ["__name__"]
+            regex: "(.*)"
+            target_label: "saved_name"
+            replacement: "$1"
+          - source_labels: ["pod"]
+            regex: "(.*)"
+            target_label: "pod_name"
+            replacement: "$1"
+          - source_labels: ["container"]
+            regex: "(.*)"
+            target_label: "container_name"
+            replacement: "$1"
+
+      {{- else }}
+
       - job_name: 'kubernetes-nodes'
 
         scheme: https
@@ -201,58 +245,32 @@ data:
             regex: "(.*)"
             target_label: "saved_name"
             replacement: "$1"
-
-
-      - job_name: 'kubernetes-pods'
-
-        kubernetes_sd_configs:
-        - role: pod
-
-        relabel_configs:
-        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
-          action: keep
-          regex: true
-        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
-          action: replace
-          target_label: __metrics_path__
-          regex: (.+)
-        - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
-          action: replace
-          regex: ([^:]+)(?::\d+)?;(\d+)
-          replacement: $1:$2
-          target_label: __address__
-        - action: labelmap
-          regex: __meta_kubernetes_pod_label_(.+)
-        - source_labels: [__meta_kubernetes_namespace]
-          action: replace
-          target_label: kubernetes_namespace
-        - source_labels: [__meta_kubernetes_pod_name]
-          action: replace
-          target_label: kubernetes_pod_name
-        metric_relabel_configs:
-          # Save the name of the metric so we can group_by since we cannot by __name__ directly...
-          - source_labels: ["__name__"]
+          - source_labels: ["pod"]
             regex: "(.*)"
-            target_label: "saved_name"
+            target_label: "pod_name"
+            replacement: "$1"
+          - source_labels: ["container"]
+            regex: "(.*)"
+            target_label: "container_name"
             replacement: "$1"
 
       - job_name: 'kube-state-metrics'
         static_configs:
         - targets: ['kube-state-metrics.kube-system.svc.{{.Values.domainName}}:8080']
         metric_relabel_configs:
-        # Save the name of the metric so we can group_by since we cannot by __name__ directly...
-        - source_labels: ["__name__"]
-          regex: "(.*)"
-          target_label: "saved_name"
-          replacement: "$1"
-        - source_labels: [pod]
-          regex: "(.*)"
-          target_label: "pod_name"
-          replacement: "$1"
-        - source_labels: [pod]
-          regex: "(yb-[^-]*)-(.*)"
-          target_label: "container_name"
-          replacement: "$1"
+          # Save the name of the metric so we can group_by since we cannot by __name__ directly...
+          - source_labels: ["__name__"]
+            regex: "(.*)"
+            target_label: "saved_name"
+            replacement: "$1"
+          - source_labels: ["pod"]
+            regex: "(.*)"
+            target_label: "pod_name"
+            replacement: "$1"
+          - source_labels: ["container"]
+            regex: "(.*)"
+            target_label: "container_name"
+            replacement: "$1"
 
       - job_name: 'kubernetes-cadvisor'
 
@@ -280,6 +298,16 @@ data:
             regex: "(.*)"
             target_label: "saved_name"
             replacement: "$1"
+          - source_labels: ["pod"]
+            regex: "(.*)"
+            target_label: "pod_name"
+            replacement: "$1"
+          - source_labels: ["container"]
+            regex: "(.*)"
+            target_label: "container_name"
+            replacement: "$1"
+
+      {{- end }}
 
       - job_name: "node"
         file_sd_configs:
