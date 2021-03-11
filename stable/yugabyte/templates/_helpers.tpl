@@ -80,6 +80,23 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
+Generate a preflight check script invocation.
+*/}}
+{{- define "yugabyte.preflight_check" -}}
+{{- if not .Values.preflight.skipAll -}}
+if [ -f /home/yugabyte/tools/k8s_preflight.py ]; then
+  PYTHONUNBUFFERED="true" /home/yugabyte/tools/k8s_preflight.py \
+    --addr="{{ .Preflight.Addr }}" \
+{{- if not .Values.preflight.skipBind }}
+    --port="{{ .Preflight.Port }}"
+{{- else }}
+    --skip_bind
+{{- end }}
+fi && \
+{{- end -}}
+{{- end -}}
+
+{{/*
 Get YugaByte fs data directories.
 */}}
 {{- define "yugabyte.fs_data_dirs" -}}

@@ -254,6 +254,21 @@ spec:
           - "/bin/bash"
           - "-c"
           - |
+          {{- $rpcAddr := include "yugabyte.rpc_bind_address" $serviceValues -}}
+          {{- $rpcPort := index $service.ports "tcp-rpc-port" -}}
+          {{- $rpcDict := dict "Addr" $rpcAddr "Port" $rpcPort -}}
+          {{- $rpcPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $rpcDict) -}}
+          {{- if $rpcPreflight -}}{{ $rpcPreflight | nindent 12 }}{{ end -}}
+          {{- $broadcastAddr := include "yugabyte.server_broadcast_address" $serviceValues -}}
+          {{- $broadcastPort := index $service.ports "tcp-rpc-port" -}}
+          {{- $broadcastDict := dict "Addr" $broadcastAddr "Port" $broadcastPort -}}
+          {{- $broadcastPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $broadcastDict) -}}
+          {{- if $broadcastPreflight -}}{{ $broadcastPreflight | nindent 12 }}{{ end -}}
+          {{- $webserverAddr := include "yugabyte.webserver_interface" $serviceValues -}}
+          {{- $webserverPort := index $service.ports "http-ui" -}}
+          {{- $webserverDict := dict "Addr" $webserverAddr "Port" $webserverPort -}}
+          {{- $webserverPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $webserverDict) -}}
+          {{- if $webserverPreflight -}}{{ $webserverPreflight | nindent 12 }}{{ end -}}
           {{- if eq .name "yb-masters" }}
             /home/yugabyte/bin/yb-master \
             {{- if not $root.Values.storage.ephemeral }}
@@ -289,10 +304,22 @@ spec:
               --use_node_to_node_encryption={{ $root.Values.tls.nodeToNode }} \
               --allow_insecure_connections={{ $root.Values.tls.insecure }} \
             {{- end }}
-              --rpc_bind_addresses={{ include "yugabyte.rpc_bind_address" $serviceValues }} \
-              --server_broadcast_addresses={{ include "yugabyte.server_broadcast_address" $serviceValues }} \
-              --webserver_interface={{ include "yugabyte.webserver_interface" $serviceValues }}
+              --rpc_bind_addresses={{ $rpcAddr }} \
+              --server_broadcast_addresses={{ $broadcastAddr }} \
+              --webserver_interface={{ $webserverAddr }}
           {{- else }}
+            {{- $cqlAddr := include "yugabyte.cql_proxy_bind_address" $serviceValues -}}
+            {{- $cqlPort := index $service.ports "tcp-yql-port" -}}
+            {{- $cqlDict := dict "Addr" $cqlAddr "Port" $cqlPort -}}
+            {{- $cqlPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $cqlDict) -}}
+            {{- if $cqlPreflight -}}{{ $cqlPreflight | nindent 12 }}{{ end -}}
+            {{- $ysqlAddr := include "yugabyte.pgsql_proxy_bind_address" $serviceValues -}}
+            {{- $ysqlPort := index $service.ports "tcp-ysql-port" -}}
+            {{- if not $root.Values.disableYsql -}}
+              {{- $ysqlDict := dict "Addr" $ysqlAddr "Port" $ysqlPort -}}
+              {{- $ysqlPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $ysqlDict) -}}
+              {{- if $ysqlPreflight -}}{{ $ysqlPreflight | nindent 12 }}{{ end -}}
+            {{- end }}
             /home/yugabyte/bin/yb-tserver \
             {{- if not $root.Values.storage.ephemeral }}
               --fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }} \
@@ -328,16 +355,16 @@ spec:
               --use_client_to_server_encryption={{ $root.Values.tls.clientToServer }} \
               --certs_for_client_dir=/opt/certs/yugabyte \
             {{- end }}
-              --rpc_bind_addresses={{ include "yugabyte.rpc_bind_address" $serviceValues }} \
-              --server_broadcast_addresses={{ include "yugabyte.server_broadcast_address" $serviceValues }} \
-              --webserver_interface={{ include "yugabyte.webserver_interface" $serviceValues }} \
+              --rpc_bind_addresses={{ $rpcAddr }} \
+              --server_broadcast_addresses={{ $broadcastAddr }} \
+              --webserver_interface={{ $webserverAddr }} \
             {{- if not $root.Values.disableYsql }}
               --enable_ysql=true \
-              --pgsql_proxy_bind_address={{ include "yugabyte.pgsql_proxy_bind_address" $serviceValues }} \
+              --pgsql_proxy_bind_address={{ $ysqlAddr }} \
             {{- else }}
               --enable_ysql=false \
             {{- end }}
-              --cql_proxy_bind_address={{ include "yugabyte.cql_proxy_bind_address" $serviceValues }}
+              --cql_proxy_bind_address={{ $cqlAddr }}
           {{- end }}
         ports:
           {{- range $label, $port := .ports }}
