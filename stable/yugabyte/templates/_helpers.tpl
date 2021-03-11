@@ -21,7 +21,7 @@ The longest name that gets created of 20 characters, so truncation should be 63-
 {{- end -}}
 
 {{/*
-Generate common labels
+Generate common labels.
 */}}
 {{- define "yugabyte.labels" }}
 heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
@@ -34,7 +34,7 @@ component: {{ .Values.Component | quote }}
 {{- end }}
 
 {{/*
-Generate app label
+Generate app label.
 */}}
 {{- define "yugabyte.applabel" }}
 {{- if .root.Values.oldNamingStyle }}
@@ -45,7 +45,7 @@ app.kubernetes.io/name: "{{ .label }}"
 {{- end }}
 
 {{/*
-Generate app selector
+Generate app selector.
 */}}
 {{- define "yugabyte.appselector" }}
 {{- if .root.Values.oldNamingStyle }}
@@ -57,7 +57,7 @@ release: {{ .root.Release.Name | quote }}
 {{- end }}
 
 {{/*
-Create Volume name
+Create Volume name.
 */}}
 {{- define "yugabyte.volume_name" -}}
   {{- printf "%s-datadir" (include "yugabyte.fullname" .) -}}
@@ -66,7 +66,7 @@ Create Volume name
 {{/*
 Derive the memory hard limit for each POD based on the memory limit.
 Since the memory is represented in <x>GBi, we use this function to convert that into bytes.
-Multiplied by 870 since 0.85 * 1024 ~ 870 (floating calculations not supported)
+Multiplied by 870 since 0.85 * 1024 ~ 870 (floating calculations not supported).
 */}}
 {{- define "yugabyte.memory_hard_limit" -}}
   {{- printf "%d" .limits.memory | regexFind "\\d+" | mul 1024 | mul 1024 | mul 870 -}}
@@ -80,12 +80,66 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
-Get YugaByte fs data directories
+Get YugaByte fs data directories.
 */}}
 {{- define "yugabyte.fs_data_dirs" -}}
   {{- range $index := until (int (.count)) -}}
     {{- if ne $index 0 }},{{ end }}/mnt/disk{{ $index -}}
   {{- end -}}
+{{- end -}}
+
+{{/*
+Generate server FQDN.
+*/}}
+{{- define "yugabyte.server_fqdn" -}}
+  {{- if .Values.oldNamingStyle -}}
+    {{- printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .Service.name .Values.domainName -}}
+  {{- else -}}
+    {{- printf "$(HOSTNAME).%s-%s.$(NAMESPACE).svc.%s" (include "yugabyte.fullname" .) .Service.name .Values.domainName -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Generate server broadcast address.
+*/}}
+{{- define "yugabyte.server_broadcast_address" -}}
+  {{- include "yugabyte.server_fqdn" . }}:{{ index .Service.ports "tcp-rpc-port" -}}
+{{- end -}}
+
+{{/*
+Generate server RPC bind address.
+*/}}
+{{- define "yugabyte.rpc_bind_address" -}}
+  {{- if .Values.istioCompatibility.enabled -}}
+    0.0.0.0:{{ index .Service.ports "tcp-rpc-port" -}}
+  {{- else -}}
+    {{- include "yugabyte.server_fqdn" . -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Generate server web interface.
+*/}}
+{{- define "yugabyte.webserver_interface" -}}
+  {{- eq .Values.ip_version_support "v6_only" | ternary "[::]" "0.0.0.0" -}}
+{{- end -}}
+
+{{/*
+Generate server CQL proxy bind address.
+*/}}
+{{- define "yugabyte.cql_proxy_bind_address" -}}
+  {{- if .Values.istioCompatibility.enabled -}}
+    0.0.0.0:{{ index .Service.ports "tcp-yql-port" -}}
+  {{- else -}}
+    {{- include "yugabyte.server_fqdn" . -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Generate server PGSQL proxy bind address.
+*/}}
+{{- define "yugabyte.pgsql_proxy_bind_address" -}}
+  {{- eq .Values.ip_version_support "v6_only" | ternary "[::]" "0.0.0.0" -}}:{{ index .Service.ports "tcp-ysql-port" -}}
 {{- end -}}
 
 {{/*
