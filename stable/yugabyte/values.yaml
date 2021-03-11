@@ -200,3 +200,9 @@ authCredentials:
     keyspace: ""
 
 oldNamingStyle: true
+
+preflight:
+  # Set to true to skip DNS address resolution and port bind checks
+  skipAll: false
+  # Set to true to skip port bind checks
+  skipBind: false
