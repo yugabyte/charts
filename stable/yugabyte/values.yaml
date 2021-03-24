@@ -109,6 +109,16 @@ Services:
 istioCompatibility:
   enabled: false
 
+## Settings required when using multicluster environment.
+multicluster:
+  ## Creates a ClusterIP service for each yb-master and yb-tserver
+  ## pod.
+  createServicePerPod: false
+  ## creates a ClusterIP service whos name does not have release name
+  ## in it. A common service across different clusters for automatic
+  ## failover. Useful when using new naming style.
+  createCommonTserverService: false
+
 serviceMonitor:
   ## If true, two ServiceMonitor CRs are created. One for yb-master
   ## and one for yb-tserver

@@ -109,7 +109,9 @@ Get YugaByte fs data directories.
 Generate server FQDN.
 */}}
 {{- define "yugabyte.server_fqdn" -}}
-  {{- if .Values.oldNamingStyle -}}
+  {{- if (and .Values.istioCompatibility.enabled .Values.multicluster.createServicePerPod) -}}
+    {{- printf "$(HOSTNAME).$(NAMESPACE).svc.%s" .Values.domainName -}}
+  {{- else if .Values.oldNamingStyle -}}
     {{- printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .Service.name .Values.domainName -}}
   {{- else -}}
     {{- printf "$(HOSTNAME).%s-%s.$(NAMESPACE).svc.%s" (include "yugabyte.fullname" .) .Service.name .Values.domainName -}}
