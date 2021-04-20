@@ -156,7 +156,7 @@ spec:
             runAsUser: {{ .Values.securityContext.runAsUser }}
           {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{ if .Values.yugaware.resources }}
+          {{- if .Values.yugaware.resources }}
           resources:
 {{ toYaml .Values.yugaware.resources | indent 12 }}
           {{- end }}
