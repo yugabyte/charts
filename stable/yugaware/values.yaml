@@ -51,9 +51,6 @@ yugaware:
     requests:
       cpu: 2
       memory: 4Gi
-    limits:
-      cpu: 2
-      memory: 4Gi
 
 tls:
   enabled: false
