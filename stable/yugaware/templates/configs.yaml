@@ -61,6 +61,7 @@ data:
       docker.network = bridge
       seedData = false
       swamper.targetPath = /opt/yugabyte/prometheus/targets
+      security.enable_auth_for_proxy_metrics = {{ .Values.yugaware.enableProxyMetricsAuth }}
       multiTenant = {{ .Values.yugaware.multiTenant }}
       releases.path = "/opt/yugabyte/releases"
       docker.release = "/opt/yugabyte/release"
