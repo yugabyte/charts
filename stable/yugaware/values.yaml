@@ -54,6 +54,7 @@ yugaware:
     limits:
       cpu: 2
       memory: 4Gi
+  enableProxyMetricsAuth: true
 
 tls:
   enabled: false
