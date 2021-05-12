@@ -59,6 +59,10 @@ spec:
       app: {{ .Release.Name }}-yugaware
   template:
     metadata:
+{{- if .Values.yugaware.pod.annotations }}
+      annotations:
+{{ toYaml .Values.yugaware.pod.annotations | indent 8 }}
+{{- end }}
       labels:
         app: {{ .Release.Name }}-yugaware
     spec:

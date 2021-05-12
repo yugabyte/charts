@@ -39,9 +39,12 @@ yugaware:
   multiTenant: false
   serviceAccount: yugaware
   service:
+    annotations: {}
     enabled: true
     ip: ""
     type: "LoadBalancer"
+  pod:
+    annotations: {}
   health:
     username: ""
     password: ""
