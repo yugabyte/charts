@@ -74,6 +74,8 @@ data:
       health.default_email = "{{ .Values.yugaware.health.email }}"
       health.ses_email_username = "{{ .Values.yugaware.health.username }}"
       health.ses_email_password = "{{ .Values.yugaware.health.password }}"
+      kubernetes.storageClass = "{{ .Values.yugaware.storageClass }}"
+      kubernetes.pullSecretName = "{{ .Values.image.pullSecret }}"
     }
 
     play.filters {
