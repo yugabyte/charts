@@ -1,0 +1,17 @@
+# Copyright (c) YugaByte, Inc.
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-yugaware-global-config
+  labels:
+    app: {{ template "yugaware.name" . }}
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+data:
+  postgres_user: "postgres"
+  postgres_password: "{{ include "getOrGeneratePassword" (dict "Namespace" .Release.Namespace "Kind" "ConfigMap" "Name" (printf "%s%s" .Release.Name "-yugaware-global-config") "Key" "postgres_password") }}"
+  postgres_db: "yugaware"
+  app_secret: "{{ b64enc (randAlphaNum 64) }}"
