@@ -148,6 +148,9 @@ spec:
           - name: yugaware-storage
             mountPath: /opt/yugabyte/prometheus/targets
             subPath: swamper_targets
+          - name: yugaware-storage
+            mountPath: /opt/yugabyte/prometheus/rules
+            subPath: swamper_rules
           args:
             - --config.file=/prometheus_configs/prometheus.yml
             - --storage.tsdb.path=/prometheus/
@@ -213,6 +216,9 @@ spec:
           - name: yugaware-storage
             mountPath: /opt/yugabyte/prometheus/targets
             subPath: swamper_targets
+          - name: yugaware-storage
+            mountPath: /opt/yugabyte/prometheus/rules
+            subPath: swamper_rules
           - name: prometheus-config
             mountPath: /default_prometheus_config
           - name: yugaware-storage
