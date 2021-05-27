@@ -9,7 +9,7 @@ image:
   # including the yugaware image
 
   repository: quay.io/yugabyte/yugaware
-  tag: 2.5.3.1-b10
+  tag: 2.5.3.4-b1
   pullPolicy: IfNotPresent
   pullSecret: yugabyte-k8s-pull-secret
 
