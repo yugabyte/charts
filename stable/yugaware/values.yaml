@@ -2,7 +2,6 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-
 image:
   commonRegistry: ""
   # Setting commonRegistry to say, quay.io overrides the registry settings for all images
@@ -11,7 +10,10 @@ image:
   repository: quay.io/yugabyte/yugaware
   tag: 2.5.1.0-b153
   pullPolicy: IfNotPresent
-  pullSecret: yugabyte-k8s-pull-secret
+  pullSecret: yugabyte-k8s-pull-secret-1
+  # Docker config JSON File name
+  # If set, this file content will be used to automatically create secred named as above
+  # pullSecretFile:
 
   thirdparty-deps:
     registry: quay.io
@@ -69,7 +71,6 @@ securityContext:
   enabled: false
   fsGroup: 1001
   runAsUser: 1001
-
 
 helm:
   timeout: 900
