@@ -43,6 +43,7 @@ yugaware:
     enabled: true
     ip: ""
     type: "LoadBalancer"
+    postgres: false # Expose internal postgres as an internal Service
   pod:
     annotations: {}
   health:
