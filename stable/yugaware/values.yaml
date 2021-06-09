@@ -42,7 +42,6 @@ yugaware:
     enabled: true
     ip: ""
     type: "LoadBalancer"
-    postgres: false # Expose internal postgres as an internal Service
   health:
     username: ""
     password: ""
@@ -55,6 +54,13 @@ yugaware:
       cpu: 2
       memory: 4Gi
   enableProxyMetricsAuth: true
+
+postgres: # Configure PostgreSQL part of the application
+  service:
+    enabled: false # Expose internal Postgres as a Service
+    annotations: {} # Additional Service annotations
+    type: ClusterIP # Service type
+    ip: "" # IP for LoadBalancer
 
 tls:
   enabled: false
