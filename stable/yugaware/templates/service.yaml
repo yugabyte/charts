@@ -49,7 +49,7 @@ metadata:
   name: {{ .Release.Name }}-postgres
   {{- if .Values.postgres.service.annotations }}
   annotations:
-    {{ toYaml .Values.postgres.service.annotations | indent 4 }}
+{{ toYaml .Values.postgres.service.annotations | indent 4 }}
   {{- end }}
   labels:
     app: {{ .Release.Name }}-yugaware
