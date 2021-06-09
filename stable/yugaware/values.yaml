@@ -55,12 +55,17 @@ yugaware:
       memory: 4Gi
   enableProxyMetricsAuth: true
 
-postgres: # Configure PostgreSQL part of the application
+## Configure PostgreSQL part of the application
+postgres:
   service:
-    enabled: false # Expose internal Postgres as a Service
-    annotations: {} # Additional Service annotations
-    type: ClusterIP # Service type
-    ip: "" # IP for LoadBalancer
+    ## Expose internal Postgres as a Service
+    enabled: false
+    ## Additional Service annotations
+    annotations: {}
+    ## Service type
+    type: "ClusterIP"
+    ## IP address for the LoadBalancer, works only if supported by the cloud provider
+    ip: ""
 
 tls:
   enabled: false
