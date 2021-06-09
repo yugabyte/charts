@@ -40,15 +40,16 @@ spec:
   {{- if and (eq .Values.yugaware.service.type "LoadBalancer") (.Values.yugaware.service.ip) }}
   loadBalancerIP: "{{ .Values.yugaware.service.ip }}"
   {{- end }}
-{{- if .Values.yugaware.service.postgres }}
+{{- end }}
+{{- if .Values.postgres.service.enabled }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Release.Name }}-postgres
-  {{- if .Values.yugaware.service.annotations }}
+  {{- if .Values.postgres.service.annotations }}
   annotations:
-    {{ toYaml .Values.yugaware.service.annotations | indent 4 }}
+    {{ toYaml .Values.postgres.service.annotations | indent 4 }}
   {{- end }}
   labels:
     app: {{ .Release.Name }}-yugaware
@@ -62,6 +63,8 @@ spec:
     targetPort: 5432
   selector:
     app: {{ .Release.Name }}-yugaware
-  type: ClusterIP
-{{- end }}
+  type: {{ .Values.postgres.service.type }}
+  {{- if and (eq .Values.postgres.service.type "LoadBalancer") (.Values.postgres.service.ip) }}
+  loadBalancerIP: "{{ .Values.postgres.service.ip }}"
+  {{- end }}
 {{- end }}
