@@ -39,6 +39,7 @@ data:
     play.modules.enabled += "org.flywaydb.play.PlayModule"
 
     yb {
+      cloud.enabled = {{ .Values.yugaware.cloud.enabled }}
       devops.home = /opt/yugabyte/devops
       metrics.host = "{{ eq .Values.ip_version_support "v6_only" | ternary "[::1]" "127.0.0.1" }}"
       metrics.url = "http://"${yb.metrics.host}":9090/api/v1"

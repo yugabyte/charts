@@ -55,6 +55,9 @@ yugaware:
       cpu: 2
       memory: 4Gi
   enableProxyMetricsAuth: true
+  # enables features specific for cloud deployments
+  cloud:
+    enabled: false
 
 tls:
   enabled: false
