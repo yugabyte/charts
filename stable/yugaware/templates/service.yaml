@@ -41,186 +41,30 @@ spec:
   loadBalancerIP: "{{ .Values.yugaware.service.ip }}"
   {{- end }}
 {{- end }}
+{{- if .Values.postgres.service.enabled }}
 ---
-apiVersion: apps/v1
-kind: StatefulSet
+apiVersion: v1
+kind: Service
 metadata:
-  name: {{ .Release.Name }}-yugaware
+  name: {{ .Release.Name }}-postgres
+  {{- if .Values.postgres.service.annotations }}
+  annotations:
+{{ toYaml .Values.postgres.service.annotations | indent 4 }}
+  {{- end }}
   labels:
     app: {{ .Release.Name }}-yugaware
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 spec:
-  serviceName: {{ .Release.Name }}-yugaware
-  replicas: {{ .Values.yugaware.replicas }}
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
   selector:
-    matchLabels:
-      app: {{ .Release.Name }}-yugaware
-  template:
-    metadata:
-      labels:
-        app: {{ .Release.Name }}-yugaware
-    spec:
-      serviceAccountName: {{ .Release.Name }}
-      imagePullSecrets:
-      - name: {{ .Values.image.pullSecret }}
-      {{- if .Values.securityContext.enabled }}
-      securityContext:
-        fsGroup: {{ .Values.securityContext.fsGroup }}
-      {{- end }}
-      volumes:
-        - name: yugaware-storage
-          persistentVolumeClaim:
-            claimName: {{ .Release.Name }}-yugaware-storage
-        - name: yugaware-ui
-          emptyDir: {}
-        - name: yugaware-config
-          configMap:
-            name: {{ .Release.Name }}-yugaware-app-config
-            items:
-              - key: application.docker.conf
-                path: application.docker.conf
-        - name: nginx-config
-          configMap:
-            name: {{ .Release.Name }}-yugaware-nginx-config
-            items:
-              - key: default.conf
-                path: default.conf
-        - name: prometheus-config
-          configMap:
-            name: {{ .Release.Name }}-yugaware-prometheus-config
-            items:
-              - key: prometheus.yml
-                path: prometheus.yml
-
-        {{- if .Values.tls.enabled }}
-        - name: {{  .Release.Name }}-yugaware-tls-cert
-          secret:
-            secretName: {{ .Release.Name }}-yugaware-tls-cert
-        {{- end }}
-      containers:
-        - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
-          name: postgres
-          env:
-            - name: POSTGRES_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Release.Name }}-yugaware-global-config
-                  key: postgres_user
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Release.Name }}-yugaware-global-config
-                  key: postgres_password
-            - name: POSTGRES_DB
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Release.Name }}-yugaware-global-config
-                  key: postgres_db
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
-          ports:
-            - containerPort: 5432
-              name: postgres
-          volumeMounts:
-            - name: yugaware-storage
-              mountPath: /var/lib/postgresql/data
-              subPath: postgres_data
-        - name: prometheus
-          image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
-          {{- if (not .Values.ocpCompatibility.enabled) }}
-          securityContext:
-            runAsUser: 0
-          {{- end }}
-          volumeMounts:
-          - name: yugaware-storage
-            mountPath: /prometheus_configs
-            subPath: prometheus.yml
-          - name: yugaware-storage
-            mountPath: /prometheus/
-          - name: yugaware-storage
-            mountPath: /opt/yugabyte/prometheus/targets
-            subPath: swamper_targets
-          args:
-            - --config.file=/prometheus_configs/prometheus.yml
-            - --storage.tsdb.path=/prometheus/
-            - --web.enable-admin-api
-            - --web.enable-lifecycle
-          ports:
-            - containerPort: 9090
-        - name: yugaware
-          image: {{ include "full_yugaware_image" . }}
-          {{- if .Values.securityContext.enabled }}
-          securityContext:
-            runAsUser: {{ .Values.securityContext.runAsUser }}
-          {{- end }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.yugaware.resources }}
-          resources:
-{{ toYaml .Values.yugaware.resources | indent 12 }}
-          {{- end }}
-          command: [ "/bin/bash", "-c"]
-          args:
-            - "cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && bin/yugaware -Dconfig.file=/data/application.docker.conf"
-          env:
-            - name: POSTGRES_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Release.Name }}-yugaware-global-config
-                  key: postgres_user
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Release.Name }}-yugaware-global-config
-                  key: postgres_password
-            - name: POSTGRES_DB
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Release.Name }}-yugaware-global-config
-                  key: postgres_db
-            - name: APP_SECRET
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Release.Name }}-yugaware-global-config
-                  key: app_secret
-          ports:
-            - containerPort: 9000
-              name: yugaware
-          volumeMounts:
-          - name: yugaware-config
-            mountPath: /data
-          - name: yugaware-storage
-            mountPath: /opt/yugabyte/yugaware/data/
-            subPath: data
-          # old path for backward compatibility
-          - name: yugaware-storage
-            mountPath: /opt/yugaware_data/
-            subPath: data
-          - name: yugaware-storage
-            mountPath: /opt/yugabyte/releases/
-            subPath: releases
-          # old path for backward compatibility
-          - name: yugaware-storage
-            mountPath: /opt/releases/
-            subPath: releases
-          - name: yugaware-storage
-            mountPath: /opt/yugabyte/prometheus/targets
-            subPath: swamper_targets
-          - name: prometheus-config
-            mountPath: /default_prometheus_config
-          - name: yugaware-storage
-            mountPath: /prometheus_configs
-            subPath: prometheus.yml
-        - name: nginx
-          image: {{ include "full_image" (dict "containerName" "nginx" "root" .) }}
-          ports:
-          - containerPort: 8080
-          volumeMounts:
-          - mountPath: /etc/nginx/conf.d/
-            name: nginx-config
-          {{- if .Values.tls.enabled }}
-          - name: {{  .Release.Name }}-yugaware-tls-cert
-            mountPath: /opt/certs/
-            readOnly: true
-          {{- end }}
+    app: {{ .Release.Name }}-yugaware
+  type: {{ .Values.postgres.service.type }}
+  {{- if and (eq .Values.postgres.service.type "LoadBalancer") (.Values.postgres.service.ip) }}
+  loadBalancerIP: "{{ .Values.postgres.service.ip }}"
+  {{- end }}
+{{- end }}
