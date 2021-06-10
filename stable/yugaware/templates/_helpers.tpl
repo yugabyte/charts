@@ -80,3 +80,19 @@ Validate Nginx SSL protocols
     {{- .Values.tls.sslProtocols -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+Get or generate PG password
+Source - https://github.com/helm/charts/issues/5167#issuecomment-843962731
+*/}}
+{{- define "getOrGeneratePassword" }}
+{{- $len := (default 8 .Length) | int -}}
+{{- $obj := (lookup "v1" .Kind .Namespace .Name).data -}}
+{{- if $obj }}
+{{- index $obj .Key -}}
+{{- else if (eq (lower .Kind) "secret") -}}
+{{- randAlphaNum $len | b64enc -}}
+{{- else -}}
+{{- randAlphaNum $len -}}
+{{- end -}}
+{{- end }}
