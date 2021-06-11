@@ -2,7 +2,6 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-
 image:
   commonRegistry: ""
   # Setting commonRegistry to say, quay.io overrides the registry settings for all images
@@ -59,6 +58,18 @@ yugaware:
   cloud:
     enabled: false
 
+## Configure PostgreSQL part of the application
+postgres:
+  service:
+    ## Expose internal Postgres as a Service
+    enabled: false
+    ## Additional Service annotations
+    annotations: {}
+    ## Service type
+    type: "ClusterIP"
+    ## IP address for the LoadBalancer, works only if supported by the cloud provider
+    ip: ""
+
 tls:
   enabled: false
   hostname: "localhost"
@@ -72,7 +83,6 @@ securityContext:
   enabled: false
   fsGroup: 1001
   runAsUser: 1001
-
 
 helm:
   timeout: 900
