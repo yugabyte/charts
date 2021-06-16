@@ -11,6 +11,9 @@ image:
   tag: 2.5.1.0-b153
   pullPolicy: IfNotPresent
   pullSecret: yugabyte-k8s-pull-secret
+  ## Docker config JSON File name
+  ## If set, this file content will be used to automatically create secret named as above
+  # pullSecretFile:
 
   thirdparty-deps:
     registry: quay.io

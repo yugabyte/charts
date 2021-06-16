@@ -1,5 +1,16 @@
 # Copyright (c) YugaByte, Inc.
 
+{{- if .Values.image.pullSecretFile }}
+---
+apiVersion: v1
+data:
+  .dockerconfigjson: {{ $.Files.Get .Values.image.pullSecretFile | b64enc }}
+kind: Secret
+metadata:
+  name: {{ .Values.image.pullSecret }}
+type: kubernetes.io/dockerconfigjson
+{{- end }}
+
 ---
 apiVersion: v1
 kind: ConfigMap
