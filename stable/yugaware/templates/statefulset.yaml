@@ -41,11 +41,20 @@ spec:
         - name: yugaware-ui
           emptyDir: {}
         - name: yugaware-config
-          configMap:
-            name: {{ .Release.Name }}-yugaware-app-config
-            items:
-              - key: application.docker.conf
-                path: application.docker.conf
+          projected:
+            sources:
+              - configMap:
+                  name: {{ .Release.Name }}-yugaware-app-config
+                  items:
+                    - key: application.docker.conf
+                      path: application.docker.conf
+            {{- if .Values.yugaware.universe_boot_script }}
+              - configMap:
+                  name: {{ .Release.Name }}-universe-boot-script
+                  items:
+                    - key: universe_boot_script
+                      path: universe-boot-script.sh
+            {{- end }}
         - name: nginx-config
           configMap:
             name: {{ .Release.Name }}-yugaware-nginx-config
