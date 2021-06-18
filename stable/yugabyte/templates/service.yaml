@@ -406,7 +406,7 @@ spec:
           - name: {{ $root.Values.oldNamingStyle | ternary "datadir0" (printf "%s0" (include "yugabyte.volume_name" $root)) }}
             mountPath: /home/yugabyte/
             subPath: yb-data
-          - name: datadir0
+          - name: {{ $root.Values.oldNamingStyle | ternary "datadir0" (printf "%s0" (include "yugabyte.volume_name" $root)) }}
             mountPath: /var/yugabyte/cores
             subPath: cores
       {{- end }}
