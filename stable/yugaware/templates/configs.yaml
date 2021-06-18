@@ -101,11 +101,7 @@ data:
       # CORS config
       cors {
         pathPrefixes = ["/"]
-{{- if .Values.tls.enabled }}
-        allowedOrigins = ["https://{{ .Values.tls.hostname }}"]
-{{- else }}
-        allowedOrigins = ["http://{{ .Values.tls.hostname }}"]
-{{- end }}
+        allowedOrigins = {{ include "allowedCorsOrigins" . }}
         # Server allows cookies/credentials to be sent with cross-origin requests
         supportsCredentials=true
         allowedHttpMethods = ["GET", "POST", "PUT", "OPTIONS", "DELETE"]

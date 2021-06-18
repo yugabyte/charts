@@ -57,7 +57,11 @@ yugaware:
       cpu: 2
       memory: 4Gi
   enableProxyMetricsAuth: true
-  # enables features specific for cloud deployments
+  ## List of additional alowed CORS origins in case of complex rev-proxy
+  additionAllowedCorsOrigins: []
+  #   - http://external.host.domain.local
+  #   - https://mylocalhost
+  ## Enables features specific for cloud deployments
   cloud:
     enabled: false
 
