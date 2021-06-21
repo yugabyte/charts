@@ -117,7 +117,11 @@ multicluster:
   ## creates a ClusterIP service whos name does not have release name
   ## in it. A common service across different clusters for automatic
   ## failover. Useful when using new naming style.
-  createCommonTserverService: false
+  createCommonTserverService:
+    enabled: false
+    ## To make above common Tserver service as headless service
+    ## Can be useful in Kubernetai
+    headless: false
 
 serviceMonitor:
   ## If true, two ServiceMonitor CRs are created. One for yb-master
