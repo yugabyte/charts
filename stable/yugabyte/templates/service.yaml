@@ -275,7 +275,7 @@ spec:
           {{- $webserverPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $webserverDict) -}}
           {{- if $webserverPreflight -}}{{ $webserverPreflight | nindent 12 }}{{ end -}}
           {{- if eq .name "yb-masters" }}
-            /home/yugabyte/bin/yb-master \
+            exec /home/yugabyte/bin/yb-master \
             {{- if not $root.Values.storage.ephemeral }}
               --fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }} \
             {{- else }}
@@ -325,7 +325,7 @@ spec:
               {{- $ysqlPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $ysqlDict) -}}
               {{- if $ysqlPreflight -}}{{ $ysqlPreflight | nindent 12 }}{{ end -}}
             {{- end }}
-            /home/yugabyte/bin/yb-tserver \
+            exec /home/yugabyte/bin/yb-tserver \
             {{- if not $root.Values.storage.ephemeral }}
               --fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }} \
             {{- else }}
