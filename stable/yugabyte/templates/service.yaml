@@ -297,7 +297,7 @@ spec:
               --num_cpus={{ ceil $root.Values.resource.master.requests.cpu }} \
               --undefok=num_cpus,enable_ysql \
             {{- range $flag, $override := $root.Values.gflags.master }}
-              --{{ $flag }}={{ $override }} \
+              --{{ $flag }}={{ quote $override }} \
             {{- end }}
             {{- if $root.Values.tls.enabled }}
               --certs_dir=/opt/certs/yugabyte \
@@ -346,7 +346,7 @@ spec:
               --use_cassandra_authentication=true \
             {{- end }}
             {{- range $flag, $override := $root.Values.gflags.tserver }}
-              --{{ $flag }}={{ $override }} \
+              --{{ $flag }}={{ quote $override }} \
             {{- end }}
             {{- if $root.Values.tls.enabled }}
               --certs_dir=/opt/certs/yugabyte \
