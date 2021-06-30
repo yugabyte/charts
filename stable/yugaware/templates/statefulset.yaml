@@ -73,6 +73,20 @@ spec:
           secret:
             secretName: {{ .Release.Name }}-yugaware-tls-cert
         {{- end }}
+      initContainers:
+        - image: {{ include "full_yugaware_image" . }}
+          name: prometheus-configuration
+          command: ["cp", "/default_prometheus_config/prometheus.yml", "/prometheus_configs/prometheus.yml"]
+          {{- if .Values.securityContext.enabled }}
+          securityContext:
+            runAsUser: {{ .Values.securityContext.runAsUser }}
+          {{- end }}
+          volumeMounts:
+          - name: prometheus-config
+            mountPath: /default_prometheus_config
+          - name: yugaware-storage
+            mountPath: /prometheus_configs
+            subPath: prometheus.yml
       containers:
         - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           name: postgres
@@ -139,7 +153,7 @@ spec:
           {{- end }}
           command: [ "/bin/bash", "-c"]
           args:
-            - "cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && bin/yugaware -Dconfig.file=/data/application.docker.conf"
+            - "bin/yugaware -Dconfig.file=/data/application.docker.conf"
           env:
             - name: POSTGRES_USER
               valueFrom:
@@ -187,8 +201,6 @@ spec:
           - name: yugaware-storage
             mountPath: /opt/yugabyte/prometheus/rules
             subPath: swamper_rules
-          - name: prometheus-config
-            mountPath: /default_prometheus_config
           - name: yugaware-storage
             mountPath: /prometheus_configs
             subPath: prometheus.yml
