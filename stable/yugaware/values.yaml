@@ -57,6 +57,7 @@ yugaware:
       cpu: 2
       memory: 4Gi
   enableProxyMetricsAuth: true
+  proxyEndpointTimeoutMs: 1 minute
   # enables features specific for cloud deployments
   cloud:
     enabled: false

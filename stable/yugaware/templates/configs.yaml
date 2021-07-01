@@ -64,6 +64,7 @@ data:
       swamper.targetPath = /opt/yugabyte/prometheus/targets
       swamper.rulesPath = /opt/yugabyte/prometheus/rules
       security.enable_auth_for_proxy_metrics = {{ .Values.yugaware.enableProxyMetricsAuth }}
+      proxy_endpoint_timeout = {{ .Values.yugaware.proxyEndpointTimeoutMs }}
       multiTenant = {{ .Values.yugaware.multiTenant }}
       releases.path = "/opt/yugabyte/releases"
       docker.release = "/opt/yugabyte/release"
