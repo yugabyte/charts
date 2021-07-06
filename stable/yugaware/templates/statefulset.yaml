@@ -216,3 +216,6 @@ spec:
             mountPath: /opt/certs/
             readOnly: true
           {{- end }}
+{{ if .Values.sidecars }}
+{{ toYaml .Values.sidecars | indent 8 }}
+{{ end }}

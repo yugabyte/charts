@@ -112,3 +112,6 @@ rbac:
 ## true.
 ocpCompatibility:
   enabled: false
+
+# Extra containers to add to the pod.
+sidecars: []
