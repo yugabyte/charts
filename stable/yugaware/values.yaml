@@ -77,6 +77,18 @@ postgres:
     ## IP address for the LoadBalancer, works only if supported by the cloud provider
     ip: ""
 
+  # If external.host is set then we will connect to an external postgres database server instead of starting our own.
+  external:
+    host: null
+    port: 5432
+    pass: ""
+    dbname: postgres
+    user: postgres
+
+    ## JDBC connection parameters including the leading `?`.
+    jdbcParams: ""
+
+
 tls:
   enabled: false
   hostname: "localhost"

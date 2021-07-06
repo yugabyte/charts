@@ -88,6 +88,7 @@ spec:
             mountPath: /prometheus_configs
             subPath: prometheus.yml
       containers:
+        {{ if not .Values.postgres.external.host }}
         - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           name: postgres
           env:
@@ -115,6 +116,7 @@ spec:
             - name: yugaware-storage
               mountPath: /var/lib/postgresql/data
               subPath: postgres_data
+        {{ end }}
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
           {{- if (not .Values.ocpCompatibility.enabled) }}
