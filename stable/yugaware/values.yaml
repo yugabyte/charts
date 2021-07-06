@@ -41,6 +41,9 @@ yugaware:
   storageClass: standard
   multiTenant: false
   serviceAccount: yugaware
+  serviceMonitor:
+    enabled: false
+    annotations: {}
   service:
     annotations: {}
     enabled: true
