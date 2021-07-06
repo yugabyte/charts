@@ -44,6 +44,7 @@ yugaware:
   serviceMonitor:
     enabled: false
     annotations: {}
+  serviceAccountAnnotations: {}
   service:
     annotations: {}
     enabled: true
