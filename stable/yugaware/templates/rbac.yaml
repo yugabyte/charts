@@ -6,6 +6,10 @@ metadata:
     k8s-app: yugaware
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
+{{- if .Values.yugaware.serviceAccountAnnotations }}
+  annotations:
+{{ toYaml .Values.yugaware.serviceAccountAnnotations | indent 4 }}
+{{- end }}
 {{- if .Values.rbac.create }}
 {{- if .Values.ocpCompatibility.enabled }}
 ---
