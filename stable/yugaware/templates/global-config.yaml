@@ -13,7 +13,7 @@ metadata:
 data:
   postgres_user: {{ empty .Values.postgres.external.host | ternary .Values.postgres.external.user "postgres" | toYaml }}
   {{ if .Values.postgres.external.host }}
-  postgres_db: {{ .Values.postgres.external.dbname "yugaware" | toYaml }}
+  postgres_db: {{ .Values.postgres.external.dbname | toYaml }}
   postgres_password: {{ .Values.postgres.external.pass | toYaml }}
   {{ else }}
   postgres_db: yugaware
