@@ -162,6 +162,10 @@ spec:
         {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
         {{- include "yugabyte.labels" $root | indent 8 }}
     spec:
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001 
       {{- if $root.Values.Image.pullSecretName }}
       imagePullSecrets:
       - name: {{ $root.Values.Image.pullSecretName }}
