@@ -11,12 +11,13 @@ metadata:
     release: {{ .Release.Name }}
     heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 data:
-  postgres_user: {{ empty .Values.postgres.external.host | ternary .Values.postgres.external.user "postgres" | toYaml }}
   {{ if .Values.postgres.external.host }}
-  postgres_db: {{ .Values.postgres.external.dbname "yugaware" | toYaml }}
+  postgres_db: {{ .Values.postgres.external.dbname | toYaml }}
+  postgres_user: {{ .Values.postgres.external.user | toYaml }}
   postgres_password: {{ .Values.postgres.external.pass | toYaml }}
   {{ else }}
   postgres_db: yugaware
+  postgres_user: postgres
   postgres_password: "{{ include "getOrGeneratePassword" (dict "Namespace" .Release.Namespace "Kind" "ConfigMap" "Name" (printf "%s%s" .Release.Name "-yugaware-global-config") "Key" "postgres_password") }}"
   {{ end }}
   app_secret: "{{ b64enc (randAlphaNum 64) }}"
