@@ -106,7 +106,7 @@ securityContext:
 
 helm:
   timeout: 900
-  package: "/opt/yugabyte/helm/yugabyte-latest.tgz"
+  packagePath: "/opt/yugabyte/helm"
 
 domainName: "cluster.local"
 
