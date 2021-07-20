@@ -55,6 +55,7 @@ data:
 apiVersion: v1
 kind: Service
 metadata:
+  namespace: "{{ $root.Release.Namespace }}"
   name: {{ $root.Values.oldNamingStyle | ternary .name (printf "%s-%s" (include "yugabyte.fullname" $root) .name) | quote }}
   labels:
     {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
@@ -77,17 +78,20 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  namespace: "{{ $root.Release.Namespace }}"
   name: {{ $root.Values.oldNamingStyle | ternary $endpoint.name (printf "%s-%s" (include "yugabyte.fullname" $root) $endpoint.name) | quote }}
+  {{- if $endpoint.annotations }}
   annotations:
 {{ toYaml $endpoint.annotations | indent 4 }}
+  {{- end }}
   labels:
     {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
     {{- include "yugabyte.labels" $root | indent 4 }}
 spec:
-  {{ if eq $root.Release.Service "Tiller" }}
+  {{- if eq $root.Release.Service "Tiller" }}
   clusterIP:
-  {{ else }}
-  {{ if $endpoint.clusterIP }}
+  {{- else }}
+  {{- if $endpoint.clusterIP }}
   clusterIP: {{ $endpoint.clusterIP }}
   {{- end }}
   {{- end }}
@@ -115,26 +119,29 @@ metadata:
 spec:
   serviceName: {{ $root.Values.oldNamingStyle | ternary .name (printf "%s-%s" (include "yugabyte.fullname" $root) .name) | quote }}
   podManagementPolicy: {{ $root.Values.PodManagementPolicy }}
-  {{ if eq .name "yb-masters" }}
+  {{- if eq .name "yb-masters" }}
   replicas: {{ $root.Values.replicas.master }}
-  {{ else }}
+  {{- else }}
   replicas: {{ $root.Values.replicas.tserver  }}
-  {{ end }}
+  {{- end }}
   {{- $storageInfo := (eq .name "yb-masters") | ternary $root.Values.storage.master $root.Values.storage.tserver -}}
-  {{ if not $root.Values.storage.ephemeral }}
+  {{- $sclass := $root.Values.storage.localDisk.enabled | ternary (printf "%s" (include "yugabyte.localsc_name" $root)) $storageInfo.storageClass -}}
+  {{- if not $root.Values.storage.ephemeral }}
   volumeClaimTemplates:
     {{- range $index := until (int ($storageInfo.count )) }}
     - metadata:
         name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
+        {{- if $sclass }}
         annotations:
-          volume.beta.kubernetes.io/storage-class: {{ $storageInfo.storageClass }}
+          volume.beta.kubernetes.io/storage-class: {{ $sclass }}
+        {{- end }}
         labels:
           {{- include "yugabyte.labels" $root | indent 10 }}
       spec:
         accessModes:
           - "ReadWriteOnce"
-        {{- if $storageInfo.storageClass }}
-        storageClassName: {{ $storageInfo.storageClass }}
+        {{- if $sclass }}
+        storageClassName: {{ $sclass }}
         {{- end }}
         resources:
           requests:
@@ -144,28 +151,24 @@ spec:
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      {{ if eq .name "yb-masters" }}
+      {{- if eq .name "yb-masters" }}
       partition: {{ $root.Values.partition.master }}
-      {{ else }}
+      {{- else }}
       partition: {{ $root.Values.partition.tserver }}
-      {{ end }}
+      {{- end }}
   selector:
     matchLabels:
       {{- include "yugabyte.appselector" ($appLabelArgs) | indent 6 }}
   template:
     metadata:
-      {{ if $root.Values.networkAnnotation }}
+      {{- if $root.Values.networkAnnotation }}
       annotations:
 {{ toYaml $root.Values.networkAnnotation | indent 8}}
-      {{ end }}
+      {{- end }}
       labels:
         {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
         {{- include "yugabyte.labels" $root | indent 8 }}
     spec:
-      securityContext:
-        runAsUser: 1001
-        runAsGroup: 1001
-        fsGroup: 1001 
       {{- if $root.Values.Image.pullSecretName }}
       imagePullSecrets:
       - name: {{ $root.Values.Image.pullSecretName }}
@@ -176,7 +179,7 @@ spec:
       {{- end }}
       affinity:
         # Set the anti-affinity selector scope to YB masters.
-        {{ if $root.Values.AZ }}
+        {{- if $root.Values.AZ }}
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
@@ -190,7 +193,7 @@ spec:
                 operator: In
                 values:
                 - {{ $root.Values.AZ }}
-        {{ end }}
+        {{- end }}
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100
@@ -249,11 +252,11 @@ spec:
           value: /root/.yugabytedb/root.crt
         {{- end }}
         resources:
-        {{ if eq .name "yb-masters" }}
+        {{- if eq .name "yb-masters" }}
 {{ toYaml $root.Values.resource.master | indent 10 }}
-        {{ else }}
+        {{- else }}
 {{ toYaml $root.Values.resource.tserver | indent 10 }}
-        {{ end }}
+        {{- end }}
         # core dumps are collected to workingDir if
         # kernel.core_pattern is set to a relative path like
         # core.%e.%p.%t ref:
@@ -381,7 +384,7 @@ spec:
             name: {{ $label | quote }}
           {{- end}}
         volumeMounts:
-          {{ if not $root.Values.storage.ephemeral }}
+          {{- if not $root.Values.storage.ephemeral }}
           {{- range $index := until (int ($storageInfo.count)) }}
           - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
             mountPath: /mnt/disk{{ $index }}
@@ -396,7 +399,7 @@ spec:
             readOnly: true
           {{- end }}
 
-      {{ if not $root.Values.storage.ephemeral }}
+      {{- if not $root.Values.storage.ephemeral }}
       - name: yb-cleanup
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
         imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
@@ -421,7 +424,7 @@ spec:
       {{- end }}
 
       volumes:
-        {{ if not $root.Values.storage.ephemeral }}
+        {{- if not $root.Values.storage.ephemeral }}
         {{- range $index := until (int ($storageInfo.count)) }}
         - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
           hostPath:
@@ -443,6 +446,7 @@ spec:
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
+  namespace: "{{ $root.Release.Namespace }}"
   name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-pdb" .label) (printf "%s-%s-pdb" (include "yugabyte.fullname" $root) .name) }}
 spec:
   maxUnavailable: {{ template "yugabyte.max_unavailable_for_quorum" $root }}

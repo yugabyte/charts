@@ -187,3 +187,24 @@ Compute the maximum number of unavailable pods based on the number of master rep
   {{- $max_unavailable_master_replicas := 100 | div (100 | sub (2 | div ($master_replicas_100x | add 100))) -}}
   {{- printf "%d" $max_unavailable_master_replicas -}}
 {{- end -}}
+
+{{/*
+Local persistent disk storage class name
+*/}}
+{{- define "yugabyte.localsc_name" -}}
+  {{- printf "%s-local-sc" (include "yugabyte.fullname" .)  -}}
+{{- end -}}
+
+{{/*
+Local persistent disk name
+*/}}
+{{- define "yugabyte.localdisk_name" -}}
+  {{- printf "%s-local-pv" (include "yugabyte.fullname" .)  -}}
+{{- end -}}
+
+{{/*
+Local persistent disk storage mount path
+*/}}
+{{- define "yugabyte.localdisk_mntpath" -}}
+  {{ default .Values.storage.localDisk.mountPath "/mnt/disks/ssd" }}
+{{- end -}}

@@ -17,6 +17,14 @@ storage:
     count: 2
     size: 10Gi
     storageClass: standard
+  localDisk:
+    # Turning this flag on would configure the local persistent disk. No of disks configured would still depend
+    # on storage.master.count and storage.tserver.count. Set those values appropriately based on the number of local
+    # disks configured during cluster creation. This would set the static PVs to be mounted instead of the dynamic
+    # storage provision.
+    enabled: false
+    # This would be the path referred in the static PVs. A running index starting from '0' will be suffixed to this path    
+    mountPath: /mnt/disks/ssd
 
 resource:
   master:
