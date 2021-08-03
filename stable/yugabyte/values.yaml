@@ -12,11 +12,11 @@ storage:
   master:
     count: 2
     size: 10Gi
-    storageClass: standard
+    storageClass: ""
   tserver:
     count: 2
     size: 10Gi
-    storageClass: standard
+    storageClass: ""
 
 resource:
   master:

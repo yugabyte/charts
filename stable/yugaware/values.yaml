@@ -38,7 +38,7 @@ image:
 yugaware:
   replicas: 1
   storage: 100Gi
-  storageClass: standard
+  storageClass: ""
   storageAnnotations: {}
   multiTenant: false
   serviceAccount: yugaware
