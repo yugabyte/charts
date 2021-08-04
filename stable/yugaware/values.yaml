@@ -39,6 +39,7 @@ yugaware:
   replicas: 1
   storage: 100Gi
   storageClass: standard
+  storageAnnotations: {}
   multiTenant: false
   serviceAccount: yugaware
   serviceMonitor:
