@@ -18,14 +18,13 @@ spec:
       app: {{ .Release.Name }}-yugaware
   template:
     metadata:
-{{- if .Values.yugaware.pod.annotations }}
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+{{- if .Values.yugaware.pod.annotations }}
 {{ toYaml .Values.yugaware.pod.annotations | indent 8 }}
 {{- end }}
       labels:
         app: {{ .Release.Name }}-yugaware
-      annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ .Release.Name }}
       imagePullSecrets:
