@@ -1,0 +1,10 @@
+{{- if .Values.storage.localDisk.enabled }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{- include "yugabyte.localsc_name" $ | indent 1 }}
+  labels:
+    {{- include "yugabyte.labels" $ | indent 4 }}
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+{{- end }}

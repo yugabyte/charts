@@ -1,0 +1,45 @@
+{{- if .Values.storage.localDisk.enabled }}
+  {{- $replicaCounter := 1 }}
+  {{- $storageInfo := dict "count" 1 "size" "10G" }}
+  {{- range tuple "master" "tserver" }}
+    {{- if eq . "master" }}
+      {{- $replicaCounter = $.Values.replicas.master }}
+      {{- $storageInfo = dict "count" $.Values.storage.master.count "size" $.Values.storage.master.size  }}
+    {{- else }}
+      {{- $replicaCounter = $.Values.replicas.tserver }}
+      {{- $storageInfo = dict "count" $.Values.storage.tserver.count "size" $.Values.storage.tserver.size }}
+    {{- end}}
+    {{- range $replicaIndex := until (int ($replicaCounter)) }}
+      {{- range $index := until (int ($storageInfo.count )) }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{- include "yugabyte.localdisk_name" $ | indent 1 }}-{{ $replicaCounter }}{{ $replicaIndex }}{{ $index }}
+  labels:
+    {{- include "yugabyte.labels" $ | indent 4 }}
+spec:
+  capacity:
+    storage: {{ $storageInfo.size }}
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{- include "yugabyte.localsc_name" $ | indent 1 }}
+  local:
+    path: {{- include "yugabyte.localdisk_mntpath" $ | indent 1 }}{{ $index }}
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: failure-domain.beta.kubernetes.io/zone
+          operator: In
+          values:
+          - {{ $.Values.AZ }}
+      - matchExpressions:
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+          - {{ $.Values.AZ }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
