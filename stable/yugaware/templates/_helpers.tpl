@@ -102,13 +102,13 @@ Make list of allowed CORS origins
 */}}
 {{- define "allowedCorsOrigins" -}}
 [
-{{- if .Values.tls.enabled -}}
-"https://{{ .Values.tls.hostname }}",
-{{- else -}}
-"http://{{ .Values.tls.hostname }}",
-{{- end -}}
 {{- range .Values.yugaware.additionAllowedCorsOrigins -}}
 {{- . | quote }},
+{{- end -}}
+{{- if .Values.tls.enabled -}}
+"https://{{ .Values.tls.hostname }}"
+{{- else -}}
+"http://{{ .Values.tls.hostname }}"
 {{- end -}}
 ]
 {{- end -}}
