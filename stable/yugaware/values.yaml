@@ -64,8 +64,6 @@ yugaware:
   enableProxyMetricsAuth: true
   ## List of additional alowed CORS origins in case of complex rev-proxy
   additionAllowedCorsOrigins: []
-  #   - http://external.host.domain.local
-  #   - https://mylocalhost
   proxyEndpointTimeoutMs: 1 minute
   ## Enables features specific for cloud deployments
   cloud:
