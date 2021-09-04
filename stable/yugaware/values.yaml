@@ -62,8 +62,10 @@ yugaware:
       cpu: 2
       memory: 4Gi
   enableProxyMetricsAuth: true
+  ## List of additional alowed CORS origins in case of complex rev-proxy
+  additionAllowedCorsOrigins: []
   proxyEndpointTimeoutMs: 1 minute
-  # enables features specific for cloud deployments
+  ## Enables features specific for cloud deployments
   cloud:
     enabled: false
 
@@ -89,7 +91,6 @@ postgres:
 
     ## JDBC connection parameters including the leading `?`.
     jdbcParams: ""
-
 
 tls:
   enabled: false

@@ -95,4 +95,20 @@ Source - https://github.com/helm/charts/issues/5167#issuecomment-843962731
 {{- else -}}
 {{- randAlphaNum $len -}}
 {{- end -}}
-{{- end }}
+{{- end -}}
+
+{{/*
+Make list of allowed CORS origins
+*/}}
+{{- define "allowedCorsOrigins" -}}
+[
+{{- range .Values.yugaware.additionAllowedCorsOrigins -}}
+{{- . | quote }},
+{{- end -}}
+{{- if .Values.tls.enabled -}}
+"https://{{ .Values.tls.hostname }}"
+{{- else -}}
+"http://{{ .Values.tls.hostname }}"
+{{- end -}}
+]
+{{- end -}}
