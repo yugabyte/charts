@@ -18,14 +18,13 @@ spec:
       app: {{ .Release.Name }}-yugaware
   template:
     metadata:
-{{- if .Values.yugaware.pod.annotations }}
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
+{{- if .Values.yugaware.pod.annotations }}
 {{ toYaml .Values.yugaware.pod.annotations | indent 8 }}
 {{- end }}
       labels:
         app: {{ .Release.Name }}-yugaware
-      annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ .Release.Name }}
       imagePullSecrets:
@@ -73,7 +72,22 @@ spec:
           secret:
             secretName: {{ .Release.Name }}-yugaware-tls-cert
         {{- end }}
+      initContainers:
+        - image: {{ include "full_yugaware_image" . }}
+          name: prometheus-configuration
+          command: ["cp", "/default_prometheus_config/prometheus.yml", "/prometheus_configs/prometheus.yml"]
+          {{- if .Values.securityContext.enabled }}
+          securityContext:
+            runAsUser: {{ .Values.securityContext.runAsUser }}
+          {{- end }}
+          volumeMounts:
+          - name: prometheus-config
+            mountPath: /default_prometheus_config
+          - name: yugaware-storage
+            mountPath: /prometheus_configs
+            subPath: prometheus.yml
       containers:
+        {{ if not .Values.postgres.external.host }}
         - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           name: postgres
           env:
@@ -101,6 +115,7 @@ spec:
             - name: yugaware-storage
               mountPath: /var/lib/postgresql/data
               subPath: postgres_data
+        {{ end }}
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
           {{- if (not .Values.ocpCompatibility.enabled) }}
@@ -139,7 +154,7 @@ spec:
           {{- end }}
           command: [ "/bin/bash", "-c"]
           args:
-            - "cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && bin/yugaware -Dconfig.file=/data/application.docker.conf"
+            - "bin/yugaware -Dconfig.file=/data/application.docker.conf"
           env:
             - name: POSTGRES_USER
               valueFrom:
@@ -187,8 +202,6 @@ spec:
           - name: yugaware-storage
             mountPath: /opt/yugabyte/prometheus/rules
             subPath: swamper_rules
-          - name: prometheus-config
-            mountPath: /default_prometheus_config
           - name: yugaware-storage
             mountPath: /prometheus_configs
             subPath: prometheus.yml
@@ -204,3 +217,6 @@ spec:
             mountPath: /opt/certs/
             readOnly: true
           {{- end }}
+{{ if .Values.sidecars }}
+{{ toYaml .Values.sidecars | indent 8 }}
+{{ end }}

@@ -27,7 +27,7 @@ image:
 
   prometheus:
     registry: ""
-    tag: v2.2.1
+    tag: v2.27.1
     name: prom/prometheus
 
   nginx:
@@ -38,9 +38,14 @@ image:
 yugaware:
   replicas: 1
   storage: 100Gi
-  storageClass: standard
+  storageClass: ""
+  storageAnnotations: {}
   multiTenant: false
   serviceAccount: yugaware
+  serviceMonitor:
+    enabled: false
+    annotations: {}
+  serviceAccountAnnotations: {}
   service:
     annotations: {}
     enabled: true
@@ -61,6 +66,7 @@ yugaware:
   additionAllowedCorsOrigins: []
   #   - http://external.host.domain.local
   #   - https://mylocalhost
+  proxyEndpointTimeoutMs: 1 minute
   ## Enables features specific for cloud deployments
   cloud:
     enabled: false
@@ -76,6 +82,17 @@ postgres:
     type: "ClusterIP"
     ## IP address for the LoadBalancer, works only if supported by the cloud provider
     ip: ""
+
+  # If external.host is set then we will connect to an external postgres database server instead of starting our own.
+  external:
+    host: null
+    port: 5432
+    pass: ""
+    dbname: postgres
+    user: postgres
+
+    ## JDBC connection parameters including the leading `?`.
+    jdbcParams: ""
 
 tls:
   enabled: false
@@ -93,7 +110,7 @@ securityContext:
 
 helm:
   timeout: 900
-  package: "/opt/yugabyte/helm/yugabyte-latest.tgz"
+  packagePath: "/opt/yugabyte/helm"
 
 domainName: "cluster.local"
 
@@ -112,3 +129,6 @@ rbac:
 ## true.
 ocpCompatibility:
   enabled: false
+
+# Extra containers to add to the pod.
+sidecars: []
