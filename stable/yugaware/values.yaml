@@ -135,3 +135,4 @@ sidecars: []
 prometheus:
   scrapeNodes: true
   evaluateAlertRules: true
+  retentionTime: 15d
