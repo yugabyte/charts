@@ -67,6 +67,9 @@ yugaware:
   cloud:
     enabled: false
 
+prometheus:
+  retentionTime: 15d
+
 ## Configure PostgreSQL part of the application
 postgres:
   service:
