@@ -120,6 +120,7 @@ spec:
             - --storage.tsdb.path=/prometheus/
             - --web.enable-admin-api
             - --web.enable-lifecycle
+            - --storage.tsdb.retention={{ .Values.prometheus.retentionTime }}
           ports:
             - containerPort: 9090
         - name: yugaware

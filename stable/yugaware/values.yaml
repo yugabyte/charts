@@ -119,3 +119,4 @@ prometheus:
     requests:
       cpu: 2
       memory: 4Gi
+  retentionTime: 15d
