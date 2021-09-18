@@ -112,6 +112,10 @@ metadata:
   labels:
     {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
     {{- include "yugabyte.labels" $root | indent 4 }}
+  {{ if $root.Values.statefulSetAnnotations }}
+  annotations:
+{{ toYaml $root.Values.statefulSetAnnotations | indent 4}}
+  {{ end }}
 spec:
   serviceName: {{ $root.Values.oldNamingStyle | ternary .name (printf "%s-%s" (include "yugabyte.fullname" $root) .name) | quote }}
   podManagementPolicy: {{ $root.Values.PodManagementPolicy }}
