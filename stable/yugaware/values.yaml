@@ -130,3 +130,8 @@ ocpCompatibility:
 
 # Extra containers to add to the pod.
 sidecars: []
+
+## Don't want prometheus to scrape nodes and evaluate alert rules in some cases (for example - cloud).
+prometheus:
+  scrapeNodes: true
+  evaluateAlertRules: true

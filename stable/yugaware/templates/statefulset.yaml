@@ -128,12 +128,16 @@ spec:
             subPath: prometheus.yml
           - name: yugaware-storage
             mountPath: /prometheus/
+          {{- if .Values.prometheus.scrapeNodes }}
           - name: yugaware-storage
             mountPath: /opt/yugabyte/prometheus/targets
             subPath: swamper_targets
+          {{- end }}
+          {{- if .Values.prometheus.evaluateAlertRules }}
           - name: yugaware-storage
             mountPath: /opt/yugabyte/prometheus/rules
             subPath: swamper_rules
+          {{- end }}
           args:
             - --config.file=/prometheus_configs/prometheus.yml
             - --storage.tsdb.path=/prometheus/
