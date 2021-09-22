@@ -60,5 +60,9 @@
     type: boolean
     required: true
     label: Create CQL API Loadbalancer
-
-
+    - variable: tls.certManager.enabled
+    default: false
+    description: "Use cert-manager to provide cluster certificates"
+    type: boolean
+    required: true
+    label: Cert-Manager Support

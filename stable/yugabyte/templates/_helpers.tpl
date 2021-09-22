@@ -187,3 +187,14 @@ Compute the maximum number of unavailable pods based on the number of master rep
   {{- $max_unavailable_master_replicas := 100 | div (100 | sub (2 | div ($master_replicas_100x | add 100))) -}}
   {{- printf "%d" $max_unavailable_master_replicas -}}
 {{- end -}}
+
+{{/*
+Set consistent issuer name.
+*/}}
+{{- define "yugabyte.tls_cm_issuer" -}}
+  {{- if .Values.tls.certManager.useClusterIssuer -}}
+    {{ .Values.tls.certManager.clusterIssuer }}
+  {{- else -}}
+    {{ .Values.oldNamingStyle | ternary "yugabyte-selfsigned" (printf "%s-selfsigned" (include "yugabyte.fullname" .)) }}
+  {{- end -}}
+{{- end -}}

@@ -1,6 +1,6 @@
 {{- $root := . -}}
 ---
-{{- if $root.Values.tls.enabled }}
+{{- if and (eq $root.Values.tls.enabled true) (eq $root.Values.tls.certManager.enabled false) }}
 ---
 apiVersion: v1
 kind: Secret
@@ -24,7 +24,7 @@ data:
 {{- $appLabelArgs := dict "label" .label "root" $root -}}
 {{- $serviceValues := (dict "Service" $service "Values" $root.Values "Chart" $root.Chart "Release" $root.Release) -}}
 
-{{- if $root.Values.tls.enabled }}
+{{- if and (eq $root.Values.tls.enabled true) (eq $root.Values.tls.certManager.enabled false) }}
 ---
 apiVersion: v1
 kind: Secret
@@ -427,10 +427,34 @@ spec:
         - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
           secret:
             secretName: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
+            {{- if $root.Values.tls.certManager.enabled }}
+            items:
+              {{- $replicas := (eq .name "yb-masters") | ternary $root.Values.replicas.master $root.Values.replicas.tserver -}}
+              {{- range $index := until ( int ( $replicas ) ) }}
+              {{- $nodeOldStyle := printf "%s-%d.%s.%s.svc.%s" $service.label $index $service.name $root.Release.Namespace $root.Values.domainName }}
+              {{- $nodeNewStyle := printf "%s-%s-%d.%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
+              {{- $node := $root.Values.oldNamingStyle | ternary $nodeOldStyle $nodeNewStyle }}
+              - key: tls.crt
+                path: node.{{$node}}.crt
+              - key: tls.key
+                path: node.{{$node}}.key
+              {{- end }}
+              - key: ca.crt
+                path: ca.crt
+            {{- end }}
             defaultMode: 256
         - name: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
           secret:
             secretName: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
+            {{- if $root.Values.tls.certManager.enabled }}
+            items:
+              - key: ca.crt
+                path: root.crt
+              - key: tls.crt
+                path: yugabytedb.crt
+              - key: tls.key
+                path: yugabytedb.key
+            {{- end }}
             defaultMode: 256
         {{- end }}
 {{- if eq $root.Values.isMultiAz false }}
