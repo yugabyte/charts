@@ -3,7 +3,7 @@ kind: PodDisruptionBudget
 metadata:
   name: {{ .Release.Name }}-yugaware-pdb
 spec:
-  maxUnavailable: 0
+  maxUnavailable: {{ .Values.yugaware.podDisruptionBudget.maxUnavailable | toJson }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-yugaware
