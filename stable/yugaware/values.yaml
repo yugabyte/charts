@@ -67,6 +67,11 @@ yugaware:
   cloud:
     enabled: false
 
+  podDisruptionBudget:
+    # See https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+    # Note that the default of 0 doesn't really make sense since a StatefulSet isn't allowed to schedule extra replicas. However it is maintained as the default while we do additional testing. This value will likely change in the future.
+    maxUnavailable: 0
+
 prometheus:
   retentionTime: 15d
 
