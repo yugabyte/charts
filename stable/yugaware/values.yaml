@@ -66,6 +66,7 @@ yugaware:
   # enables features specific for cloud deployments
   cloud:
     enabled: false
+    requestIdHeader: "X-REQUEST-ID"
 
   podDisruptionBudget:
     # See https://kubernetes.io/docs/tasks/run-application/configure-pdb/
@@ -142,3 +143,8 @@ sidecars: []
 prometheus:
   scrapeNodes: true
   evaluateAlertRules: true
+
+# Arbitrary key=value config entries for application.docker.conf
+additionalAppConf:
+  stringConf:
+  nonStringConf:
