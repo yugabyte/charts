@@ -66,3 +66,9 @@
     type: boolean
     required: true
     label: Cert-Manager Support
+    - variable: statefulSetAnnotations
+    default: {}
+    description: Annotations for the StatefulSet
+    type: dict
+    required: false
+    label: "Annotations for the StatefulSet"
