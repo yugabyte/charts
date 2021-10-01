@@ -73,9 +73,6 @@ yugaware:
     # Note that the default of 0 doesn't really make sense since a StatefulSet isn't allowed to schedule extra replicas. However it is maintained as the default while we do additional testing. This value will likely change in the future.
     maxUnavailable: 0
 
-prometheus:
-  retentionTime: 15d
-
 ## Configure PostgreSQL part of the application
 postgres:
   service:
@@ -143,6 +140,7 @@ sidecars: []
 prometheus:
   scrapeNodes: true
   evaluateAlertRules: true
+  retentionTime: 15d
 
 # Arbitrary key=value config entries for application.docker.conf
 additionalAppConf:
