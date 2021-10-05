@@ -157,9 +157,10 @@ spec:
           resources:
 {{ toYaml .Values.yugaware.resources | indent 12 }}
           {{- end }}
-          command: [ "/bin/bash", "-c"]
+          command: [ "/sbin/tini", "--"]
           args:
-            - "bin/yugaware -Dconfig.file=/data/application.docker.conf"
+            - "bin/yugaware"
+            - "-Dconfig.file=/data/application.docker.conf"
           env:
             - name: POSTGRES_USER
               valueFrom:
