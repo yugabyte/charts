@@ -122,6 +122,10 @@ helm2Legacy: false
 
 ip_version_support: "v4_only" # v4_only, v6_only are the only supported values at the moment
 
+nginx:
+  # max size of file upload allowed by YB platform
+  upload_size: 10G
+
 rbac:
   ## Set this to false if you don't have enough permissions to create
   ## ClusterRole and Binding, for example an OpenShift cluster. When
