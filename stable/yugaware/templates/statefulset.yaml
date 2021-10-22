@@ -74,6 +74,7 @@ spec:
         {{- end }}
       initContainers:
         - image: {{ include "full_yugaware_image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: prometheus-configuration
           command: ["cp", "/default_prometheus_config/prometheus.yml", "/prometheus_configs/prometheus.yml"]
           {{- if .Values.securityContext.enabled }}
@@ -88,8 +89,9 @@ spec:
             subPath: prometheus.yml
       containers:
         {{ if not .Values.postgres.external.host }}
-        - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
-          name: postgres
+        - name: postgres
+          image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: POSTGRES_USER
               valueFrom:
@@ -111,6 +113,12 @@ spec:
           ports:
             - containerPort: 5432
               name: postgres
+
+         {{- if .Values.postgres.resources }}
+          resources:
+{{ toYaml .Values.postgres.resources | indent 12 }}
+          {{ end }}
+
           volumeMounts:
             - name: yugaware-storage
               mountPath: /var/lib/postgresql/data
@@ -118,10 +126,17 @@ spec:
         {{ end }}
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if (not .Values.ocpCompatibility.enabled) }}
           securityContext:
             runAsUser: 0
           {{- end }}
+
+          {{- if .Values.prometheus.resources }}
+          resources:
+{{ toYaml .Values.prometheus.resources | indent 12 }}
+          {{ end }}
+
           volumeMounts:
           - name: yugaware-storage
             mountPath: /prometheus_configs
@@ -153,10 +168,12 @@ spec:
             runAsUser: {{ .Values.securityContext.runAsUser }}
           {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
           {{- if .Values.yugaware.resources }}
           resources:
 {{ toYaml .Values.yugaware.resources | indent 12 }}
           {{- end }}
+
           command: [ "/sbin/tini", "--"]
           args:
             - "bin/yugaware"
@@ -213,8 +230,15 @@ spec:
             subPath: prometheus.yml
         - name: nginx
           image: {{ include "full_image" (dict "containerName" "nginx" "root" .) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
           - containerPort: 8080
+
+          {{- if .Values.nginx.resources }}
+          resources:
+{{ toYaml .Values.nginx.resources | indent 12 }}
+          {{- end }}
+
           volumeMounts:
           - mountPath: /etc/nginx/conf.d/
             name: nginx-config
