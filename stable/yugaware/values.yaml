@@ -64,6 +64,11 @@ postgres:
     ## IP address for the LoadBalancer, works only if supported by the cloud provider
     ip: ""
 
+  resources:
+    requests:
+      cpu: 0.5
+      memory: 1Gi
+
 tls:
   enabled: false
   hostname: "localhost"
@@ -92,6 +97,11 @@ nginx:
   # max size of file upload allowed by YB platform
   upload_size: 10G
 
+  resources:
+    requests:
+      cpu: 0.25
+      memory: 300Mi
+
 rbac:
   ## Set this to false if you don't have enough permissions to create
   ## ClusterRole and Binding, for example an OpenShift cluster. When
@@ -103,3 +113,9 @@ rbac:
 ## true.
 ocpCompatibility:
   enabled: false
+
+prometheus:
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
