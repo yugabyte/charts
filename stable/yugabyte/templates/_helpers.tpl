@@ -106,6 +106,16 @@ Get YugaByte fs data directories.
 {{- end -}}
 
 {{/*
+Get files from fs data directories for readiness / liveness probes.
+*/}}
+{{- define "yugabyte.fs_data_dirs_probe_files" -}}
+  {{- range $index := until (int (.count)) -}}
+    {{- if ne $index 0 }} {{ end }}"/mnt/disk{{ $index -}}/disk.check"
+  {{- end -}}
+{{- end -}}
+
+
+{{/*
 Generate server FQDN.
 */}}
 {{- define "yugabyte.server_fqdn" -}}
