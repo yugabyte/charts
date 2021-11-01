@@ -229,6 +229,18 @@ spec:
                       cp /home/yugabyte/bin/log_cleanup.sh /mnt/disk0/yb-data/scripts;
                     fi;
                   fi
+        {{- if (and (not $root.Values.storage.ephemeral) (not $service.skipHealthChecks)) }}
+        livenessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - touch {{ template "yugabyte.fs_data_dirs_probe_files" $storageInfo }}
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        {{- end }}
         env:
         - name: POD_IP
           valueFrom:
@@ -261,6 +273,9 @@ spec:
           - "/bin/bash"
           - "-c"
           - |
+          {{- if (and (not $root.Values.storage.ephemeral) (not $root.Values.preflight.skipAll)) }}
+            touch {{ template "yugabyte.fs_data_dirs_probe_files" $storageInfo }} && \
+          {{- end }}
           {{- $rpcAddr := include "yugabyte.rpc_bind_address" $serviceValues -}}
           {{- $rpcPort := index $service.ports "tcp-rpc-port" -}}
           {{- $rpcDict := dict "Addr" $rpcAddr "Port" $rpcPort -}}
