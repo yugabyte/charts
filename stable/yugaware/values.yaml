@@ -41,7 +41,10 @@ yugaware:
   storageClass: ""
   storageAnnotations: {}
   multiTenant: false
-  serviceAccount: yugaware
+  # Providing service account externally won't create new SA.
+  # It just attaches the clusterrole to it. 
+  # Helpful in Yugabyte Platform GKE App. 
+  serviceAccount: ''
   serviceMonitor:
     enabled: false
     annotations: {}
