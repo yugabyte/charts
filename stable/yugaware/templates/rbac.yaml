@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
+  name: {{ .Release.Name }}
   labels:
     k8s-app: yugaware
     kubernetes.io/cluster-service: "true"
