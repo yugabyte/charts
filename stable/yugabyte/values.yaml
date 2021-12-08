@@ -92,6 +92,7 @@ serviceEndpoints:
     ## Sets the Service's externalTrafficPolicy
     # externalTrafficPolicy: ""
     app: "yb-master"
+    loadBalancerIP: ""
     ports:
       http-ui: "7000"
 
@@ -100,6 +101,7 @@ serviceEndpoints:
     ## Sets the Service's externalTrafficPolicy
     # externalTrafficPolicy: ""
     app: "yb-tserver"
+    loadBalancerIP: ""
     ports:
       tcp-yql-port: "9042"
       tcp-yedis-port: "6379"
