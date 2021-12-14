@@ -89,12 +89,16 @@ domainName: "cluster.local"
 serviceEndpoints:
   - name: "yb-master-ui"
     type: LoadBalancer
+    ## Sets the Service's externalTrafficPolicy
+    # externalTrafficPolicy: ""
     app: "yb-master"
     ports:
       http-ui: "7000"
 
   - name: "yb-tserver-service"
     type: LoadBalancer
+    ## Sets the Service's externalTrafficPolicy
+    # externalTrafficPolicy: ""
     app: "yb-tserver"
     ports:
       tcp-yql-port: "9042"
@@ -216,6 +220,69 @@ tolerations: []
 affinity: {}
 
 statefulSetAnnotations: {}
+
+master:
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
+  ## This might override the default affinity from service.yaml
+  ## Example.
+  # affinity:
+  #   podAntiAffinity:
+  #     requiredDuringSchedulingIgnoredDuringExecution:
+  #     - labelSelector:
+  #         matchExpressions:
+  #         - key: app
+  #           operator: In
+  #           values:
+  #           - "yb-master"
+  #       topologyKey: kubernetes.io/hostname
+  affinity: {}
+
+  ## Extra environment variables passed to the Master pods.
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#envvar-v1-core
+  ## Example:
+  # extraEnv:
+  # - name: NODE_IP
+  #   valueFrom:
+  #     fieldRef:
+  #       fieldPath: status.hostIP
+  extraEnv: []
+
+  ## Annotations to be added to the Master pods.
+  podAnnotations: {}
+
+tserver:
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
+  ## This might override the default affinity from service.yaml
+  ## Example.
+  # affinity:
+  #   podAntiAffinity:
+  #     requiredDuringSchedulingIgnoredDuringExecution:
+  #     - labelSelector:
+  #         matchExpressions:
+  #         - key: app
+  #           operator: In
+  #           values:
+  #           - "yb-tserver"
+  #       topologyKey: kubernetes.io/hostname
+  affinity: {}
+
+  ## Extra environment variables passed to the TServer pods.
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#envvar-v1-core
+  ## Example:
+  # extraEnv:
+  # - name: NODE_IP
+  #   valueFrom:
+  #     fieldRef:
+  #       fieldPath: status.hostIP
+  extraEnv: []
+
+  ## Annotations to be added to the TServer pods.
+  podAnnotations: {}
+
+  ## Sets the --server_broadcast_addresses flag on the TServer, no
+  ## preflight checks are done for this address. You might need to add
+  ## `use_private_ip: cloud` to the gflags.master and gflags.tserver.
+  serverBroadcastAddress: ""
 
 helm2Legacy: false
 
