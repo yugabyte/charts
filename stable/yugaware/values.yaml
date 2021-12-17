@@ -120,3 +120,10 @@ prometheus:
       cpu: 2
       memory: 4Gi
   retentionTime: 15d
+
+## Override the APIVersion used by policy group for
+## PodDisruptionBudget resources. The chart selects the correct
+## APIVersion based on the target Kubernetes cluster. You don't need
+## to modify this unless you are using helm template command i.e. GKE
+## app's deployer image against a Kubernetes cluster >= 1.21.
+# pdbPolicyVersionOverride: "v1beta1"
