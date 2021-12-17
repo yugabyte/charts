@@ -99,6 +99,7 @@ spec:
   selector:
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
   type: {{ $endpoint.type }}
+  externalTrafficPolicy: {{ $endpoint.externalTrafficPolicy | default "Cluster" }}
 {{- end}}
 {{- end}}
 {{ end }}
@@ -154,10 +155,19 @@ spec:
       {{- include "yugabyte.appselector" ($appLabelArgs) | indent 6 }}
   template:
     metadata:
-      {{ if $root.Values.networkAnnotation }}
+      {{- if eq .name "yb-masters" }}
+      {{- if (or $root.Values.networkAnnotation $root.Values.master.podAnnotations) }}
       annotations:
-{{ toYaml $root.Values.networkAnnotation | indent 8}}
-      {{ end }}
+      {{- with $root.Values.networkAnnotation }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- with $root.Values.master.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- end }}
+      {{- else }}
+      {{- if (or $root.Values.networkAnnotation $root.Values.tserver.podAnnotations) }}
+      annotations:
+      {{- with $root.Values.networkAnnotation }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- with $root.Values.tserver.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- end }}
+      {{- end }}
       labels:
         {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
         {{- include "yugabyte.labels" $root | indent 8 }}
@@ -204,6 +214,11 @@ spec:
                   - {{ $root.Release.Name | quote }}
                 {{- end }}
               topologyKey: kubernetes.io/hostname
+        {{- if eq .name "yb-masters" }}
+        {{- with $root.Values.master.affinity }}{{ toYaml . | nindent 8 }}{{ end }}
+        {{- else }}
+        {{- with $root.Values.tserver.affinity }}{{ toYaml . | nindent 8 }}{{ end }}
+        {{- end }}
       containers:
       - name: "{{ .label }}"
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
@@ -247,6 +262,11 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        {{- if eq .name "yb-masters" }}
+        {{- with $root.Values.master.extraEnv }}{{ toYaml . | nindent 8 }}{{ end }}
+        {{- else }}
+        {{- with $root.Values.tserver.extraEnv }}{{ toYaml . | nindent 8 }}{{ end }}
+        {{- end }}
         {{- if and $root.Values.tls.enabled $root.Values.tls.clientToServer (ne .name "yb-masters") }}
         - name: SSL_CERTFILE
           value: /root/.yugabytedb/root.crt
@@ -369,9 +389,12 @@ spec:
               --allow_insecure_connections={{ $root.Values.tls.insecure }} \
               --use_client_to_server_encryption={{ $root.Values.tls.clientToServer }} \
               --certs_for_client_dir=/opt/certs/yugabyte \
+              {{- if $root.Values.tserver.serverBroadcastAddress }}
+              --cert_node_filename={{ include "yugabyte.server_fqdn" $serviceValues }} \
+              {{- end }}
             {{- end }}
               --rpc_bind_addresses={{ $rpcAddr }} \
-              --server_broadcast_addresses={{ $broadcastAddr }} \
+              --server_broadcast_addresses={{ $root.Values.tserver.serverBroadcastAddress | default $broadcastAddr }} \
               --webserver_interface={{ $webserverAddr }} \
             {{- if not $root.Values.disableYsql }}
               --enable_ysql=true \
