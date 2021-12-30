@@ -99,6 +99,9 @@ spec:
   selector:
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
   type: {{ $endpoint.type }}
+  {{- if $endpoint.loadBalancerIP }}
+  loadBalancerIP: {{ $endpoint.loadBalancerIP }}
+  {{- end }}
 {{- end}}
 {{- end}}
 {{ end }}
