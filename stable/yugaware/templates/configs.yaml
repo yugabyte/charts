@@ -27,8 +27,6 @@ data:
     play.crypto.secret=${APP_SECRET}
     play.i18n.langs = [ "en" ]
     pidfile.path = "/dev/null"
-    play.evolutions.enabled=false
-    play.modules.enabled += "org.flywaydb.play.PlayModule"
     play.logger.includeConfigProperties=true
     log.override.path = "/opt/yugabyte/yugaware/data/logs"
 
@@ -55,8 +53,6 @@ data:
     ebean {
       default = ["com.yugabyte.yw.models.*"]
     }
-
-    play.modules.enabled += "org.flywaydb.play.PlayModule"
 
     yb {
   {{- if .Values.yugaware.universe_boot_script }}
