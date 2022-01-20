@@ -90,12 +90,14 @@ serviceEndpoints:
   - name: "yb-master-ui"
     type: LoadBalancer
     app: "yb-master"
+    # loadBalancerIP: ""
     ports:
       http-ui: "7000"
 
   - name: "yb-tserver-service"
     type: LoadBalancer
     app: "yb-tserver"
+    # loadBalancerIP: ""
     ports:
       tcp-yql-port: "9042"
       tcp-yedis-port: "6379"
