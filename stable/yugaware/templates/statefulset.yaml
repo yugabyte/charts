@@ -60,6 +60,12 @@ spec:
             items:
               - key: default.conf
                 path: default.conf
+        - name: nginx-main-config
+          configMap:
+            name: {{ .Release.Name }}-yugaware-nginx-main-config
+            items:
+              - key: nginx.conf
+                path: nginx.conf
         - name: prometheus-config
           configMap:
             name: {{ .Release.Name }}-yugaware-prometheus-config
@@ -242,6 +248,9 @@ spec:
           volumeMounts:
           - mountPath: /etc/nginx/conf.d/
             name: nginx-config
+          - mountPath: /etc/nginx/nginx.conf
+            subPath: nginx.conf
+            name: nginx-main-config
           {{- if .Values.tls.enabled }}
           - name: {{  .Release.Name }}-yugaware-tls-cert
             mountPath: /opt/certs/
