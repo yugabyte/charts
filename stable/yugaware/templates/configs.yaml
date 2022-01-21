@@ -184,6 +184,52 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: {{ .Release.Name }}-yugaware-nginx-main-config
+  labels:
+    app: {{ template "yugaware.name" . }}
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+data:
+  nginx.conf: |
+    worker_processes  1;
+
+    error_log  /var/log/nginx/error.log warn;
+    pid        /tmp/nginx.pid;
+
+    events {
+      worker_connections  {{ .Values.nginx.workerConnections }};
+    }
+
+    http {
+      proxy_temp_path /tmp/proxy_temp;
+      client_body_temp_path /tmp/client_temp;
+      fastcgi_temp_path /tmp/fastcgi_temp;
+      uwsgi_temp_path /tmp/uwsgi_temp;
+      scgi_temp_path /tmp/scgi_temp;
+
+      include       /etc/nginx/mime.types;
+      default_type  application/octet-stream;
+
+      log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for"';
+
+      access_log  /var/log/nginx/access.log  main;
+
+      sendfile        on;
+      #tcp_nopush     on;
+
+      keepalive_timeout  65;
+
+      #gzip  on;
+
+      include /etc/nginx/conf.d/*.conf;
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: {{ .Release.Name }}-yugaware-prometheus-config
   labels:
     app: {{ template "yugaware.name" . }}
