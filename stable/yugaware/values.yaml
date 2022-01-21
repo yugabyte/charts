@@ -122,6 +122,9 @@ helm2Legacy: false
 
 ip_version_support: "v4_only" # v4_only, v6_only are the only supported values at the moment
 
+nginx:
+  workerConnections: 1024
+
 rbac:
   ## Set this to false if you don't have enough permissions to create
   ## ClusterRole and Binding, for example an OpenShift cluster. When
