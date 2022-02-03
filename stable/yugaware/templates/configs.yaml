@@ -85,6 +85,7 @@ data:
       health.ses_email_password = "{{ .Values.yugaware.health.password }}"
       kubernetes.storageClass = "{{ .Values.yugaware.storageClass }}"
       kubernetes.pullSecretName = "{{ .Values.image.pullSecret }}"
+      url = "https://{{ .Values.tls.hostname }}"
     }
 
     play.filters {
