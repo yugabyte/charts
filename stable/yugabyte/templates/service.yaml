@@ -278,7 +278,7 @@ spec:
         {{- with $root.Values.tserver.extraEnv }}{{ toYaml . | nindent 8 }}{{ end }}
         {{- end }}
         {{- if and $root.Values.tls.enabled $root.Values.tls.clientToServer (ne .name "yb-masters") }}
-        - name: SSL_CERTFILE
+        - name: SSL_ROOT_CERTFILE
           value: /root/.yugabytedb/root.crt
         {{- end }}
         resources:
