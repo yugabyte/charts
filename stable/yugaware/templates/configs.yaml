@@ -179,12 +179,6 @@ data:
 {{- if .Values.nginx.db_node_proxy_enabled }}
       location ~ "^/universes/.+/proxy/(.+):(7000|9000|9300|12000|13000)/(metrics|prometheus-metrics)$" {
         proxy_pass "http://$1:$2/$3$is_args$args";
-        sub_filter "http://" "/proxy/";
-        sub_filter "href='/" "href='/proxy/$1:$2/";
-        sub_filter "href=\"/" "href=\"/proxy/$1:$2/";
-        sub_filter "src='/" "src='/proxy/$1:$2/";
-        sub_filter "src=\"/" "src=\"/proxy/$1:$2/";
-        sub_filter_once off;
     }
 {{- end }}
 
