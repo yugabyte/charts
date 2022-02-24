@@ -129,6 +129,7 @@ ip_version_support: "v4_only" # v4_only, v6_only are the only supported values a
 
 nginx:
   workerConnections: 1024
+  db_node_proxy_enabled: false
 
   # max size of file upload allowed by YB platform
   upload_size: 10G
