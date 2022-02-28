@@ -302,6 +302,9 @@ spec:
         # https://github.com/yugabyte/charts/issues/11
         workingDir: "/mnt/disk0/cores"
         command:
+          - "/sbin/tini"
+          - "--"
+        args:
           - "/bin/bash"
           - "-c"
           - |
