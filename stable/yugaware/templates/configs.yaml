@@ -164,7 +164,7 @@ data:
       listen  {{ eq .Values.ip_version_support "v6_only" | ternary "[::]:8080" "8080" }};
       server_name {{ .Values.tls.hostname }};
       return  301  https://$host$request_uri;
-    }  
+    }
 {{- end }}
 
     server {
@@ -415,7 +415,7 @@ data:
         metric_relabel_configs:
           # Only keep the metrics which we care about
           - source_labels: ["__name__"]
-            regex: "kube_pod_container_resource_requests_cpu_cores"
+            regex: "kube_pod_container_resource_requests(_cpu_cores|)"
             action: keep
           # Save the name of the metric so we can group_by since we cannot by __name__ directly...
           - source_labels: ["__name__"]
@@ -434,6 +434,12 @@ data:
           - source_labels: ["pod_name"]
             regex: "(.*)yb-(.*)"
             action: keep
+          # rename new name of the CPU metric to the old name and label
+          # ref: https://github.com/kubernetes/kube-state-metrics/blob/master/CHANGELOG.md#v200-alpha--2020-09-16
+          - source_labels: ["__name__", "unit"]
+            regex: "kube_pod_container_resource_requests;core"
+            target_label: "__name__"
+            replacement: "kube_pod_container_resource_requests_cpu_cores"
 
       - job_name: 'kubernetes-cadvisor'
 
