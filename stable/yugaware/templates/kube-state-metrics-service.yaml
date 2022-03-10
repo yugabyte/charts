@@ -1,0 +1,23 @@
+{{- if and .Values.kubeStateMetric.install (not .Values.kubeStateMetric.customEndpoint) -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-ksm
+  labels:
+    app: {{ .Release.Name }}-yugaware-ksm
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+  {{- if .Values.yugaware.service.annotations }}
+  annotations:
+  {{ toYaml .Values.yugaware.service.annotations | indent 4 }}
+  {{- end }}
+spec:
+  type: "ClusterIP"
+  ports:
+  - name: "http"
+    protocol: TCP
+    port: 8080
+    targetPort: 8080
+  selector:
+    app: {{ .Release.Name }}-yugaware-ksm
+{{- end -}}

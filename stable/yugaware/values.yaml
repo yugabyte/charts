@@ -176,3 +176,36 @@ additionalAppConf:
 ## to modify this unless you are using helm template command i.e. GKE
 ## app's deployer image against a Kubernetes cluster >= 1.21.
 # pdbPolicyVersionOverride: "v1beta1"
+
+## kube-state-metric support
+## Custom endpoint has higher priority than installation. 
+kubeStateMetric:
+  ## To provide custom kube-state-metric endpoint
+  # customEndpoint: "kube-state-metrics.svc.cluster.local:8080"
+  ## To enable the kube-state-metric installation along with platform
+  install: false
+  image:
+    repository: k8s.gcr.io/kube-state-metrics/kube-state-metrics
+    tag: v2.4.1
+    pullPolicy: IfNotPresent
+  replicas: 1
+  securityContext:
+    enabled: true
+    runAsGroup: 65534
+    runAsUser: 65534
+    fsGroup: 65534
+  resources:
+    limits:
+      cpu: 100m
+      memory: 64Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
+  ## List of additional cli arguments to configure kube-state-metrics
+  ## for example: --enable-gzip-encoding, --log-file, etc.
+  ## all the possible args can be found here: https://github.com/kubernetes/kube-state-metrics/blob/master/docs/cli-arguments.md
+  extraArgs: []
+  ## As we know platform need only nodes and pods metrics from kube-state-metrics
+  ## So we just enable the collector for nodes and pods.
+  collectors:
+    - pods
