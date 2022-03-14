@@ -161,16 +161,22 @@ spec:
   template:
     metadata:
       {{- if eq .name "yb-masters" }}
-      {{- if (or $root.Values.networkAnnotation $root.Values.master.podAnnotations) }}
+      {{- if (or $root.Values.networkAnnotation $root.Values.master.podAnnotations $root.Values.tls.enabled) }}
       annotations:
       {{- with $root.Values.networkAnnotation }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- with $root.Values.master.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- if $root.Values.tls.enabled }}
+        checksum/rootCA: {{ cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum }}
+      {{- end }}
       {{- end }}
       {{- else }}
-      {{- if (or $root.Values.networkAnnotation $root.Values.tserver.podAnnotations) }}
+      {{- if (or $root.Values.networkAnnotation $root.Values.tserver.podAnnotations $root.Values.tls.enabled) }}
       annotations:
       {{- with $root.Values.networkAnnotation }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- with $root.Values.tserver.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- if $root.Values.tls.enabled }}
+        checksum/rootCA: {{ cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum }}
+      {{- end }}
       {{- end }}
       {{- end }}
       labels:
