@@ -187,6 +187,9 @@ spec:
       imagePullSecrets:
       - name: {{ $root.Values.Image.pullSecretName }}
       {{ end }}
+      {{- if $root.Values.podSecurityContext.enabled }}
+      securityContext: {{- omit $root.Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      {{- end }}
       {{- if $root.Values.nodeSelector }}
       nodeSelector:
       {{ toYaml $root.Values.nodeSelector | indent 8 }}
