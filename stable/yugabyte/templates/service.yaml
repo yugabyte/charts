@@ -11,11 +11,17 @@ metadata:
     {{- include "yugabyte.labels" $root | indent 4 }}
 type: Opaque
 data:
+{{- if $root.Values.tls.rootCA.key }}
 {{- $rootCAClient := buildCustomCert $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key -}}
 {{- $client := genSignedCert "yugabyte" ( default nil ) ( default nil ) 3650 $rootCAClient }}
   root.crt: {{ $rootCAClient.Cert | b64enc }}
   yugabytedb.crt: {{ $client.Cert | b64enc }}
   yugabytedb.key: {{ $client.Key | b64enc }}
+{{- else }}
+  root.crt: {{ $root.Values.tls.rootCA.cert }}
+  yugabytedb.crt: {{ $root.Values.tls.clientCert.cert }}
+  yugabytedb.key: {{ $root.Values.tls.clientCert.key }}
+{{- end }}
 ---
 {{- end }}
 
@@ -36,19 +42,24 @@ metadata:
     {{- include "yugabyte.labels" $root | indent 4 }}
 type: Opaque
 data:
-{{- $rootCA := buildCustomCert $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key -}}
 {{- $replicas := (eq .name "yb-masters") | ternary $root.Values.replicas.master $root.Values.replicas.tserver -}}
 {{- range $index := until ( int ( $replicas ) ) }}
 {{- $nodeOldStyle := printf "%s-%d.%s.%s.svc.%s" $service.label $index $service.name $root.Release.Namespace $root.Values.domainName }}
 {{- $nodeNewStyle := printf "%s-%s-%d.%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
 {{- $node := $root.Values.oldNamingStyle | ternary $nodeOldStyle $nodeNewStyle }}
+{{- if $root.Values.tls.rootCA.key }}
 {{- $dns1 := printf "*.*.%s" $root.Release.Namespace }}
 {{- $dns2 := printf "%s.svc.%s" $dns1 $root.Values.domainName }}
+{{- $rootCA := buildCustomCert $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key -}}
 {{- $server := genSignedCert $node ( default nil ) (list $dns1 $dns2 ) 3650 $rootCA }}
   node.{{$node}}.crt: {{ $server.Cert | b64enc }}
   node.{{$node}}.key: {{ $server.Key | b64enc }}
+{{- else }}
+  node.{{$node}}.crt: {{ $root.Values.tls.nodeCert.cert }}
+  node.{{$node}}.key: {{ $root.Values.tls.nodeCert.key }}
 {{- end }}
-  ca.crt: {{ $rootCA.Cert | b64enc }}
+{{- end }}
+  ca.crt: {{ $root.Values.tls.rootCA.cert }}
 {{- end }}
 
 ---
