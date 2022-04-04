@@ -312,7 +312,7 @@ preflight:
 
 ## Pod securityContext
 ## Ref: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#security-context
-## Run YB Master and YB Tserver as a non-root user
+## The following configuration runs YB-Master and YB-TServer as a non-root user
 podSecurityContext:
   enabled: false
   ## Mark it false, if you want to stop the non root user validation
