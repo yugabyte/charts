@@ -156,6 +156,7 @@ metadata:
 data:
   default.conf: |
 {{- if .Values.tls.enabled }}
+    # Ref: https://www.nginx.com/blog/http-strict-transport-security-hsts-and-nginx/
     server {
       listen  {{ eq .Values.ip_version_support "v6_only" | ternary "[::]:8080" "8080" }};
       server_name {{ .Values.tls.hostname }};
@@ -172,13 +173,15 @@ data:
       ssl_protocols {{ include "validate_nginx_ssl_protocols" . }};
 {{- end }}
       server_name  {{ .Values.tls.hostname }};
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 {{- else }}
       listen       {{ eq .Values.ip_version_support "v6_only" | ternary "[::]:8080" "8080" }};
       server_name  {{ .Values.tls.hostname }};
 {{- end }}
       proxy_http_version 1.1;
       proxy_set_header X-Real-IP  $remote_addr;
-      proxy_set_header X-Forwarded-For $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
       proxy_set_header Host $host;
 
       location / {
