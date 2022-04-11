@@ -347,10 +347,14 @@ data:
             regex: "(.*)"
             target_label: "container_name"
             replacement: "$1"
-          - source_labels: ["__name__", "unit"]
-            regex: "kube_pod_container_resource_requests;core"
+          - source_labels: ["__name__"]
+            regex: "kube_pod_container_resource_requests_cpu_cores"
+            target_label: "unit"
+            replacement: "core"
+          - source_labels: ["__name__"]
+            regex: "kube_pod_container_resource_requests_cpu_cores"
             target_label: "__name__"
-            replacement: "kube_pod_container_resource_requests_cpu_cores"
+            replacement: "kube_pod_container_resource_requests"
 
       - job_name: 'kubernetes-cadvisor'
 
