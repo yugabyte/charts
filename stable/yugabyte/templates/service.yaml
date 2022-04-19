@@ -145,12 +145,16 @@ spec:
     {{- range $index := until (int ($storageInfo.count )) }}
     - metadata:
         name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
+        {{- if $root.Values.legacyVolumeClaimAnnotations }}
+        annotations:
+          volume.beta.kubernetes.io/storage-class: {{ $storageInfo.storageClass | quote }}
+        {{- end }}
         labels:
           {{- include "yugabyte.labels" $root | indent 10 }}
       spec:
         accessModes:
           - "ReadWriteOnce"
-        {{- if $storageInfo.storageClass }}
+        {{- if or $root.Values.legacyVolumeClaimAnnotations $storageInfo.storageClass }}
         storageClassName: {{ $storageInfo.storageClass }}
         {{- end }}
         resources:
