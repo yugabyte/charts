@@ -261,6 +261,7 @@ data:
         evaluation_interval: 10s
     rule_files:
       - '/opt/yugabyte/prometheus/rules/yugaware.ad.*.yml'
+      - '/opt/yugabyte/prometheus/rules/yugaware.recording-rules.yml'
     scrape_configs:
       {{- if .Values.ocpCompatibility.enabled }}
       - job_name: "ocp-prometheus-federated"
