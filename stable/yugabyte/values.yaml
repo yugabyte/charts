@@ -4,11 +4,11 @@
 Component: "yugabytedb"
 Image:
   repository: "yugabytedb/yugabyte"
-  tag: 2.5.1.0-b153
+  tag: 2.13.1.0-b112
   pullPolicy: IfNotPresent
 
 storage:
-  ephemeral: false  # will not allocate PVs when true
+  ephemeral: false # will not allocate PVs when true
   master:
     count: 2
     size: 10Gi
@@ -156,7 +156,8 @@ serviceMonitor:
   interval: 30s
   ## extraLabels can be used to add labels to the ServiceMonitors
   ## being created
-  extraLabels: {}
+  extraLabels:
+    {}
     # release: prom
 
   ## Configurations of ServiceMonitor for yb-master
@@ -189,29 +190,29 @@ serviceMonitor:
     path: "/prometheus-metrics"
 
   commonMetricRelabelings:
-  # https://git.io/JJW5p
-  # Save the name of the metric so we can group_by since we cannot by __name__ directly...
-  - sourceLabels: ["__name__"]
-    regex: "(.*)"
-    targetLabel: "saved_name"
-    replacement: "$1"
-  # The following basically retrofit the handler_latency_* metrics to label format.
-  - sourceLabels: ["__name__"]
-    regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(.*)"
-    targetLabel: "server_type"
-    replacement: "$1"
-  - sourceLabels: ["__name__"]
-    regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(.*)"
-    targetLabel: "service_type"
-    replacement: "$2"
-  - sourceLabels: ["__name__"]
-    regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(_sum|_count)?"
-    targetLabel: "service_method"
-    replacement: "$3"
-  - sourceLabels: ["__name__"]
-    regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(_sum|_count)?"
-    targetLabel: "__name__"
-    replacement: "rpc_latency$4"
+    # https://git.io/JJW5p
+    # Save the name of the metric so we can group_by since we cannot by __name__ directly...
+    - sourceLabels: ["__name__"]
+      regex: "(.*)"
+      targetLabel: "saved_name"
+      replacement: "$1"
+    # The following basically retrofit the handler_latency_* metrics to label format.
+    - sourceLabels: ["__name__"]
+      regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(.*)"
+      targetLabel: "server_type"
+      replacement: "$1"
+    - sourceLabels: ["__name__"]
+      regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(.*)"
+      targetLabel: "service_type"
+      replacement: "$2"
+    - sourceLabels: ["__name__"]
+      regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(_sum|_count)?"
+      targetLabel: "service_method"
+      replacement: "$3"
+    - sourceLabels: ["__name__"]
+      regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(_sum|_count)?"
+      targetLabel: "__name__"
+      replacement: "rpc_latency$4"
 
 resources: {}
 
