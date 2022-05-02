@@ -235,6 +235,10 @@ spec:
         {{- else }}
         {{- with $root.Values.tserver.affinity }}{{ toYaml . | nindent 8 }}{{ end }}
         {{- end }}
+      {{- with $root.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: "{{ .label }}"
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
