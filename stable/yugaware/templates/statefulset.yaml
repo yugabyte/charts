@@ -101,17 +101,17 @@ spec:
           env:
             - name: POSTGRES_USER
               valueFrom:
-                configMapKeyRef:
+                secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_user
             - name: POSTGRES_PASSWORD
               valueFrom:
-                configMapKeyRef:
+                secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_password
             - name: POSTGRES_DB
               valueFrom:
-                configMapKeyRef:
+                secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_db
             - name: PGDATA
@@ -187,22 +187,22 @@ spec:
           env:
             - name: POSTGRES_USER
               valueFrom:
-                configMapKeyRef:
+                secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_user
             - name: POSTGRES_PASSWORD
               valueFrom:
-                configMapKeyRef:
+                secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_password
             - name: POSTGRES_DB
               valueFrom:
-                configMapKeyRef:
+                secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_db
             - name: APP_SECRET
               valueFrom:
-                configMapKeyRef:
+                secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: app_secret
           ports:
