@@ -154,7 +154,7 @@ spec:
       spec:
         accessModes:
           - "ReadWriteOnce"
-        {{- if or $root.Values.legacyVolumeClaimAnnotations $storageInfo.storageClass }}
+        {{- if $storageInfo.storageClass }}
         storageClassName: {{ $storageInfo.storageClass }}
         {{- end }}
         resources:
