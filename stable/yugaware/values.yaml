@@ -178,7 +178,7 @@ additionalAppConf:
 # pdbPolicyVersionOverride: "v1beta1"
 
 ## kube-state-metric support
-## Custom endpoint has higher priority than installation. 
+## Custom endpoint has higher priority than installation. The endpoint value defaults to kube-state-metrics.kube-system.svc.<domainName>:8080.
 kubeStateMetric:
   ## To provide custom kube-state-metric endpoint
   # customEndpoint: "kube-state-metrics.svc.cluster.local:8080"
@@ -205,7 +205,7 @@ kubeStateMetric:
   ## for example: --enable-gzip-encoding, --log-file, etc.
   ## all the possible args can be found here: https://github.com/kubernetes/kube-state-metrics/blob/master/docs/cli-arguments.md
   extraArgs: []
-  ## As we know platform need only nodes and pods metrics from kube-state-metrics
-  ## So we just enable the collector for nodes and pods.
+  ## As we know platform need only pods metrics from kube-state-metrics
+  ## So we just enable the collector for pods.
   collectors:
     - pods

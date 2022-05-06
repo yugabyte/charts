@@ -347,6 +347,8 @@ data:
             regex: "(.*)"
             target_label: "container_name"
             replacement: "$1"
+          # rename old name of the CPU metric to the new name and label
+          # ref: https://github.com/kubernetes/kube-state-metrics/blob/master/CHANGELOG.md#v200-alpha--2020-09-16
           - source_labels: ["__name__"]
             regex: "kube_pod_container_resource_requests_cpu_cores"
             target_label: "unit"

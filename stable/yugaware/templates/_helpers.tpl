@@ -116,7 +116,7 @@ Make list of allowed CORS origins
 {{/*
 kube-state-metrics
 */}}
-{{- define "kubeStateMetric.endpoint" -}}
+{{- define "yugaware.kubeStateMetrics.endpoint" -}}
 {{- if .Values.kubeStateMetric.customEndpoint -}}
 {{- .Values.kubeStateMetric.customEndpoint -}}
 {{- else if .Values.kubeStateMetric.install -}}

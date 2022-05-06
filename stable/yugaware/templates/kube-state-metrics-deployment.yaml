@@ -1,3 +1,4 @@
+# Adapted from https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-state-metrics (Apache-2.0 license)
 {{- if and .Values.kubeStateMetric.install (not .Values.kubeStateMetric.customEndpoint) -}}
 apiVersion: apps/v1
 kind: Deployment
