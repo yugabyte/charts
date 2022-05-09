@@ -309,3 +309,7 @@ preflight:
   skipAll: false
   # Set to true to skip port bind checks
   skipBind: false
+
+## Added to handle old universe which has volume annotations
+## K8s universe <= 2.5 to >= 2.6
+legacyVolumeClaimAnnotations: false
