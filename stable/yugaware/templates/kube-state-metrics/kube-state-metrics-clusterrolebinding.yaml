@@ -1,4 +1,4 @@
-{{- if and .Values.kubeStateMetric.install (not .Values.kubeStateMetric.customEndpoint) -}}
+{{- if and .Values.kubeStateMetrics.install (not .Values.kubeStateMetrics.customEndpoint) -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

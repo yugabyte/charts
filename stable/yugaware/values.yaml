@@ -177,9 +177,9 @@ additionalAppConf:
 ## app's deployer image against a Kubernetes cluster >= 1.21.
 # pdbPolicyVersionOverride: "v1beta1"
 
-## kube-state-metric support
+## kube-state-metrics support
 ## Custom endpoint has higher priority than installation. The endpoint value defaults to kube-state-metrics.kube-system.svc.<domainName>:8080.
-kubeStateMetric:
+kubeStateMetrics:
   ## To provide custom kube-state-metric endpoint
   # customEndpoint: "kube-state-metrics.svc.cluster.local:8080"
   ## To enable the kube-state-metric installation along with platform

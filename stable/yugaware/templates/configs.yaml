@@ -332,7 +332,7 @@ data:
 
       - job_name: 'kube-state-metrics'
         static_configs:
-        - targets: ['{{ template "kubeStateMetric.endpoint" . }}']
+        - targets: ['{{ template "yugaware.kubeStateMetrics.endpoint" . }}']
         metric_relabel_configs:
           # Save the name of the metric so we can group_by since we cannot by __name__ directly...
           - source_labels: ["__name__"]

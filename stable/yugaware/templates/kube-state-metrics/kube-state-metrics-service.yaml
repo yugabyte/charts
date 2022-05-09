@@ -1,4 +1,4 @@
-{{- if and .Values.kubeStateMetric.install (not .Values.kubeStateMetric.customEndpoint) -}}
+{{- if and .Values.kubeStateMetrics.install (not .Values.kubeStateMetrics.customEndpoint) -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,10 +7,6 @@ metadata:
     app: {{ .Release.Name }}-yugaware-ksm
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
-  {{- if .Values.yugaware.service.annotations }}
-  annotations:
-  {{ toYaml .Values.yugaware.service.annotations | indent 4 }}
-  {{- end }}
 spec:
   type: "ClusterIP"
   ports:
