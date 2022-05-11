@@ -320,3 +320,7 @@ podSecurityContext:
   fsGroup: 10001
   runAsUser: 10001
   runAsGroup: 10001
+  
+## Added to handle old universe which has volume annotations
+## K8s universe <= 2.5 to >= 2.6
+legacyVolumeClaimAnnotations: false
