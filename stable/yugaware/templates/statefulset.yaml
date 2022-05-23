@@ -82,10 +82,30 @@ spec:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: prometheus-configuration
-          command: ["cp", "/default_prometheus_config/prometheus.yml", "/prometheus_configs/prometheus.yml"]
+          command:
+            - 'bash'
+            - '-c'
+            - >
+              cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml;
+              echo "finding pem files with 660 permission";
+              directory_name="/opt/yugabyte/yugaware/data";
+              pemfiles=$(find "$directory_name"/keys/** -name "*.pem" -exec stat -c "%a" {} +);
+              if [[ $pemfiles == *660* ]]; then
+                echo "creating new key directory";
+                mkdir "$directory_name"/new_keys;
+                echo "copying content of data/key/* to new keys directory";
+                cp -r "$directory_name"/keys/* "$directory_name"/new_keys/;
+                echo "setting permission to all pem files to 600";
+                find "$directory_name"/new_keys/** -name "*.pem" -exec chmod 600 {} +;
+                echo "Renaming old keys directory";
+                mv "$directory_name"/keys "$directory_name"/keys-"$(date +%s)";
+                echo "Renaming new keys directory";
+                mv "$directory_name"/new_keys "$directory_name"/keys;
+              else
+                echo "Does not find pem file with 660 permission";
+              fi;
           {{- if .Values.securityContext.enabled }}
-          securityContext:
-            runAsUser: {{ .Values.securityContext.runAsUser }}
+          securityContext: {{- omit .Values.securityContext "enabled" "fsGroup" | toYaml | nindent 12 }}
           {{- end }}
           volumeMounts:
           - name: prometheus-config
@@ -93,6 +113,9 @@ spec:
           - name: yugaware-storage
             mountPath: /prometheus_configs
             subPath: prometheus.yml
+          - name: yugaware-storage
+            mountPath: /opt/yugabyte/yugaware/data/
+            subPath: data
       containers:
         {{ if not .Values.postgres.external.host }}
         - name: postgres
@@ -133,7 +156,9 @@ spec:
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if (not .Values.ocpCompatibility.enabled) }}
+          {{- if .Values.securityContext.enabled }}
+          securityContext: {{- omit .Values.securityContext "enabled" "fsGroup"  | toYaml | nindent 12 }}
+          {{- else if (not .Values.ocpCompatibility.enabled) }}
           securityContext:
             runAsUser: 0
           {{- end }}
@@ -170,8 +195,7 @@ spec:
         - name: yugaware
           image: {{ include "full_yugaware_image" . }}
           {{- if .Values.securityContext.enabled }}
-          securityContext:
-            runAsUser: {{ .Values.securityContext.runAsUser }}
+          securityContext: {{- omit .Values.securityContext "enabled" "fsGroup" | toYaml | nindent 12 }}
           {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
 
