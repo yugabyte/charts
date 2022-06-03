@@ -159,6 +159,9 @@ prometheus:
   scrapeNodes: true
   evaluateAlertRules: true
   retentionTime: 15d
+  queryConcurrency: 20
+  queryMaxSamples: 5000000
+  queryTimeout: 30s
 
   resources:
     requests:

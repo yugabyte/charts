@@ -165,6 +165,9 @@ spec:
             - --web.enable-admin-api
             - --web.enable-lifecycle
             - --storage.tsdb.retention.time={{ .Values.prometheus.retentionTime }}
+            - --query.max-concurrency={{ .Values.prometheus.queryConcurrency }}
+            - --query.max-samples={{ .Values.prometheus.queryMaxSamples }}
+            - --query.timeout={{ .Values.prometheus.queryTimeout }}
           ports:
             - containerPort: 9090
         - name: yugaware
