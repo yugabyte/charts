@@ -32,6 +32,9 @@ spec:
       {{- if .Values.securityContext.enabled }}
       securityContext:
         fsGroup: {{ .Values.securityContext.fsGroup }}
+        {{- if (semverCompare ">=1.20-x" .Capabilities.KubeVersion.Version) }}
+        fsGroupChangePolicy: {{ .Values.securityContext.fsGroupChangePolicy }}
+        {{- end }}
       {{- end }}
       volumes:
         - name: yugaware-storage
@@ -72,7 +75,14 @@ spec:
             items:
               - key: prometheus.yml
                 path: prometheus.yml
-
+        {{- if .Values.securityContext.enabled }}
+        - name: init-container-script
+          configMap:
+            name: {{ .Release.Name }}-yugaware-init
+            items:
+              - key: init-permissions.sh
+                path: init-permissions.sh
+        {{- end }}
         {{- if .Values.tls.enabled }}
         - name: {{  .Release.Name }}-yugaware-tls-cert
           secret:
@@ -82,10 +92,19 @@ spec:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: prometheus-configuration
-          command: ["cp", "/default_prometheus_config/prometheus.yml", "/prometheus_configs/prometheus.yml"]
           {{- if .Values.securityContext.enabled }}
+          command:
+            - 'bash'
+            - '-c'
+            - >
+              cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml;
+              bash /init-container/init-permissions.sh;
           securityContext:
             runAsUser: {{ .Values.securityContext.runAsUser }}
+            runAsGroup: {{ .Values.securityContext.runAsGroup }}
+            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+          {{- else }}
+          command: ["cp", "/default_prometheus_config/prometheus.yml", "/prometheus_configs/prometheus.yml"]
           {{- end }}
           volumeMounts:
           - name: prometheus-config
@@ -93,6 +112,13 @@ spec:
           - name: yugaware-storage
             mountPath: /prometheus_configs
             subPath: prometheus.yml
+          {{- if .Values.securityContext.enabled }}
+          - name: yugaware-storage
+            mountPath: /opt/yugabyte/yugaware/data/
+            subPath: data
+          - name: init-container-script
+            mountPath: /init-container
+          {{- end }}
       containers:
         {{ if not .Values.postgres.external.host }}
         - name: postgres
@@ -133,7 +159,12 @@ spec:
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if (not .Values.ocpCompatibility.enabled) }}
+          {{- if .Values.securityContext.enabled }}
+          securityContext:
+            runAsUser: {{ .Values.securityContext.runAsUser }}
+            runAsGroup: {{ .Values.securityContext.runAsGroup }}
+            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+          {{- else if (not .Values.ocpCompatibility.enabled) }}
           securityContext:
             runAsUser: 0
           {{- end }}
@@ -175,6 +206,8 @@ spec:
           {{- if .Values.securityContext.enabled }}
           securityContext:
             runAsUser: {{ .Values.securityContext.runAsUser }}
+            runAsGroup: {{ .Values.securityContext.runAsGroup }}
+            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
           {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
 
