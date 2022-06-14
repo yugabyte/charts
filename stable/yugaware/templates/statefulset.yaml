@@ -78,7 +78,7 @@ spec:
         {{- if .Values.securityContext.enabled }}
         - name: init-container-script
           configMap:
-            name: {{ .Release.Name }}-yugaware-init-container
+            name: {{ .Release.Name }}-yugaware-init
             items:
               - key: init-permissions.sh
                 path: init-permissions.sh
