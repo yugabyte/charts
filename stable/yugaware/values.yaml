@@ -114,8 +114,14 @@ tls:
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 securityContext:
   enabled: false
-  fsGroup: 1001
-  runAsUser: 1001
+  ## fsGroup related values are set at the pod level.
+  fsGroup: 10001
+  fsGroupChangePolicy: "OnRootMismatch"
+  ## The following values are set for yugaware and prometheus containers.
+  ## Setting runAsUser other than 10001 will fail the VM universe deployment flow.
+  runAsUser: 10001
+  runAsGroup: 10001
+  runAsNonRoot: true
 
 helm:
   timeout: 900
