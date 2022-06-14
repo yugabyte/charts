@@ -118,6 +118,7 @@ securityContext:
   runAsUser: 10001
   runAsGroup: 10001
   runAsNonRoot: true
+  fsGroupChangePolicy: "OnRootMismatch"
 
 helm:
   timeout: 900

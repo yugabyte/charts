@@ -32,6 +32,9 @@ spec:
       {{- if .Values.securityContext.enabled }}
       securityContext:
         fsGroup: {{ .Values.securityContext.fsGroup }}
+        {{- if (semverCompare ">=1.20-x" .Capabilities.KubeVersion.Version) }}
+        fsGroupChangePolicy: {{ .Values.securityContext.fsGroupChangePolicy }}
+        {{- end }}
       {{- end }}
       volumes:
         - name: yugaware-storage
@@ -72,7 +75,14 @@ spec:
             items:
               - key: prometheus.yml
                 path: prometheus.yml
-
+        {{- if .Values.securityContext.enabled }}
+        - name: init-container-script
+          configMap:
+            name: {{ .Release.Name }}-yugaware-init-container
+            items:
+              - key: init-permissions.sh
+                path: init-permissions.sh
+        {{- end }}
         {{- if .Values.tls.enabled }}
         - name: {{  .Release.Name }}-yugaware-tls-cert
           secret:
@@ -82,30 +92,19 @@ spec:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: prometheus-configuration
+          {{- if .Values.securityContext.enabled }}
           command:
             - 'bash'
             - '-c'
             - >
               cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml;
-              echo "finding pem files with 660 permission";
-              directory_name="/opt/yugabyte/yugaware/data";
-              pemfiles=$(find "$directory_name"/keys/** -name "*.pem" -exec stat -c "%a" {} +);
-              if [[ $pemfiles == *660* ]]; then
-                echo "creating new key directory";
-                mkdir "$directory_name"/new_keys;
-                echo "copying content of data/key/* to new keys directory";
-                cp -r "$directory_name"/keys/* "$directory_name"/new_keys/;
-                echo "setting permission to all pem files to 600";
-                find "$directory_name"/new_keys/** -name "*.pem" -exec chmod 600 {} +;
-                echo "Renaming old keys directory";
-                mv "$directory_name"/keys "$directory_name"/keys-"$(date +%s)";
-                echo "Renaming new keys directory";
-                mv "$directory_name"/new_keys "$directory_name"/keys;
-              else
-                echo "Does not find pem file with 660 permission";
-              fi;
-          {{- if .Values.securityContext.enabled }}
-          securityContext: {{- omit .Values.securityContext "enabled" "fsGroup" | toYaml | nindent 12 }}
+              bash /init-container/init-permissions.sh;
+          securityContext:
+            runAsUser: {{ .Values.securityContext.runAsUser }}
+            runAsGroup: {{ .Values.securityContext.runAsGroup }}
+            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+          {{- else }}
+          command: ["cp", "/default_prometheus_config/prometheus.yml", "/prometheus_configs/prometheus.yml"]
           {{- end }}
           volumeMounts:
           - name: prometheus-config
@@ -113,9 +112,13 @@ spec:
           - name: yugaware-storage
             mountPath: /prometheus_configs
             subPath: prometheus.yml
+          {{- if .Values.securityContext.enabled }}
           - name: yugaware-storage
             mountPath: /opt/yugabyte/yugaware/data/
             subPath: data
+          - name: init-container-script
+            mountPath: /init-container
+          {{- end }}
       containers:
         {{ if not .Values.postgres.external.host }}
         - name: postgres
@@ -157,7 +160,10 @@ spec:
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.securityContext.enabled }}
-          securityContext: {{- omit .Values.securityContext "enabled" "fsGroup"  | toYaml | nindent 12 }}
+          securityContext:
+            runAsUser: {{ .Values.securityContext.runAsUser }}
+            runAsGroup: {{ .Values.securityContext.runAsGroup }}
+            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
           {{- else if (not .Values.ocpCompatibility.enabled) }}
           securityContext:
             runAsUser: 0
@@ -195,7 +201,10 @@ spec:
         - name: yugaware
           image: {{ include "full_yugaware_image" . }}
           {{- if .Values.securityContext.enabled }}
-          securityContext: {{- omit .Values.securityContext "enabled" "fsGroup" | toYaml | nindent 12 }}
+          securityContext:
+            runAsUser: {{ .Values.securityContext.runAsUser }}
+            runAsGroup: {{ .Values.securityContext.runAsGroup }}
+            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
           {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
 
