@@ -121,10 +121,18 @@ Generate server FQDN.
 {{- define "yugabyte.server_fqdn" -}}
   {{- if (and .Values.istioCompatibility.enabled .Values.multicluster.createServicePerPod) -}}
     {{- printf "$(HOSTNAME).$(NAMESPACE).svc.%s" .Values.domainName -}}
+  {{- else if (and .Values.oldNamingStyle .Values.multicluster.createServiceExports) -}}
+    {{ $membershipName := required "A valid membership name is required! Please set multicluster.kubernetesClusterId" .Values.multicluster.kubernetesClusterId }}
+    {{- printf "$(HOSTNAME).%s.%s.$(NAMESPACE).svc.clusterset.local" $membershipName .Service.name -}}
   {{- else if .Values.oldNamingStyle -}}
-    {{- printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .Service.name .Values.domainName -}}
+    {{- printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .Service.name .Values.domainName -}}  
   {{- else -}}
-    {{- printf "$(HOSTNAME).%s-%s.$(NAMESPACE).svc.%s" (include "yugabyte.fullname" .) .Service.name .Values.domainName -}}
+    {{- if .Values.multicluster.createServiceExports -}}
+      {{ $membershipName := required "A valid membership name is required! Please set multicluster.kubernetesClusterId" .Values.multicluster.kubernetesClusterId }}
+      {{- printf "$(HOSTNAME).%s.%s-%s.$(NAMESPACE).svc.clusterset.local" $membershipName (include "yugabyte.fullname" .) .Service.name -}}
+    {{- else -}}
+      {{- printf "$(HOSTNAME).%s-%s.$(NAMESPACE).svc.%s" (include "yugabyte.fullname" .) .Service.name .Values.domainName -}}
+    {{- end -}}
   {{- end -}}
 {{- end -}}
 
@@ -139,7 +147,7 @@ Generate server broadcast address.
 Generate server RPC bind address.
 */}}
 {{- define "yugabyte.rpc_bind_address" -}}
-  {{- if .Values.istioCompatibility.enabled -}}
+  {{- if or .Values.istioCompatibility.enabled .Values.multicluster.createServiceExports -}}
     0.0.0.0:{{ index .Service.ports "tcp-rpc-port" -}}
   {{- else -}}
     {{- include "yugabyte.server_fqdn" . -}}
@@ -157,7 +165,7 @@ Generate server web interface.
 Generate server CQL proxy bind address.
 */}}
 {{- define "yugabyte.cql_proxy_bind_address" -}}
-  {{- if .Values.istioCompatibility.enabled -}}
+  {{- if or .Values.istioCompatibility.enabled .Values.multicluster.createServiceExports -}}
     0.0.0.0:{{ index .Service.ports "tcp-yql-port" -}}
   {{- else -}}
     {{- include "yugabyte.server_fqdn" . -}}

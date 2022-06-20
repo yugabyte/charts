@@ -46,10 +46,19 @@ data:
 {{- range $index := until ( int ( $replicas ) ) }}
 {{- $nodeOldStyle := printf "%s-%d.%s.%s.svc.%s" $service.label $index $service.name $root.Release.Namespace $root.Values.domainName }}
 {{- $nodeNewStyle := printf "%s-%s-%d.%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
+{{- if and $root.Values.multicluster.createServiceExports $root.Values.oldNamingStyle -}}
+  {{- $nodeOldStyle = printf "%s-%d.%s.%s.%s.svc.clusterset.local" $service.label $index $root.Values.multicluster.kubernetesClusterId $service.name $root.Release.Namespace }}
+{{- end -}}
+{{- if and $root.Values.multicluster.createServiceExports (eq $root.Values.oldNamingStyle false) -}}
+  {{- $nodeNewStyle = printf "%s-%s-%d.%s.%s-%s.%s.svc.clusterset.local" (include "yugabyte.fullname" $root) $service.label $index $root.Values.multicluster.kubernetesClusterId (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
+{{- end -}}
 {{- $node := $root.Values.oldNamingStyle | ternary $nodeOldStyle $nodeNewStyle }}
 {{- if $root.Values.tls.rootCA.key }}
 {{- $dns1 := printf "*.*.%s" $root.Release.Namespace }}
 {{- $dns2 := printf "%s.svc.%s" $dns1 $root.Values.domainName }}
+{{- if $root.Values.multicluster.createServiceExports -}}
+  {{- $dns1 = printf "*.*.*.%s.svc.clusterset.local" $root.Release.Namespace }}
+{{- end -}}
 {{- $rootCA := buildCustomCert $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key -}}
 {{- $server := genSignedCert $node ( default nil ) (list $dns1 $dns2 ) 3650 $rootCA }}
   node.{{$node}}.crt: {{ $server.Cert | b64enc }}
