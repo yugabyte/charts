@@ -227,8 +227,6 @@ resources: {}
 
 nodeSelector: {}
 
-tolerations: []
-
 affinity: {}
 
 statefulSetAnnotations: {}
@@ -262,6 +260,19 @@ master:
   ## Annotations to be added to the Master pods.
   podAnnotations: {}
 
+  ## Labels to be added to the Master pods.
+  podLabels: {}
+
+  ## Tolerations to be added to the Master pods.
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#toleration-v1-core
+  ## Example:
+  # tolerations:
+  # - key: dedicated
+  #   operator: Equal
+  #   value: experimental
+  #   effect: NoSchedule
+  tolerations: []
+
 tserver:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
   ## This might override the default affinity from service.yaml
@@ -290,6 +301,19 @@ tserver:
 
   ## Annotations to be added to the TServer pods.
   podAnnotations: {}
+
+  ## Labels to be added to the TServer pods.
+  podLabels: {}
+
+  ## Tolerations to be added to the TServer pods.
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#toleration-v1-core
+  ## Example:
+  # tolerations:
+  # - key: dedicated
+  #   operator: Equal
+  #   value: experimental
+  #   effect: NoSchedule
+  tolerations: []
 
   ## Sets the --server_broadcast_addresses flag on the TServer, no
   ## preflight checks are done for this address. You might need to add

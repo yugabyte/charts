@@ -197,6 +197,11 @@ spec:
       labels:
         {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
         {{- include "yugabyte.labels" $root | indent 8 }}
+        {{- if eq .name "yb-masters" }}
+        {{- with $root.Values.master.podLabels }}{{ toYaml . | nindent 8 }}{{ end }}
+        {{- else }}
+        {{- with $root.Values.tserver.podLabels }}{{ toYaml . | nindent 8 }}{{ end }}
+        {{- end }}
     spec:
       {{- if $root.Values.Image.pullSecretName }}
       imagePullSecrets:
@@ -210,6 +215,17 @@ spec:
       {{ toYaml $root.Values.nodeSelector | indent 8 }}
       {{- end }}
       terminationGracePeriodSeconds: 300
+      {{- if eq .name "yb-masters" }} # yb-masters
+      {{- if $root.Values.master.tolerations }}
+      tolerations:
+      {{- with $root.Values.master.tolerations }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- end }}
+      {{- else }} # yb-tservers
+      {{- if $root.Values.tserver.tolerations }}
+      tolerations:
+      {{- with $root.Values.tserver.tolerations }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- end }}
+      {{- end }}
       affinity:
         # Set the anti-affinity selector scope to YB masters.
         {{ if $root.Values.AZ }}
