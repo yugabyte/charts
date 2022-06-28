@@ -234,6 +234,7 @@ spec:
       {{- with $root.Values.tserver.tolerations }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- end }}
       {{- end }}
+      terminationGracePeriodSeconds: 300
       affinity:
         # Set the anti-affinity selector scope to YB masters.
         {{ if $root.Values.AZ }}
@@ -290,15 +291,6 @@ spec:
                 - "-c"
                 - >
                   mkdir -p /mnt/disk0/cores;
-                  pattern="$(sysctl kernel.core_pattern --values || true)";
-                  core_dir="${pattern%/*}";
-                  if [ "${core_dir:0:1}" = "/" ]; then
-                    if [ ! -d "${core_dir}" ]; then
-                      # create the parent directory
-                      mkdir -p "${core_dir%/*}" || true;
-                      ln -s "/mnt/disk0/cores" "${core_dir}" || true;
-                    fi;
-                  fi;
                   mkdir -p /mnt/disk0/yb-data/scripts;
                   if [ ! -f /mnt/disk0/yb-data/scripts/log_cleanup.sh ]; then
                     if [ -f /home/yugabyte/bin/log_cleanup.sh ]; then
@@ -330,6 +322,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: YBDEVOPS_CORECOPY_DIR
+          value: "/mnt/disk0/cores"
         {{- if eq .name "yb-masters" }}
         {{- with $root.Values.master.extraEnv }}{{ toYaml . | nindent 8 }}{{ end }}
         {{- else }}
@@ -374,9 +368,14 @@ spec:
           {{- $webserverPort := index $service.ports "http-ui" -}}
           {{- $webserverDict := dict "Addr" $webserverAddr "Port" $webserverPort -}}
           {{- $webserverPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $webserverDict) -}}
-          {{- if $webserverPreflight -}}{{ $webserverPreflight | nindent 12 }}{{ end -}}
+          {{- if $webserverPreflight -}}{{ $webserverPreflight | nindent 12 }}{{ end }}
+            if [[ -f /home/yugabyte/tools/k8s_parent.py ]]; then
+              k8s_parent="/home/yugabyte/tools/k8s_parent.py"
+            else
+              k8s_parent=""
+            fi && \
           {{- if eq .name "yb-masters" }}
-            exec /home/yugabyte/bin/yb-master \
+            exec ${k8s_parent} /home/yugabyte/bin/yb-master \
             {{- if not $root.Values.storage.ephemeral }}
               --fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }} \
             {{- else }}
@@ -426,7 +425,7 @@ spec:
               {{- $ysqlPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $ysqlDict) -}}
               {{- if $ysqlPreflight -}}{{ $ysqlPreflight | nindent 12 }}{{ end -}}
             {{- end }}
-            exec /home/yugabyte/bin/yb-tserver \
+            exec ${k8s_parent} /home/yugabyte/bin/yb-tserver \
             {{- if not $root.Values.storage.ephemeral }}
               --fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }} \
             {{- else }}
@@ -505,7 +504,10 @@ spec:
         - name: USER
           value: "yugabyte"
         command:
-          - "/bin/sh"
+          - "/sbin/tini"
+          - "--"
+        args:
+          - "/bin/bash"
           - "-c"
           - >
             while true; do
