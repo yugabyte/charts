@@ -273,6 +273,25 @@ master:
   #   effect: NoSchedule
   tolerations: []
 
+  ## Extra volumes
+  ## extraVolumesMounts are mandatory for each extraVolumes.
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#volume-v1-core
+  ## Example:
+  # extraVolumes:
+  # - name: custom-nfs-vol
+  #   persistentVolumeClaim:
+  #     claimName: some-nfs-claim
+  extraVolumes: []
+
+  ## Extra volume mounts
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#volumemount-v1-core
+  ## Example:
+  # extraVolumeMounts:
+  # - name: custom-nfs-vol
+  #   mountPath: /home/yugabyte/nfs-backup
+  extraVolumeMounts: []
+
+
 tserver:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
   ## This might override the default affinity from service.yaml
@@ -319,6 +338,24 @@ tserver:
   ## preflight checks are done for this address. You might need to add
   ## `use_private_ip: cloud` to the gflags.master and gflags.tserver.
   serverBroadcastAddress: ""
+
+  ## Extra volumes
+  ## extraVolumesMounts are mandatory for each extraVolumes.
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#volume-v1-core
+  ## Example:
+  # extraVolumes:
+  # - name: custom-nfs-vol
+  #   persistentVolumeClaim:
+  #     claimName: some-nfs-claim
+  extraVolumes: []
+
+  ## Extra volume mounts
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#volumemount-v1-core
+  ## Example:
+  # extraVolumeMounts:
+  # - name: custom-nfs-vol
+  #   path: /home/yugabyte/nfs-backup
+  extraVolumeMounts: []
 
 helm2Legacy: false
 
