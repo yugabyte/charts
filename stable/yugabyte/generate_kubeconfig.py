@@ -29,6 +29,7 @@ parser = argparse.ArgumentParser(description='Generate KubeConfig with Token')
 parser.add_argument('-s', '--service_account', help='Service Account name', required=True)
 parser.add_argument('-n', '--namespace', help='Kubernetes namespace', default='kube-system')
 parser.add_argument('-c', '--context', help='kubectl context')
+parser.add_argument('-o', '--output_file', help='output file path')
 args = vars(parser.parse_args())
 
 # if the context is not provided we use the current-context
@@ -61,7 +62,9 @@ if secret_data is None:
     exit("No usable secret found for '{}'.".format(args['service_account']))
 
 context_name = '{}-{}'.format(args['service_account'], cluster_name)
-kube_config = '/tmp/{}.conf'.format(args['service_account'])
+kube_config = args['output_file']
+if not kube_config:
+    kube_config = '/tmp/{}.conf'.format(args['service_account'])
 
 with tempfile.NamedTemporaryFile() as ca_crt_file:
     ca_crt = base64.b64decode(secret_data['data']['ca.crt'])
