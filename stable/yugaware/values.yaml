@@ -117,8 +117,8 @@ securityContext:
   ## fsGroup related values are set at the pod level.
   fsGroup: 10001
   fsGroupChangePolicy: "OnRootMismatch"
-  ## The following values are set for yugaware and prometheus
-  ## containers.
+  ## The following values are set for yugaware and prometheus containers.
+  ## Setting runAsUser other than 10001 will fail the VM universe deployment flow.
   runAsUser: 10001
   runAsGroup: 10001
   runAsNonRoot: true

@@ -96,9 +96,8 @@ spec:
           command:
             - 'bash'
             - '-c'
-            - >
-              cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml;
-              bash /init-container/init-permissions.sh;
+            - |
+              cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && /bin/bash /init-container/init-permissions.sh;
           securityContext:
             runAsUser: {{ .Values.securityContext.runAsUser }}
             runAsGroup: {{ .Values.securityContext.runAsGroup }}
