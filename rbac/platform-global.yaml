@@ -69,6 +69,7 @@ rules:
   verbs:
   - "delete"
   - "create"
+  - "patch"
 - apiGroups:
   - ""
   resources:
