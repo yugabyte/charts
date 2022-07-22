@@ -11,7 +11,7 @@ from sys import exit
 import json
 import base64
 import tempfile
-
+import os.path
 
 def run_command(command_args, namespace=None, as_json=True):
     command = ['kubectl']
@@ -66,17 +66,20 @@ kube_config = args['output_file']
 if not kube_config:
     kube_config = '/tmp/{}.conf'.format(args['service_account'])
 
-with tempfile.NamedTemporaryFile() as ca_crt_file:
-    ca_crt = base64.b64decode(secret_data['data']['ca.crt'])
-    ca_crt_file.write(ca_crt)
-    ca_crt_file.flush()
-    # create kubeconfig entry
-    set_cluster_cmd = ['config', 'set-cluster', cluster_name,
-                       '--kubeconfig={}'.format(kube_config),
-                       '--server={}'.format(endpoint.strip('"')),
-                       '--embed-certs=true',
-                       '--certificate-authority={}'.format(ca_crt_file.name)]
-    run_command(set_cluster_cmd, as_json=False)
+
+tmpdir = tempfile.TemporaryDirectory()
+ca_crt_file_name = os.path.join(tmpdir.name, "ca.crt")
+ca_crt_file = open(ca_crt_file_name, "wb")
+ca_crt_file.write(base64.b64decode(secret_data['data']['ca.crt']))
+ca_crt_file.close()
+
+# create kubeconfig entry
+set_cluster_cmd = ['config', 'set-cluster', cluster_name,
+                    '--kubeconfig={}'.format(kube_config),
+                    '--server={}'.format(endpoint.strip('"')),
+                    '--embed-certs=true',
+                    '--certificate-authority={}'.format(ca_crt_file_name)]
+run_command(set_cluster_cmd, as_json=False)
 
 user_token = base64.b64decode(secret_data['data']['token']).decode('utf-8')
 set_credentials_cmd = ['config', 'set-credentials', context_name,
