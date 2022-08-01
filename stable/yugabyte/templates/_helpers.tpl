@@ -211,10 +211,10 @@ Compute the maximum number of unavailable pods based on the number of master rep
 Set consistent issuer name.
 */}}
 {{- define "yugabyte.tls_cm_issuer" -}}
-  {{- if .Values.tls.certManager.useClusterIssuer -}}
-    {{ .Values.tls.certManager.clusterIssuer }}
-  {{- else -}}
+  {{- if .Values.tls.certManager.bootstrapSelfsigned -}}
     {{ .Values.oldNamingStyle | ternary "yugabyte-selfsigned" (printf "%s-selfsigned" (include "yugabyte.fullname" .)) }}
+  {{- else -}}
+    {{ .Values.tls.certManager.useClusterIssuer | ternary .Values.tls.certManager.clusterIssuer .Values.tls.certManager.issuer}}
   {{- end -}}
 {{- end -}}
 
