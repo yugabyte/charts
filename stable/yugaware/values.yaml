@@ -64,7 +64,7 @@ yugaware:
   enableProxyMetricsAuth: true
   ## List of additional alowed CORS origins in case of complex rev-proxy
   additionAllowedCorsOrigins: []
-  proxyEndpointTimeoutMs: 1 minute
+  proxyEndpointTimeoutMs: 3 minute
   ## Enables features specific for cloud deployments
   cloud:
     enabled: false
@@ -144,6 +144,8 @@ nginx:
     requests:
       cpu: 0.25
       memory: 300Mi
+
+  proxyConnectionTimeoutSec: 600
 
 rbac:
   ## Set this to false if you don't have enough permissions to create
