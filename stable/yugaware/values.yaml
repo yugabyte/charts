@@ -145,7 +145,7 @@ nginx:
       cpu: 0.25
       memory: 300Mi
 
-  proxyConnectionTimeoutSec: 600
+  proxyReadTimeoutSec: 600
 
 rbac:
   ## Set this to false if you don't have enough permissions to create
