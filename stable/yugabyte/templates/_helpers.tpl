@@ -86,6 +86,7 @@ Generate a preflight check script invocation.
 {{- if not .Values.preflight.skipAll -}}
 if [ -f /home/yugabyte/tools/k8s_preflight.py ]; then
   PYTHONUNBUFFERED="true" /home/yugabyte/tools/k8s_preflight.py \
+    dnscheck \
     --addr="{{ .Preflight.Addr }}" \
 {{- if not .Values.preflight.skipBind }}
     --port="{{ .Preflight.Port }}"

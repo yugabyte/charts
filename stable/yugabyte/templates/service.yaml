@@ -342,6 +342,11 @@ spec:
           - "/bin/bash"
           - "-c"
           - |
+          {{- if and (not $root.Values.preflight.skipUlimit) (not $root.Values.preflight.skipAll) }}
+            if [ -f /home/yugabyte/tools/k8s_preflight.py ]; then
+              /home/yugabyte/tools/k8s_preflight.py all
+            fi && \
+          {{- end }}
           {{- if (and (not $root.Values.storage.ephemeral) (not $root.Values.preflight.skipAll)) }}
             touch {{ template "yugabyte.fs_data_dirs_probe_files" $storageInfo }} && \
           {{- end }}

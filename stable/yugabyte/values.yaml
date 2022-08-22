@@ -381,6 +381,10 @@ preflight:
   # Set to true to skip port bind checks
   skipBind: false
 
+  ## Set to true to skip ulimit verification
+  ## SkipAll has higher priority
+  skipUlimit: false
+
 ## Pod securityContext
 ## Ref: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#security-context
 ## The following configuration runs YB-Master and YB-TServer as a non-root user
