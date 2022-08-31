@@ -25,6 +25,9 @@ spec:
 {{- end }}
       labels:
         app: {{ .Release.Name }}-yugaware
+{{- if .Values.yugaware.pod.labels }}                                                           
+{{ toYaml .Values.yugaware.pod.labels | indent 8 }}                                             
+{{- end }}
     spec:
       serviceAccountName: {{ .Release.Name }}
       imagePullSecrets:
