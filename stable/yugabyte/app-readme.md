@@ -1,1 +1,1 @@
-This chart bootstraps an RF3 Yugabyte DB version 2.12.9.1-b1 cluster using the Helm Package Manager.
+This chart bootstraps an RF3 Yugabyte DB version 2.12.9.2-b3 cluster using the Helm Package Manager.
