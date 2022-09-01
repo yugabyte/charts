@@ -256,7 +256,7 @@ spec:
           - name: yugaware-storage
             mountPath: /opt/yugabyte/releases/
             subPath: releases
-          - name: ybc-storage
+          - name: yugaware-storage
             mountPath: /opt/yugabyte/ybc/releases/
             subPath: ybc_releases
           # old path for backward compatibility
