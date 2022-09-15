@@ -43,6 +43,15 @@ rules:
   - "delete"
   - "update"                    # needed by Helm
   - "patch"
+- apiGroups:
+  - "cert-manager.io"
+  resources:
+  - "certificates"
+  verbs:
+  - "create"
+  - "delete"
+  - "get"
+  - "patch"
 ## We don't use ServiceMonitor in platform
 # - apiGroups:
 #   - "monitoring.coreos.com"
