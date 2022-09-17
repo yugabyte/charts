@@ -39,6 +39,30 @@ spec:
         fsGroupChangePolicy: {{ .Values.securityContext.fsGroupChangePolicy }}
         {{- end }}
       {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8}}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+      {{- with .Values.tolerations }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- end }}
+      {{- if .Values.zoneAffinity }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: failure-domain.beta.kubernetes.io/zone
+                operator: In
+                values:
+{{ toYaml .Values.zoneAffinity | indent 18 }}
+            - matchExpressions:
+              - key: topology.kubernetes.io/zone
+                operator: In
+                values:
+{{ toYaml .Values.zoneAffinity | indent 18 }}
+      {{- end }}
       volumes:
         - name: yugaware-storage
           persistentVolumeClaim:
