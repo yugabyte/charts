@@ -166,6 +166,7 @@ spec:
         - name: postgres
           image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["-c", "huge_pages=off"]
           env:
             - name: POSTGRES_USER
               valueFrom:
