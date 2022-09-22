@@ -27,12 +27,12 @@ image:
 
   prometheus:
     registry: ""
-    tag: v2.27.1
+    tag: v2.37.0
     name: prom/prometheus
 
   nginx:
     registry: ""
-    tag: 1.17.4-amd64
+    tag: 1.23.1-amd64
     name: nginxinc/nginx-unprivileged
 
 yugaware:
