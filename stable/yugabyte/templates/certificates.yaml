@@ -66,6 +66,9 @@ These secrets are mounted into master/tserver pods.
 {{- $service := . -}}
 {{- $appLabelArgs := dict "label" .label "root" $root -}}
 {{- $serviceValues := (dict "Service" $service "Values" $root.Values "Chart" $root.Chart "Release" $root.Release) -}}
+{{- $replicas := (eq .name "yb-masters") | ternary $root.Values.replicas.master $root.Values.replicas.tserver -}}
+
+{{- if (gt (int $replicas)  0) }}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -98,7 +101,6 @@ spec:
     - client auth
   # At least one of a DNS Name, URI, or IP address is required.
   dnsNames:
-  {{- $replicas := (eq .name "yb-masters") | ternary $root.Values.replicas.master $root.Values.replicas.tserver -}}
   {{- range $index := until ( int ( $replicas ) ) }}
   {{- $nodeOldStyle := printf "%s-%d.%s.%s.svc.%s" $service.label $index $service.name $root.Release.Namespace $root.Values.domainName }}
   {{- $nodeNewStyle := printf "%s-%s-%d.%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
@@ -108,6 +110,7 @@ spec:
   uris: []
   ipAddresses: []
 ---
+{{- end }}
 {{- end }}
 
 ---
