@@ -46,18 +46,26 @@ data:
 {{- range $index := until ( int ( $replicas ) ) }}
 {{- $nodeOldStyle := printf "%s-%d.%s.%s.svc.%s" $service.label $index $service.name $root.Release.Namespace $root.Values.domainName }}
 {{- $nodeNewStyle := printf "%s-%s-%d.%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
-{{- if and $root.Values.multicluster.createServiceExports $root.Values.oldNamingStyle -}}
+
+{{- if $root.Values.multicluster.createServiceExports -}}
   {{- $nodeOldStyle = printf "%s-%d.%s.%s.%s.svc.clusterset.local" $service.label $index $root.Values.multicluster.kubernetesClusterId $service.name $root.Release.Namespace }}
-{{- end -}}
-{{- if and $root.Values.multicluster.createServiceExports (eq $root.Values.oldNamingStyle false) -}}
   {{- $nodeNewStyle = printf "%s-%s-%d.%s.%s-%s.%s.svc.clusterset.local" (include "yugabyte.fullname" $root) $service.label $index $root.Values.multicluster.kubernetesClusterId (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
 {{- end -}}
+
+{{- if (and $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod) -}}
+  {{- $nodeOldStyle = printf "%s-%d.%s.svc.%s" $service.label $index $root.Release.Namespace $root.Values.domainName }}
+  {{- $nodeNewStyle = printf "%s-%s-%d.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index $root.Release.Namespace $root.Values.domainName }}
+{{- end -}}
+
 {{- $node := $root.Values.oldNamingStyle | ternary $nodeOldStyle $nodeNewStyle }}
 {{- if $root.Values.tls.rootCA.key }}
 {{- $dns1 := printf "*.*.%s" $root.Release.Namespace }}
 {{- $dns2 := printf "%s.svc.%s" $dns1 $root.Values.domainName }}
 {{- if $root.Values.multicluster.createServiceExports -}}
   {{- $dns1 = printf "*.*.*.%s.svc.clusterset.local" $root.Release.Namespace }}
+{{- end -}}
+{{- if (and $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod) -}}
+  {{- $dns1 = printf "*.%s.svc.%s" $root.Release.Namespace $root.Values.domainName }}
 {{- end -}}
 {{- $rootCA := buildCustomCert $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key -}}
 {{- $server := genSignedCert $node ( default nil ) (list $dns1 $dns2 ) 3650 $rootCA }}
@@ -103,6 +111,7 @@ metadata:
   labels:
     {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
     {{- include "yugabyte.labels" $root | indent 4 }}
+    service-type: "endpoint"
 spec:
   {{ if eq $root.Release.Service "Tiller" }}
   clusterIP:
@@ -206,6 +215,9 @@ spec:
       labels:
         {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
         {{- include "yugabyte.labels" $root | indent 8 }}
+        {{- if $root.Values.istioCompatibility.enabled }}
+        sidecar.istio.io/inject: "true"
+        {{- end }}
         {{- if eq .name "yb-masters" }}
         {{- with $root.Values.master.podLabels }}{{ toYaml . | nindent 8 }}{{ end }}
         {{- else }}
@@ -365,10 +377,13 @@ spec:
           {{- $rpcPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $rpcDict) -}}
           {{- if $rpcPreflight -}}{{ $rpcPreflight | nindent 12 }}{{ end -}}
           {{- $broadcastAddr := include "yugabyte.server_broadcast_address" $serviceValues -}}
-          {{- $broadcastPort := index $service.ports "tcp-rpc-port" -}}
-          {{- $broadcastDict := dict "Addr" $broadcastAddr "Port" $broadcastPort -}}
-          {{- $broadcastPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $broadcastDict) -}}
-          {{- if $broadcastPreflight -}}{{ $broadcastPreflight | nindent 12 }}{{ end -}}
+          {{/* skip bind check for Istio multi-cluster, we cannot/don't bind to service IP */}}
+          {{- if (not (and $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod)) }}
+            {{- $broadcastPort := index $service.ports "tcp-rpc-port" -}}
+            {{- $broadcastDict := dict "Addr" $broadcastAddr "Port" $broadcastPort -}}
+            {{- $broadcastPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $broadcastDict) -}}
+            {{- if $broadcastPreflight -}}{{ $broadcastPreflight | nindent 12 }}{{ end -}}
+          {{- end }}
           {{- $webserverAddr := include "yugabyte.webserver_interface" $serviceValues -}}
           {{- $webserverPort := index $service.ports "http-ui" -}}
           {{- $webserverDict := dict "Addr" $webserverAddr "Port" $webserverPort -}}

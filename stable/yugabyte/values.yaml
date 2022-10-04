@@ -147,7 +147,8 @@ Services:
       http-yedis-met: "11000"
       http-ysql-met: "13000"
 
-## Should be set to true only if Istio is being used.
+## Should be set to true only if Istio is being used. This also adds
+## the Istio sidecar injection labels to the pods.
 ## TODO: remove this once
 ## https://github.com/yugabyte/yugabyte-db/issues/5641 is fixed.
 ##
