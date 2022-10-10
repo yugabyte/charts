@@ -32,7 +32,7 @@ image:
 
   nginx:
     registry: ""
-    tag: 1.23.1-amd64
+    tag: 1.23.1
     name: nginxinc/nginx-unprivileged
 
 yugaware:
