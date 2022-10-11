@@ -134,3 +134,16 @@ Make list of allowed CORS origins
 {{- end -}}
 ]
 {{- end -}}
+
+{{/*
+kube-state-metrics
+*/}}
+{{- define "yugaware.kubeStateMetrics.endpoint" -}}
+{{- if .Values.kubeStateMetrics.customEndpoint -}}
+{{- .Values.kubeStateMetrics.customEndpoint -}}
+{{- else if .Values.kubeStateMetrics.install -}}
+{{- printf "%s-ksm.%s.svc.%s:8080" .Release.Name .Release.Namespace .Values.domainName -}}
+{{- else -}}
+{{- printf "kube-state-metrics.kube-system.svc.%s:8080" .Values.domainName -}}
+{{- end -}}
+{{- end -}}

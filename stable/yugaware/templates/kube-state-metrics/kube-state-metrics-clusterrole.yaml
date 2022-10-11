@@ -1,0 +1,182 @@
+{{- /*
+  Adapted from https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-state-metrics (Apache-2.0 license).
+  */}}
+{{- if and .Values.kubeStateMetrics.install (not .Values.kubeStateMetrics.customEndpoint) -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: {{ .Release.Name }}-yugaware-ksm
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+  name: {{ .Release.Name }}-ksm
+rules:
+{{ if has "certificatesigningrequests" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["certificates.k8s.io"]
+  resources:
+  - certificatesigningrequests
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "configmaps" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "cronjobs" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["batch"]
+  resources:
+  - cronjobs
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "daemonsets" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["extensions", "apps"]
+  resources:
+  - daemonsets
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "deployments" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["extensions", "apps"]
+  resources:
+  - deployments
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "endpoints" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - endpoints
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "horizontalpodautoscalers" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["autoscaling"]
+  resources:
+  - horizontalpodautoscalers
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "ingresses" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources:
+  - ingresses
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "jobs" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["batch"]
+  resources:
+  - jobs
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "limitranges" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - limitranges
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "mutatingwebhookconfigurations" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources:
+    - mutatingwebhookconfigurations
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "namespaces" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - namespaces
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "networkpolicies" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - networkpolicies
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "nodes" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - nodes
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "persistentvolumeclaims" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - persistentvolumeclaims
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "persistentvolumes" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - persistentvolumes
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "poddisruptionbudgets" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["policy"]
+  resources:
+    - poddisruptionbudgets
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "pods" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - pods
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "replicasets" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["extensions", "apps"]
+  resources:
+  - replicasets
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "replicationcontrollers" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - replicationcontrollers
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "resourcequotas" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - resourcequotas
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "secrets" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - secrets
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "services" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: [""]
+  resources:
+  - services
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "statefulsets" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["apps"]
+  resources:
+  - statefulsets
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "storageclasses" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["storage.k8s.io"]
+  resources:
+    - storageclasses
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "validatingwebhookconfigurations" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources:
+    - validatingwebhookconfigurations
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "volumeattachments" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["storage.k8s.io"]
+  resources:
+    - volumeattachments
+  verbs: ["list", "watch"]
+{{ end -}}
+{{ if has "verticalpodautoscalers" $.Values.kubeStateMetrics.collectors }}
+- apiGroups: ["autoscaling.k8s.io"]
+  resources:
+    - verticalpodautoscalers
+  verbs: ["list", "watch"]
+{{ end -}}
+{{- end -}}

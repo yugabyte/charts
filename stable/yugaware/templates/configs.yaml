@@ -346,7 +346,7 @@ data:
 
       - job_name: 'kube-state-metrics'
         static_configs:
-        - targets: ['kube-state-metrics.kube-system.svc.{{.Values.domainName}}:8080']
+        - targets: ['{{ template "yugaware.kubeStateMetrics.endpoint" . }}']
         metric_relabel_configs:
           # Save the name of the metric so we can group_by since we cannot by __name__ directly...
           - source_labels: ["__name__"]
@@ -361,6 +361,16 @@ data:
             regex: "(.*)"
             target_label: "container_name"
             replacement: "$1"
+          # rename old name of the CPU metric to the new name and label
+          # ref: https://github.com/kubernetes/kube-state-metrics/blob/master/CHANGELOG.md#v200-alpha--2020-09-16
+          - source_labels: ["__name__"]
+            regex: "kube_pod_container_resource_requests_cpu_cores"
+            target_label: "unit"
+            replacement: "core"
+          - source_labels: ["__name__"]
+            regex: "kube_pod_container_resource_requests_cpu_cores"
+            target_label: "__name__"
+            replacement: "kube_pod_container_resource_requests"
 
       - job_name: 'kubernetes-cadvisor'
 
