@@ -317,8 +317,10 @@ spec:
           value: "/mnt/disk0/cores"
         {{- if eq .name "yb-masters" }}
         {{- with $root.Values.master.extraEnv }}{{ toYaml . | nindent 8 }}{{ end }}
+        {{- with $root.Values.master.secretEnv }}{{ toYaml . | nindent 8 }}{{ end }}
         {{- else }}
         {{- with $root.Values.tserver.extraEnv }}{{ toYaml . | nindent 8 }}{{ end }}
+        {{- with $root.Values.tserver.secretEnv }}{{ toYaml . | nindent 8 }}{{ end }}
         {{- end }}
         {{- if and $root.Values.tls.enabled $root.Values.tls.clientToServer (ne .name "yb-masters") }}
         - name: SSL_CERTFILE

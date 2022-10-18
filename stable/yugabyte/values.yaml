@@ -257,6 +257,16 @@ master:
   #       fieldPath: status.hostIP
   extraEnv: []
 
+  # secretEnv variables are used to expose secrets data as env variables in the master pod.
+  # TODO Add namespace also to support copying secrets from other namespace.
+  # secretEnv:
+  # - name: MYSQL_LDAP_PASSWORD
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: secretName
+  #       key: password
+  secretEnv: []
+
   ## Annotations to be added to the Master pods.
   podAnnotations: {}
 
@@ -317,6 +327,16 @@ tserver:
   #     fieldRef:
   #       fieldPath: status.hostIP
   extraEnv: []
+
+  # secretEnv variables are used to expose secrets data as env variables in the tserver pods.
+  # TODO Add namespace also to support copying secrets from other namespace.
+  # secretEnv:
+  # - name: MYSQL_LDAP_PASSWORD
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: secretName
+  #       key: password
+  secretEnv: []
 
   ## Annotations to be added to the TServer pods.
   podAnnotations: {}
