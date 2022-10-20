@@ -19,7 +19,7 @@ def main(release):
     json_response = response.json()
 
     tags = dict()
-    for tag_obj in json_response:
+    for tag_obj in json_response['results']:
         tag = tag_obj['name']
         if tag.startswith(release.version):
             build_number = int(tag[tag.rindex("-b")+2:])
