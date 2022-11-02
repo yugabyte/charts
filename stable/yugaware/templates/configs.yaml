@@ -226,7 +226,7 @@ data:
       uwsgi_temp_path /tmp/uwsgi_temp;
       scgi_temp_path /tmp/scgi_temp;
 
-      proxy_read_timeout {{ .Values.nginx.proxyReadTimeoutSec }};
+      proxy_read_timeout  {{ template "get_nginx_proxyReadTimeoutSec" . }};
 
       include       /etc/nginx/mime.types;
       default_type  application/octet-stream;
