@@ -25,8 +25,8 @@ spec:
 {{- end }}
       labels:
         app: {{ .Release.Name }}-yugaware
-{{- if .Values.yugaware.pod.labels }}                                                           
-{{ toYaml .Values.yugaware.pod.labels | indent 8 }}                                             
+{{- if .Values.yugaware.pod.labels }}
+{{ toYaml .Values.yugaware.pod.labels | indent 8 }}
 {{- end }}
     spec:
       serviceAccountName: {{ .Release.Name }}
@@ -150,7 +150,12 @@ spec:
         - name: postgres
           image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args: ["-c", "huge_pages=off"]
+          args:
+          {{- if .Values.ocpCompatibility.enabled }}
+          - "run-postgresql"
+          {{- end }}
+          - "-c"
+          - "huge_pages=off"
           env:
             - name: POSTGRES_USER
               valueFrom:
@@ -167,6 +172,28 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_db
+            {{- if .Values.ocpCompatibility.enabled }}
+            - name: POSTGRESQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_user
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_password
+            - name: POSTGRESQL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_password
+            - name: POSTGRESQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_db
+            {{- end }}
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
           ports:
@@ -303,6 +330,7 @@ spec:
         - name: nginx
           image: {{ include "full_image" (dict "containerName" "nginx" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["nginx", "-g", "daemon off;"]
           ports:
           - containerPort: 8080
 
