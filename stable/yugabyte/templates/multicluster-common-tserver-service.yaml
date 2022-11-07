@@ -1,4 +1,4 @@
-{{- if (and .Values.multicluster.createCommonTserverService (not .Values.oldNamingStyle)) }}
+{{- if (and .Values.multicluster.createCommonTserverService.enabled (not .Values.oldNamingStyle)) }}
 {{- range $service := .Values.serviceEndpoints }}
 {{- if eq $service.name "yb-tserver-service" }}
 {{- $appLabelArgs := dict "label" $service.app "root" $ -}}
@@ -10,6 +10,9 @@ metadata:
     {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
     {{- include "yugabyte.labels" $ | indent 4 }}
 spec:
+  {{- if $.Values.multicluster.createCommonTserverService.headless }}
+  clusterIP: None
+  {{- end }}
   ports:
     {{- range $label, $port := $service.ports }}
     - name: {{ $label | quote }}

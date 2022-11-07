@@ -181,7 +181,11 @@ multicluster:
   ## creates a ClusterIP service whos name does not have release name
   ## in it. A common service across different clusters for automatic
   ## failover. Useful when using new naming style.
-  createCommonTserverService: false
+  createCommonTserverService:
+    enabled: false
+    ## To make above common Tserver service as headless service
+    ## Can be useful in Kubernetai
+    headless: false
 
   ## Enable it to deploy YugabyteDB in a multi-cluster services enabled
   ## Kubernetes cluster (KEP-1645). This will create ServiceExport.
