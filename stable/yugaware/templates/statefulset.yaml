@@ -20,6 +20,8 @@ spec:
     metadata:
       labels:
         app: {{ .Release.Name }}-yugaware
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configs.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ .Release.Name }}
       imagePullSecrets:
