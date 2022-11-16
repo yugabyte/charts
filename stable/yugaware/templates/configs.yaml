@@ -202,6 +202,25 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: {{ .Release.Name }}-yugaware-pg-upgrade
+  labels:
+    app: {{ template "yugaware.name" . }}
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+data:
+  pg-upgrade-11-to-14.sh: |
+    #!/bin/bash
+
+    if [ ! "$(ls -A /var/lib/postgresql/14/data)" ] && [ "$(ls -A /var/lib/postgresql/11/data)" ];
+    then
+      docker-upgrade pg_upgrade >> /pg_upgrade_logs/pg_upgrade_11_to_14.log;
+      echo "host all all all scram-sha-256" >> /var/lib/postgresql/14/data/pg_hba.conf;
+    fi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: {{ .Release.Name }}-yugaware-nginx-main-config
   labels:
     app: {{ template "yugaware.name" . }}
