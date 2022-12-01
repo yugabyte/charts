@@ -356,6 +356,13 @@ data:
           target_label: __metrics_path__
           replacement: /api/v1/nodes/${1}/proxy/metrics
         metric_relabel_configs:
+          # Only keep the metrics which we care about
+          - source_labels: ["__name__"]
+            regex: "kubelet_volume_stats_used_bytes|kubelet_volume_stats_capacity_bytes"
+            action: keep
+          - source_labels: ["persistentvolumeclaim"]
+            regex: "(.*)-yb-(.*)"
+            action: keep
           # Save the name of the metric so we can group_by since we cannot by __name__ directly...
           - source_labels: ["__name__"]
             regex: "(.*)"
@@ -374,6 +381,10 @@ data:
         static_configs:
         - targets: ['kube-state-metrics.kube-system.svc.{{.Values.domainName}}:8080']
         metric_relabel_configs:
+          # Only keep the metrics which we care about
+          - source_labels: ["__name__"]
+            regex: "kube_pod_container_resource_requests_cpu_cores"
+            action: keep
           # Save the name of the metric so we can group_by since we cannot by __name__ directly...
           - source_labels: ["__name__"]
             regex: "(.*)"
@@ -387,6 +398,10 @@ data:
             regex: "(.*)"
             target_label: "container_name"
             replacement: "$1"
+          # Keep metrics from YugabyteDB pods, discard everything else
+          - source_labels: ["pod_name"]
+            regex: "(.*)yb-(.*)"
+            action: keep
 
       - job_name: 'kubernetes-cadvisor'
 
@@ -409,6 +424,10 @@ data:
           target_label: __metrics_path__
           replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
         metric_relabel_configs:
+          # Only keep the metrics which we care about
+          - source_labels: ["__name__"]
+            regex: "container_cpu_usage_seconds_total|container_memory_working_set_bytes"
+            action: keep
           # Save the name of the metric so we can group_by since we cannot by __name__ directly...
           - source_labels: ["__name__"]
             regex: "(.*)"
@@ -422,6 +441,10 @@ data:
             regex: "(.*)"
             target_label: "container_name"
             replacement: "$1"
+          # Keep metrics from YugabyteDB pods, discard everything else
+          - source_labels: ["pod_name"]
+            regex: "(.*)yb-(.*)"
+            action: keep
 
       {{- end }}
 
