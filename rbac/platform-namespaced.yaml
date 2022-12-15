@@ -112,6 +112,12 @@ rules:
   - "statefulsets/scale"
   verbs:
   - "patch"                     # required for scale command
+- apiGroups:
+  - ""
+  resources:
+  - "events"
+  verbs:
+  - "list"
 ---
 
 apiVersion: rbac.authorization.k8s.io/v1
