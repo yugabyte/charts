@@ -176,6 +176,22 @@ prometheus:
       cpu: 2
       memory: 4Gi
 
+  ## Prometheus remote write config, as described here:
+  ## https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write
+  ## If tls configuration is needed, set prometheus.remoteWrite.tls.enabled = true and provide
+  ## necessary certificates/keys in base64 format as prometheus.remoteWrite.tls.[caCert|cert|key].
+  ## Remote write config should expect certs/keys in
+  ## /opt/remote_write/certs/[ca.crt|client.crt|client.key] respectively.
+  remoteWrite:
+    config: []
+    tls:
+      enabled: false
+      ## base64 encoded certificates and key expected
+      caCert: ""
+      clientCert: ""
+      clientKey: ""
+
+
 # Arbitrary key=value config entries for application.docker.conf
 additionalAppConf:
   stringConf:

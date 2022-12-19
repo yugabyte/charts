@@ -88,6 +88,11 @@ spec:
           secret:
             secretName: {{ .Release.Name }}-yugaware-tls-cert
         {{- end }}
+        {{- if .Values.prometheus.remoteWrite.tls.enabled }}
+        - name: {{  .Release.Name }}-yugaware-prometheus-remote-write-tls
+          secret:
+            secretName: {{ .Release.Name }}-yugaware-prometheus-remote-write-tls
+        {{- end }}
         - name: pg-upgrade-11-to-14
           configMap:
             name: {{ .Release.Name }}-yugaware-pg-upgrade
@@ -213,6 +218,11 @@ spec:
           - name: yugaware-storage
             mountPath: /opt/yugabyte/prometheus/rules
             subPath: swamper_rules
+          {{- end }}
+          {{- if .Values.prometheus.remoteWrite.tls.enabled }}
+          - name: {{ .Release.Name }}-yugaware-prometheus-remote-write-tls
+            mountPath: /opt/remote_write/certs/
+            readOnly: true
           {{- end }}
           args:
             - --config.file=/prometheus_configs/prometheus.yml
