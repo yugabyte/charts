@@ -330,7 +330,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: app_secret
-            {{- with .Values.yugaware.extraEnv }}{{ toYaml . | indent 12 }}{{ end }}
+            {{- with .Values.yugaware.extraEnv }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 9000
               name: yugaware
