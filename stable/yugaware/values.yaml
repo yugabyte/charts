@@ -82,6 +82,8 @@ yugaware:
 
   universe_boot_script: ""
 
+  extraEnv: []
+
 ## Configure PostgreSQL part of the application
 postgres:
   user: postgres
