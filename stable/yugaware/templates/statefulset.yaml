@@ -114,6 +114,13 @@ spec:
         - name: {{  .Release.Name }}-yugaware-tls-cert
           secret:
             secretName: {{ .Release.Name }}-yugaware-tls-cert
+            {{- if .Values.tls.certManager.enabled }}
+            items:
+            - key: tls.crt
+              path: server.crt
+            - key: tls.key
+              path: server.key 
+            {{- end }}
         {{- end }}
         {{- if .Values.prometheus.remoteWrite.tls.enabled }}
         - name: {{  .Release.Name }}-yugaware-prometheus-remote-write-tls

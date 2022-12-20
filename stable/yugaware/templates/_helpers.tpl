@@ -149,7 +149,7 @@ server.crt: {{ $root.Values.tls.certificate }}
 server.key: {{ index $result "server.key" }}
 server.crt: {{ index $result "server.crt" }}
   {{- else -}}
-    {{- $cert := genSelfSignedCert "yugaware-ui-tls" nil nil 3560 -}}
+    {{- $cert := genSelfSignedCert $root.Values.tls.hostname nil nil 3560 -}}
 server.key: {{ $cert.Key | b64enc }}
 server.crt: {{ $cert.Cert | b64enc }}
   {{- end -}}

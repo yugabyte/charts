@@ -127,6 +127,29 @@ tls:
   certificate: ""
   key: ""
   sslProtocols: "" # if set, override default Nginx SSL protocols setting
+  ## cert-manager values
+  ## If cert-manager is enabled:
+  ## If genSelfsigned: true:
+  ##   Create a self-signed issuer/clusterIssuer
+  ##   Generate a rootCA using the above issuer.
+  ##   Generate a tls certificate with secret name as: {{ .Release.Name }}-yugaware-tls-cert
+  ## Else if genSelfsigned: false:
+  ##   Expect a clusterIssuer/issuer to be provided by user
+  ##   Generate a tls cert based on above issuer with secret name as: {{ .Release.Name }}-yugaware-tls-cert
+  certManager:
+    enabled: false
+    genSelfsigned: true
+    useClusterIssuer: false
+    clusterIssuer: cluster-ca
+    issuer: yugaware-ca
+    ## Configuration for the TLS certificate requested from Issuer/ClusterIssuer
+    configuration:
+      duration: 8760h # 90d
+      renewBefore: 240h # 15d
+      algorithm: RSA # ECDSA or RSA
+      # Can be 2048, 4096 or 8192 for RSA
+      # Or 256, 384 or 521 for ECDSA
+      keySize: 2048
 
 ## yugaware pod Security Context
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
