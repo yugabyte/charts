@@ -143,16 +143,8 @@ metadata:
     heritage: {{ .Release.Service | quote }}
 type: Opaque
 data:
-# For user-provided cert and key. Expect to be base-64 encoded.
-{{- if and .Values.tls.certificate .Values.tls.key }}
-  server.crt: {{ .Values.tls.certificate }}
-  server.key: {{ .Values.tls.key }}
-{{- else }}
-{{- $cert := genSelfSignedCert "yugaware-ui-tls" ( default nil ) ( default nil ) 3560 }}
-  server.crt: {{ $cert.Cert | b64enc }}
-  server.key: {{ $cert.Key | b64enc }}
+{{- include "getOrCreateServerCert" (dict "Namespace" .Release.Namespace "Root" . "Name" (printf "%s%s" .Release.Name "-yugaware-tls-cert")) | nindent 2 }}
 {{- end }}
-{{- end}}
 
 ---
 apiVersion: v1

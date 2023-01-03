@@ -134,3 +134,24 @@ Make list of allowed CORS origins
 {{- end -}}
 ]
 {{- end -}}
+
+{{/*
+Get or generate server cert and key
+*/}}
+{{- define "getOrCreateServerCert" -}}
+{{- $root := .Root -}}
+{{- if and $root.Values.tls.certificate $root.Values.tls.key -}}
+server.key: {{ $root.Values.tls.key }}
+server.crt: {{ $root.Values.tls.certificate }}
+{{- else -}}
+  {{- $result := (lookup "v1" "Secret" .Namespace .Name).data -}}
+  {{- if $result -}}
+server.key: {{ index $result "server.key" }}
+server.crt: {{ index $result "server.crt" }}
+  {{- else -}}
+    {{- $cert := genSelfSignedCert "yugaware-ui-tls" nil nil 3560 -}}
+server.key: {{ $cert.Key | b64enc }}
+server.crt: {{ $cert.Cert | b64enc }}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
