@@ -74,3 +74,28 @@ jobs:
         git status
         git diff
         exit 1
+    - name: "Switch to master branch"
+      id: switch-to-master-branch
+      run: |
+        git checkout master
+    - name: "Update the master version if needed."
+      id: update-master-version
+      continue-on-error: true
+      run: |
+        # Following script updates files only if higher version is passed.
+        .ci/update_version.sh '${{steps.extract-version.outputs.yb_version}}'
+    - name: "Push the changes to master branch"
+      if: steps.update-master-version.outcome == 'success'
+      run: |
+        git status
+        git diff
+        git add ./stable/yugabyte/Chart.yaml ./stable/yugaware/Chart.yaml \
+                ./stable/yugabyte/values.yaml ./stable/yugaware/values.yaml ./stable/yugabyte/app-readme.md
+        git commit -m "Update the version to ${{steps.extract-version.outputs.yb_version}}"
+        git push origin HEAD:master
+    - name: "Show git status in case of failure"
+      if: steps.update-master-version.outcome == 'failure'
+      run: |
+        git status
+        git diff
+        exit 1
