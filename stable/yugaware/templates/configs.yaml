@@ -411,7 +411,7 @@ data:
 
       - job_name: 'kube-state-metrics'
         static_configs:
-        - targets: ['kube-state-metrics.kube-system.svc.{{.Values.domainName}}:8080']
+        - targets: ['kube-state-metrics.kube-state.svc.{{.Values.domainName}}:8080']
         metric_relabel_configs:
           # Only keep the metrics which we care about
           - source_labels: ["__name__"]
@@ -440,6 +440,10 @@ data:
             regex: "kube_pod_container_resource_requests;core"
             target_label: "__name__"
             replacement: "kube_pod_container_resource_requests_cpu_cores"
+          # Keep metrics for CPU, discard duplicate metrics
+          - source_labels: ["saved_name"]
+            regex: "kube_pod_container_resource_requests_cpu_cores"
+            action: keep
 
       - job_name: 'kubernetes-cadvisor'
 
