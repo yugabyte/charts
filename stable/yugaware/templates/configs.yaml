@@ -411,7 +411,7 @@ data:
 
       - job_name: 'kube-state-metrics'
         static_configs:
-        - targets: ['kube-state-metrics.kube-state.svc.{{.Values.domainName}}:8080']
+        - targets: ['kube-state-metrics.kube-system.svc.{{.Values.domainName}}:8080']
         metric_relabel_configs:
           # Only keep the metrics which we care about
           - source_labels: ["__name__"]
