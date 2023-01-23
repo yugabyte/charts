@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "yugabyte.fullname" . }}-master-hooks
+  namespace: "{{ .Release.Namespace }}"
+data:
+{{- $replicas := (eq .name "yb-masters") | ternary .Values.replicas.master .Values.replicas.tserver -}}
+{{- range $index := until ( int ( $replicas ) ) }}
+  yb-master-{{.}}-pre_debug_hook.sh: "echo 'hello-from-pre' " 
+  yb-master-{{.}}-post_debug_hook.sh: "echo 'hello-from-post' " 
+{{- end }}  
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "yugabyte.fullname" . }}-tserver-hooks
+  namespace: "{{ .Release.Namespace }}"
+data:
+{{- $replicas := (eq .name "yb-tservers") | ternary .Values.replicas.master .Values.replicas.tserver -}}
+{{- range $index := until ( int ( $replicas ) ) }}
+  yb-tserver-{{.}}-pre_debug_hook.sh: "echo 'hello-from-pre' " 
+  yb-tserver-{{.}}-post_debug_hook.sh: "echo 'hello-from-post' " 
+{{- end }} 
+---

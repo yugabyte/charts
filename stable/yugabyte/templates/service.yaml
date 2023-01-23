@@ -522,6 +522,8 @@ spec:
             name: {{ $label | quote }}
           {{- end}}
         volumeMounts:
+          - name: debug-hooks-volume
+            mountPath: /opt/debug_hooks_config
           {{ if not $root.Values.storage.ephemeral }}
           {{- range $index := until (int ($storageInfo.count)) }}
           - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
@@ -572,6 +574,17 @@ spec:
       {{- end }}
 
       volumes:
+        {{- if (eq .name "yb-masters") }}
+        - name: debug-hooks-volume
+          configMap: 
+            name: {{ include "yugabyte.fullname" $root }}-master-hooks
+            defaultMode: 0744
+        {{- else if (eq .name "yb-tservers") }}
+        - name: debug-hooks-volume
+          configMap: 
+            name: {{ include "yugabyte.fullname" $root }}-tserver-hooks
+            defaultMode: 0744
+        {{- end }}
         {{ if not $root.Values.storage.ephemeral }}
         {{- range $index := until (int ($storageInfo.count)) }}
         - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
