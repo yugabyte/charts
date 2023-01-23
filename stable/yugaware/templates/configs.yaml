@@ -441,7 +441,7 @@ data:
             target_label: "__name__"
             replacement: "kube_pod_container_resource_requests_cpu_cores"
           # Keep metrics for CPU, discard duplicate metrics
-          - source_labels: ["saved_name"]
+          - source_labels: ["__name__"]
             regex: "kube_pod_container_resource_requests_cpu_cores"
             action: keep
 
