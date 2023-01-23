@@ -29,7 +29,7 @@ spec:
 {{ toYaml .Values.yugaware.pod.labels | indent 8 }}
 {{- end }}
     spec:
-      serviceAccountName: {{ .Release.Name }}
+      serviceAccountName: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
       imagePullSecrets:
       - name: {{ .Values.image.pullSecret }}
       {{- if .Values.securityContext.enabled }}
