@@ -227,6 +227,24 @@ data:
       docker-upgrade pg_upgrade | tee -a /pg_upgrade_logs/pg_upgrade_11_to_14.log;
       echo "host all all all scram-sha-256" >> "${PGDATANEW}/pg_hba.conf";
     fi
+{{- if .Values.securityContext.enabled }}
+---
+apiVersion: "v1"
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-yugaware-pg-prerun
+  labels:
+    app: {{ template "yugaware.name" . }}
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+data:
+  pg-prerun.sh: |
+    #!/bin/bash
+    set -x -o errexit
+
+    mkdir -p $PGDATA && chown -R $PG_UID:$PG_GID $PGDATA;
+{{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap

@@ -133,6 +133,12 @@ spec:
             items:
               - key: pg-upgrade-11-to-14.sh
                 path: pg-upgrade-11-to-14.sh
+        - name: pg-init
+          configMap:
+            name: {{ .Release.Name }}-yugaware-pg-prerun
+            items:
+              - key: pg-prerun.sh
+                path: pg-prerun.sh
       initContainers:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -195,6 +201,25 @@ spec:
           - name: yugaware-storage
             mountPath: /pg_upgrade_logs
             subPath: postgres_data_14
+        {{- if .Values.securityContext.enabled }}
+        - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
+          name: postgres-init
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash", "/pg_prerun/pg-prerun.sh"]
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: PG_UID
+              value: {{ .Values.securityContext.runAsUser | quote }}
+            - name: PG_GID
+              value: {{ .Values.securityContext.runAsGroup | quote }}
+          volumeMounts:
+          - name: yugaware-storage
+            mountPath: /var/lib/postgresql/data
+            subPath: postgres_data_14
+          - name: pg-init
+            mountPath: /pg_prerun
+        {{- end }}
       containers:
         {{ if not .Values.postgres.external.host }}
         - name: postgres
@@ -206,6 +231,12 @@ spec:
           {{- end }}
           - "-c"
           - "huge_pages=off"
+          {{- if .Values.securityContext.enabled }}
+          securityContext:
+            runAsUser: {{ required "runAsUser cannot be empty" .Values.securityContext.runAsUser }}
+            runAsGroup: {{ .Values.securityContext.runAsGroup | default 0 }}
+            runAsNonRoot: true
+          {{- end }}
           env:
             - name: POSTGRES_USER
               valueFrom:
@@ -326,9 +357,9 @@ spec:
           {{- end }}
 
           command: [ "/sbin/tini", "--"]
-          args:
-            - "bin/yugaware"
-            - "-Dconfig.file=/data/application.docker.conf"
+          args: 
+          - "bin/yugaware"
+          - "-Dconfig.file=/data/application.docker.conf"
           env:
             - name: POSTGRES_USER
               valueFrom:
