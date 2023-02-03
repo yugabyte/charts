@@ -155,3 +155,16 @@ server.crt: {{ $cert.Cert | b64enc }}
   {{- end -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Check export of nss_wrapper environment variables required
+*/}}
+{{- define "checkNssWrapperExportRequired" -}}
+  {{- if .Values.securityContext.enabled -}}
+    {{- if and (ne .Values.securityContext.runAsUser 0) (ne .Values.securityContext.runAsUser 10001) -}}
+      {{- printf "true" -}}
+    {{- end -}}
+  {{- else -}}
+      {{- printf "false" -}}
+  {{- end -}}
+{{- end -}}

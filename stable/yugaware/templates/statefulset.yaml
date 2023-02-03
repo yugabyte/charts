@@ -235,7 +235,7 @@ spec:
           securityContext:
             runAsUser: {{ required "runAsUser cannot be empty" .Values.securityContext.runAsUser }}
             runAsGroup: {{ .Values.securityContext.runAsGroup | default 0 }}
-            runAsNonRoot: true
+            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
           {{- end }}
           env:
             - name: POSTGRES_USER
@@ -355,12 +355,18 @@ spec:
           resources:
 {{ toYaml .Values.yugaware.resources | indent 12 }}
           {{- end }}
-
-          command: [ "/sbin/tini", "--"]
-          args: 
-          - "bin/yugaware"
-          - "-Dconfig.file=/data/application.docker.conf"
+          args: ["bin/yugaware","-Dconfig.file=/data/application.docker.conf"]
           env:
+          # Conditionally set these env variables, if runAsUser is not 0(root)
+          # or 10001(yugabyte).
+          {{- if eq (include "checkNssWrapperExportRequired" .) "true" }}
+            - name: NSS_WRAPPER_GROUP
+              value: "/tmp/group.template"
+            - name: NSS_WRAPPER_PASSWD
+              value: "/tmp/passwd.template"
+            - name: LD_PRELOAD
+              value: "/usr/lib64/libnss_wrapper.so"
+          {{- end }}
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
