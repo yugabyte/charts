@@ -24,7 +24,7 @@ data:
 {{- end }}
 ---
 {{- end }}
-
+---
 {{- range .Values.Services }}
 {{- $service := . -}}
 {{- $appLabelArgs := dict "label" .label "root" $root -}}
@@ -337,18 +337,20 @@ spec:
         - name: YBDEVOPS_CORECOPY_DIR
           value: "/mnt/disk0/cores"
         {{- if eq .name "yb-masters" }}
-        {{- with $root.Values.master.extraEnv }}{{ toYaml . | nindent 8 }}{{ end }}
-        {{- with $root.Values.master.secretEnv }}{{ toYaml . | nindent 8 }}{{ end }}
+        {{- with $root.Values.master.extraEnv }}{{ toYaml . | nindent 8 }}{{- end }}
+        {{- $data := dict "secretenv" $root.Values.master.secretEnv "root" $root "suffix" "master"}}
+        {{- include "yugabyte.addenvsecrets" $data | nindent 8 }}
         {{- else }}
-        {{- with $root.Values.tserver.extraEnv }}{{ toYaml . | nindent 8 }}{{ end }}
-        {{- with $root.Values.tserver.secretEnv }}{{ toYaml . | nindent 8 }}{{ end }}
+        {{- with $root.Values.tserver.extraEnv }}{{ toYaml . | nindent 8 }}{{- end }}
+        {{- $data := dict "secretenv" $root.Values.tserver.secretEnv "root" $root "suffix" "tserver" }}
+        {{- include "yugabyte.addenvsecrets" $data | nindent 8 }}
         {{- end }}
         {{- if and $root.Values.tls.enabled $root.Values.tls.clientToServer (ne .name "yb-masters") }}
         - name: SSL_CERTFILE
           value: /root/.yugabytedb/root.crt
         {{- end }}
         resources:
-        {{ if eq .name "yb-masters" }}
+        {{- if eq .name "yb-masters" }}
 {{ toYaml $root.Values.resource.master | indent 10 }}
         {{ else }}
 {{ toYaml $root.Values.resource.tserver | indent 10 }}

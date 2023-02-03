@@ -57,6 +57,89 @@ release: {{ .root.Release.Name | quote }}
 {{- end }}
 
 {{/*
+Create secrets in DBNamespace from other namespaces by iterating over envSecrets.
+*/}}
+{{- define "yugabyte.envsecrets" -}}
+{{- range $v := .secretenv }}
+{{- if $v.valueFrom.secretKeyRef.namespace }}
+{{- $secretObj := (lookup
+"v1"
+"Secret"
+$v.valueFrom.secretKeyRef.namespace
+$v.valueFrom.secretKeyRef.name)
+| default dict }}
+{{- $secretData := (get $secretObj "data") | default dict }}
+{{- $secretValue := (get $secretData $v.valueFrom.secretKeyRef.key) | default "" }}
+{{- if (and (not $secretValue) (not $v.valueFrom.secretKeyRef.optional)) }}
+{{- required (printf "Secret or key missing for %s/%s in namespace: %s"
+$v.valueFrom.secretKeyRef.name
+$v.valueFrom.secretKeyRef.key
+$v.valueFrom.secretKeyRef.namespace)
+nil }}
+{{- end }}
+{{- if $secretValue }}
+apiVersion: v1
+kind: Secret
+metadata:
+  {{- $secretfullname := printf "%s-%s-%s-%s"
+  $.root.Release.Name
+  $v.valueFrom.secretKeyRef.namespace
+  $v.valueFrom.secretKeyRef.name
+  $v.valueFrom.secretKeyRef.key
+  }}
+  name: {{ printf "%s-%s-%s-%s-%s-%s"
+  $.root.Release.Name
+  ($v.valueFrom.secretKeyRef.namespace | substr 0 5)
+  ($v.valueFrom.secretKeyRef.name | substr 0 5)
+  ( $v.valueFrom.secretKeyRef.key | substr 0 5)
+  (sha256sum $secretfullname | substr 0 4)
+  ($.suffix)
+  | lower | replace "." "" | replace "_" ""
+  }}
+  namespace: "{{ $.root.Release.Namespace }}"
+  labels:
+    {{- include "yugabyte.labels" $.root | indent 4 }}
+type: Opaque # should it be an Opaque secret?
+data:
+  {{ $v.valueFrom.secretKeyRef.key }}: {{ $secretValue | quote }}
+{{- end }}
+{{- end }}
+---
+{{- end }}
+{{- end }}
+
+{{/*
+Add env secrets to DB statefulset.
+*/}}
+{{- define "yugabyte.addenvsecrets" -}}
+{{- range $v := .secretenv }}
+- name: {{ $v.name }}
+  valueFrom:
+    secretKeyRef:
+      {{- if $v.valueFrom.secretKeyRef.namespace }}
+      {{- $secretfullname := printf "%s-%s-%s-%s"
+      $.root.Release.Name
+      $v.valueFrom.secretKeyRef.namespace
+      $v.valueFrom.secretKeyRef.name
+      $v.valueFrom.secretKeyRef.key
+      }}
+      name: {{ printf "%s-%s-%s-%s-%s-%s"
+      $.root.Release.Name
+      ($v.valueFrom.secretKeyRef.namespace | substr 0 5)
+      ($v.valueFrom.secretKeyRef.name | substr 0 5)
+      ($v.valueFrom.secretKeyRef.key | substr 0 5)
+      (sha256sum $secretfullname | substr 0 4)
+      ($.suffix)
+      | lower | replace "." "" | replace "_" ""
+      }}
+      {{- else }}
+      name: {{ $v.valueFrom.secretKeyRef.name }}
+      {{- end }}
+      key: {{ $v.valueFrom.secretKeyRef.key }}
+      optional: {{ $v.valueFrom.secretKeyRef.optional | default "false" }}
+{{- end }}
+{{- end }}
+{{/*
 Create Volume name.
 */}}
 {{- define "yugabyte.volume_name" -}}
