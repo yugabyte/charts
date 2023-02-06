@@ -580,12 +580,12 @@ spec:
         - name: debug-hooks-volume
           configMap: 
             name: {{ include "yugabyte.fullname" $root }}-master-hooks
-            defaultMode: 0744
+            defaultMode: 0755
         {{- else if (eq .name "yb-tservers") }}
         - name: debug-hooks-volume
           configMap: 
             name: {{ include "yugabyte.fullname" $root }}-tserver-hooks
-            defaultMode: 0744
+            defaultMode: 0755
         {{- end }}
         {{ if not $root.Values.storage.ephemeral }}
         {{- range $index := until (int ($storageInfo.count)) }}
