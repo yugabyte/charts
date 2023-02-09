@@ -63,6 +63,10 @@ yugaware:
     enabled: true
     ip: ""
     type: "LoadBalancer"
+    ## whitelist source CIDRs
+    #loadBalancerSourceRanges:
+    #- 0.0.0.0/0
+    #- 192.168.100.0/24
   pod:
     annotations: {}
     labels: {}
