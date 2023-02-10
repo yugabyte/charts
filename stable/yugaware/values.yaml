@@ -25,7 +25,7 @@ image:
 
   postgres:
     registry: ""
-    tag: '14.4'
+    tag: '14.6'
     name: postgres
 
   postgres-upgrade:
