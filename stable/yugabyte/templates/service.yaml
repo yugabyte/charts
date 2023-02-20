@@ -59,7 +59,7 @@ data:
 
 {{- $node := $root.Values.oldNamingStyle | ternary $nodeOldStyle $nodeNewStyle }}
 {{- if $root.Values.tls.rootCA.key }}
-{{- $dns1 := printf "*.*.%s" $root.Release.Namespace }}
+{{- $dns1 := printf "*.%s-%s.%s" (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
 {{- $dns2 := printf "%s.svc.%s" $dns1 $root.Values.domainName }}
 {{- if $root.Values.multicluster.createServiceExports -}}
   {{- $dns1 = printf "*.*.*.%s.svc.clusterset.local" $root.Release.Namespace }}
@@ -98,7 +98,7 @@ spec:
   selector:
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
 
-{{ if $root.Values.enableLoadBalancer }}
+{{- if $root.Values.enableLoadBalancer }}
 {{- range $endpoint :=  $root.Values.serviceEndpoints }}
 {{- if eq $service.label $endpoint.app }}
 ---
@@ -134,7 +134,7 @@ spec:
   {{- end }}
 {{- end}}
 {{- end}}
-{{ end }}
+{{- end}}
 
 ---
 apiVersion: apps/v1
@@ -574,6 +574,52 @@ spec:
             mountPath: /var/yugabyte/cores
             subPath: cores
       {{- end }}
+
+      {{- if and (eq .name "yb-tservers") ($root.Values.ybc.enabled) }}
+      - name: yb-controller
+        image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
+        imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - "bash"
+                - "-c"
+                - >
+                  mkdir -p /mnt/disk0/yw-data/controller/tmp;
+                  mkdir -p /mnt/disk0/yw-data/controller/conf;
+                  mkdir -p /mnt/disk0/ybc-data/controller/logs;
+                  mkdir -p /tmp/yugabyte/controller;
+                  ln -sf /mnt/disk0/ybc-data/controller/logs /tmp/yugabyte/controller;
+                  ln -sf /mnt/disk0/yw-data/controller/bin /tmp/yugabyte/controller;      
+        command:
+          - "/sbin/tini"
+          - "--"
+        args:
+          - "/bin/bash"
+          - "-c"
+          - >
+            while true; do
+              sleep 60;
+              /home/yugabyte/tools/k8s_ybc_parent.py status || /home/yugabyte/tools/k8s_ybc_parent.py start;
+            done
+        volumeMounts:
+          {{- if not $root.Values.storage.ephemeral }}
+          {{- range $index := until (int ($storageInfo.count)) }}
+          - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
+            mountPath: /mnt/disk{{ $index }}
+          {{- end }}
+          {{- end }}
+          {{- if $root.Values.tls.enabled }}
+          - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
+            mountPath: {{ $root.Values.tls.certManager.enabled | ternary "/home/yugabyte/cert-manager" "/opt/certs/yugabyte" }}
+            readOnly: true
+          {{- end }}
+          {{- if ($root.Values.tserver.extraVolumeMounts) -}}
+          {{- include "yugabyte.isExtraVolumesMappingExists" $root.Values.tserver -}}
+          {{- $root.Values.tserver.extraVolumeMounts | toYaml | nindent 10 -}}
+          {{- end -}}
+      {{- end}}
 
       volumes:
         {{- if (eq .name "yb-masters") }}
