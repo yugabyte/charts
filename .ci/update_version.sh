@@ -46,7 +46,7 @@ fi
 
 files_to_update_version=("stable/yugabyte/Chart.yaml" "stable/yugaware/Chart.yaml")
 files_to_update_tag=("stable/yugabyte/values.yaml" "stable/yugaware/values.yaml")
-chart_release_version="$(echo "${release_version}" | grep -o '[0-9]\+.[0-9]\+.[0-9]\+')"
+chart_release_version="2.16.2"
 
 # Update appVersion and version in Chart.yaml
 for file in "${files_to_update_version[@]}"; do
