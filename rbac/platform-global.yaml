@@ -52,6 +52,15 @@ rules:
   - "delete"
   - "get"
   - "patch"
+- apiGroups:
+  - ""
+  resources:
+  - "configmaps"
+  verbs:
+  - "get"
+  - "create"
+  - "patch"
+  - "delete"
 ## We don't use ServiceMonitor in platform
 # - apiGroups:
 #   - "monitoring.coreos.com"
