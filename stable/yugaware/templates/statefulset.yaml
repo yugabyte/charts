@@ -119,7 +119,7 @@ spec:
             - key: tls.crt
               path: server.crt
             - key: tls.key
-              path: server.key 
+              path: server.key
             {{- end }}
         {{- end }}
         {{- if .Values.prometheus.remoteWrite.tls.enabled }}
@@ -226,7 +226,7 @@ spec:
           image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
-          {{- if .Values.ocpCompatibility.enabled }}
+          {{- if and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io") }}
           - "run-postgresql"
           {{- end }}
           - "-c"
@@ -253,12 +253,17 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_db
-            {{- if .Values.ocpCompatibility.enabled }}
+            {{- if and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io") }}
+            # Hardcoded the POSTGRESQL_USER because it's mandatory env var in RH PG image
+            # It doesn't have access to create the DB, so YBA fails to create the perf_advisor DB.
+            # Need to use admin user of RH PG image (postgres)
+            # Changing the user name won't be possible moving forward for OpenShift certified chart
             - name: POSTGRESQL_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Release.Name }}-yugaware-global-config
-                  key: postgres_user
+              value: pg-yba
+              # valueFrom:
+              #   secretKeyRef:
+              #     name: {{ .Release.Name }}-yugaware-global-config
+              #     key: postgres_user
             - name: POSTGRESQL_PASSWORD
               valueFrom:
                 secretKeyRef:
