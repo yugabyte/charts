@@ -157,6 +157,28 @@ server.crt: {{ $cert.Cert | b64enc }}
 {{- end -}}
 
 {{/*
+Get or generate server key cert in pem format
+*/}}
+{{- define "getOrCreateServerPem" -}}
+{{- $root := .Root -}}
+{{- if and $root.Values.tls.certificate $root.Values.tls.key -}}
+{{- $serverPemContent := ( printf "%s\n%s" $root.Values.tls.key $root.Values.tls.certificate ) -}}
+server.pem: {{ $serverPemContent }}
+{{- else -}}
+  {{- $result := (lookup "v1" "Secret" .Namespace .Name).data -}}
+  {{- if $result -}}
+{{- $serverPemContent := ( printf "%s\n%s" index $result "server.key" index $result "server.crt" ) -}}
+server.pem: {{ $serverPemContent }}
+  {{- else -}}
+    {{- $cert := genSelfSignedCert $root.Values.tls.hostname nil nil 3560 -}}
+{{- $serverPemContentTemp := ( printf "%s\n%s" $cert.Key $cert.Cert ) -}}
+{{- $serverPemContent := $serverPemContentTemp | b64enc -}}
+server.pem: {{ $serverPemContent }}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Check export of nss_wrapper environment variables required
 */}}
 {{- define "checkNssWrapperExportRequired" -}}

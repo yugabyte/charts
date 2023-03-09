@@ -5,6 +5,10 @@
 fullnameOverride: ""
 nameOverride: ""
 
+# Cloud team will retain nginx for sometime
+# until they start creating a separate pool
+useNginxProxy: false
+
 image:
   commonRegistry: ""
   # Setting commonRegistry to say, quay.io overrides the registry settings for all images

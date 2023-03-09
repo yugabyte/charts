@@ -84,6 +84,7 @@ spec:
                     - key: universe_boot_script
                       path: universe-boot-script.sh
             {{- end }}
+      {{- if .Values.useNginxProxy }}
         - name: nginx-config
           configMap:
             name: {{ .Release.Name }}-yugaware-nginx-config
@@ -96,6 +97,7 @@ spec:
             items:
               - key: nginx.conf
                 path: nginx.conf
+      {{- end }}
         - name: prometheus-config
           configMap:
             name: {{ .Release.Name }}-yugaware-prometheus-config
@@ -110,7 +112,7 @@ spec:
               - key: init-permissions.sh
                 path: init-permissions.sh
         {{- end }}
-        {{- if .Values.tls.enabled }}
+        {{- if and (.Values.tls.enabled) (.Values.useNginxProxy) }}
         - name: {{  .Release.Name }}-yugaware-tls-cert
           secret:
             secretName: {{ .Release.Name }}-yugaware-tls-cert
@@ -121,6 +123,14 @@ spec:
             - key: tls.key
               path: server.key
             {{- end }}
+        {{- end }}
+        {{- if and (not .Values.useNginxProxy) (.Values.tls.enabled) }}
+        - name: {{  .Release.Name }}-yugaware-tls-pem
+          secret:
+            secretName: {{ .Release.Name }}-yugaware-tls-pem
+            items:
+            - key: server.pem
+              path: server.pem
         {{- end }}
         {{- if .Values.prometheus.remoteWrite.tls.enabled }}
         - name: {{  .Release.Name }}-yugaware-prometheus-remote-write-tls
@@ -425,6 +435,12 @@ spec:
           - name: yugaware-storage
             mountPath: /prometheus_configs
             subPath: prometheus.yml
+        {{- if and (not .Values.useNginxProxy) (.Values.tls.enabled) }}
+          - name: {{  .Release.Name }}-yugaware-tls-pem
+            mountPath: /opt/certs/
+            readOnly: true
+        {{- end }}
+      {{- if .Values.useNginxProxy }}
         - name: nginx
           image: {{ include "full_image" (dict "containerName" "nginx" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -448,6 +464,7 @@ spec:
             mountPath: /opt/certs/
             readOnly: true
           {{- end }}
+      {{- end }}
 {{ if .Values.sidecars }}
 {{ toYaml .Values.sidecars | indent 8 }}
 {{ end }}

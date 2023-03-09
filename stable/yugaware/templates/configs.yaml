@@ -58,6 +58,14 @@ data:
   {{ end }}
     }
 
+    {{- if and (not .Values.useNginxProxy) (.Values.tls.enabled) }}
+    https.port = 9443
+    play.server.https.keyStore {
+      path = /opt/certs/server.pem
+      type = PEM
+    }
+    {{- end }}
+
     yb {
   {{- if .Values.yugaware.universe_boot_script }}
       universe_boot_script = "/data/universe-boot-script.sh"
@@ -133,6 +141,7 @@ data:
     {{ $key }} = {{ $value }}
     {{- end }}
 {{- if and .Values.tls.enabled (not .Values.tls.certManager.enabled) }}
+{{- if .Values.useNginxProxy }}
 ---
 apiVersion: v1
 kind: Secret
@@ -148,6 +157,24 @@ data:
 {{- include "getOrCreateServerCert" (dict "Namespace" .Release.Namespace "Root" . "Name" (printf "%s%s" .Release.Name "-yugaware-tls-cert")) | nindent 2 }}
 {{- end }}
 
+{{ if not .Values.useNginxProxy }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-yugaware-tls-pem
+  labels:
+    app: "{{ template "yugaware.name" . }}"
+    chart: "{{ template "yugaware.chart" . }}"
+    release: {{ .Release.Name | quote }}
+    heritage: {{ .Release.Service | quote }}
+type: Opaque
+data:
+{{- include "getOrCreateServerPem" (dict "Namespace" .Release.Namespace "Root" . "Name" (printf "%s%s" .Release.Name "-yugaware-tls-pem")) | nindent 2 }}
+{{ end }}
+{{- end }}
+
+{{- if .Values.useNginxProxy }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -203,6 +230,7 @@ data:
         client_max_body_size {{ .Values.nginx.upload_size }};
       }
     }
+{{ end }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -247,6 +275,7 @@ data:
 
     mkdir -p $PGDATA && chown -R $PG_UID:$PG_GID $PGDATA;
 {{- end }}
+{{- if .Values.useNginxProxy }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -295,6 +324,7 @@ data:
 
       include /etc/nginx/conf.d/*.conf;
     }
+{{- end }}
 {{- if .Values.prometheus.remoteWrite.tls.enabled }}
 ---
 apiVersion: v1
