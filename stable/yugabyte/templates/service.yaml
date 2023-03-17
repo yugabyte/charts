@@ -524,6 +524,10 @@ spec:
             name: {{ $label | quote }}
           {{- end}}
         volumeMounts:
+          {{- if (eq .name "yb-tservers") }}
+          - name: tserver-tmp
+            mountPath: /tmp
+          {{- end }}
           - name: debug-hooks-volume
             mountPath: /opt/debug_hooks_config
           {{ if not $root.Values.storage.ephemeral }}
@@ -591,7 +595,7 @@ spec:
                   mkdir -p /mnt/disk0/ybc-data/controller/logs;
                   mkdir -p /tmp/yugabyte/controller;
                   ln -sf /mnt/disk0/ybc-data/controller/logs /tmp/yugabyte/controller;
-                  ln -sf /mnt/disk0/yw-data/controller/bin /tmp/yugabyte/controller;      
+                  ln -sf /mnt/disk0/yw-data/controller/bin /tmp/yugabyte/controller;
         command:
           - "/sbin/tini"
           - "--"
@@ -604,6 +608,8 @@ spec:
               /home/yugabyte/tools/k8s_ybc_parent.py status || /home/yugabyte/tools/k8s_ybc_parent.py start;
             done
         volumeMounts:
+          - name: tserver-tmp
+            mountPath: /tmp
           {{- if not $root.Values.storage.ephemeral }}
           {{- range $index := until (int ($storageInfo.count)) }}
           - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
@@ -632,6 +638,8 @@ spec:
           configMap: 
             name: {{ include "yugabyte.fullname" $root }}-tserver-hooks
             defaultMode: 0755
+        - name: tserver-tmp
+          emptyDir: {}
         {{- end }}
         {{ if not $root.Values.storage.ephemeral }}
         {{- range $index := until (int ($storageInfo.count)) }}
