@@ -596,6 +596,10 @@ spec:
                   mkdir -p /tmp/yugabyte/controller;
                   ln -sf /mnt/disk0/ybc-data/controller/logs /tmp/yugabyte/controller;
                   ln -sf /mnt/disk0/yw-data/controller/bin /tmp/yugabyte/controller;
+                  {{- if and $root.Values.tls.enabled $root.Values.tls.certManager.enabled }}
+                  mkdir -p /opt/certs;
+                  ln -sf /mnt/disk0/certs /opt/certs/yugabyte;
+                  {{- end }}
         command:
           - "/sbin/tini"
           - "--"

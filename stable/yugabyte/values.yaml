@@ -82,10 +82,10 @@ tls:
       # It is necessary to provide some external means of restarting the pods.
       duration: 2160h # 90d
       renewBefore: 360h # 15d
-      algorithm: ECDSA # ECDSA or RSA
-      # Can be 2046, 4096 or 8192 for RSA
+      algorithm: RSA # ECDSA or RSA
+      # Can be 2048, 4096 or 8192 for RSA
       # Or 256, 384 or 521 for ECDSA
-      keySize: 521
+      keySize: 2048
 
   ## When certManager.enabled=false, rootCA.cert and rootCA.key are used to generate TLS certs.
   ## When certManager.enabled=true and boostrapSelfsigned=true, rootCA is ignored.
