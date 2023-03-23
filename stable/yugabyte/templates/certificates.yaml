@@ -107,7 +107,7 @@ spec:
   {{- $node := $root.Values.oldNamingStyle | ternary $nodeOldStyle $nodeNewStyle }}
   - {{$node}}
   {{- end }}
-  - {{ printf "%s.%s.svc.%s" $service.name $root.Release.Namespace $root.Values.domainName }}
+  - {{ printf "%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
   uris: []
   ipAddresses: []
 ---
