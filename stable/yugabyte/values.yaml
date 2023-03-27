@@ -49,6 +49,9 @@ partition:
   master: 0
   tserver: 0
 
+updateStrategy:
+  type: RollingUpdate
+
 # Used in Multi-AZ setup
 masterAddresses: ""
 

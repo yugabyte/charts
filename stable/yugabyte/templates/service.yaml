@@ -181,13 +181,17 @@ spec:
     {{- end }}
   {{- end }}
   updateStrategy:
+    {{- if eq $root.Values.updateStrategy.type "RollingUpdate" }}
     type: RollingUpdate
     rollingUpdate:
-      {{ if eq .name "yb-masters" }}
+      {{- if eq .name "yb-masters" }}
       partition: {{ $root.Values.partition.master }}
-      {{ else }}
+      {{- else }}
       partition: {{ $root.Values.partition.tserver }}
-      {{ end }}
+      {{- end }}
+    {{- else }}
+    type: {{ $root.Values.updateStrategy.type }}
+    {{- end }}
   selector:
     matchLabels:
       {{- include "yugabyte.appselector" ($appLabelArgs) | indent 6 }}
