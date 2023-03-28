@@ -2,7 +2,7 @@
 
 image:
 
-  repository: registry.connect.redhat.com/yugabytedb/yugabyte-platform
+  repository: quay.io/yugabyte/yugaware-ubi
 
   postgres:
     registry: registry.redhat.io
