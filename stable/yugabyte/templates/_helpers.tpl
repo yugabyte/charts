@@ -167,18 +167,21 @@ Generate a preflight check script invocation.
 */}}
 {{- define "yugabyte.preflight_check" -}}
 {{- if not .Values.preflight.skipAll -}}
+{{- $port := .Preflight.Port -}}
+{{- range $addr := split "," .Preflight.Addr -}}
 if [ -f /home/yugabyte/tools/k8s_preflight.py ]; then
   PYTHONUNBUFFERED="true" /home/yugabyte/tools/k8s_preflight.py \
     dnscheck \
-    --addr="{{ .Preflight.Addr }}" \
-{{- if not .Values.preflight.skipBind }}
-    --port="{{ .Preflight.Port }}"
+    --addr="{{ $addr }}" \
+{{- if not $.Values.preflight.skipBind }}
+    --port="{{ $port }}"
 {{- else }}
     --skip_bind
 {{- end }}
 fi && \
-{{- end -}}
-{{- end -}}
+{{ end }}
+{{- end }}
+{{- end }}
 
 {{/*
 Get YugaByte fs data directories.
@@ -233,11 +236,19 @@ Generate server RPC bind address.
 In case of multi-cluster services (MCS), we set it to $(POD_IP) to
 ensure YCQL uses a resolvable address.
 See https://github.com/yugabyte/yugabyte-db/issues/16155
+
+We use a workaround for above in case of Istio by setting it to
+$(POD_IP) and localhost. Master doesn't support that combination, so
+we stick to 0.0.0.0, which works for master.
 */}}
 {{- define "yugabyte.rpc_bind_address" -}}
   {{- $port := index .Service.ports "tcp-rpc-port" -}}
   {{- if .Values.istioCompatibility.enabled -}}
-    0.0.0.0:{{ $port }}
+    {{- if (eq .Service.name "yb-masters") -}}
+      0.0.0.0:{{ $port }}
+    {{- else -}}
+      $(POD_IP):{{ $port }},127.0.0.1:{{ $port }}
+    {{- end -}}
   {{- else if .Values.multicluster.createServiceExports -}}
     $(POD_IP):{{ $port }}
   {{- else -}}
