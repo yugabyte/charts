@@ -62,13 +62,13 @@ data:
 {{- $dns1 := printf "*.%s-%s.%s" (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
 {{- $dns2 := printf "%s.svc.%s" $dns1 $root.Values.domainName }}
 {{- if $root.Values.multicluster.createServiceExports -}}
-  {{- $dns1 = printf "*.*.*.%s.svc.clusterset.local" $root.Release.Namespace }}
+  {{- $dns1 = printf "*.%s.%s-%s.%s.svc.clusterset.local" $root.Values.multicluster.kubernetesClusterId (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
 {{- end -}}
 {{- if (and $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod) -}}
   {{- $dns1 = printf "*.%s.svc.%s" $root.Release.Namespace $root.Values.domainName }}
 {{- end -}}
 {{- $rootCA := buildCustomCert $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key -}}
-{{- $server := genSignedCert $node ( default nil ) (list $dns1 $dns2 ) 3650 $rootCA }}
+{{- $server := genSignedCert $node ( default nil ) (list $node $dns1 $dns2 ) 3650 $rootCA }}
   node.{{$node}}.crt: {{ $server.Cert | b64enc }}
   node.{{$node}}.key: {{ $server.Key | b64enc }}
 {{- else }}
@@ -600,6 +600,7 @@ spec:
                   mkdir -p /tmp/yugabyte/controller;
                   ln -sf /mnt/disk0/ybc-data/controller/logs /tmp/yugabyte/controller;
                   ln -sf /mnt/disk0/yw-data/controller/bin /tmp/yugabyte/controller;
+                  rm -f /tmp/yugabyte/controller/yb-controller.pid;
                   {{- if and $root.Values.tls.enabled $root.Values.tls.certManager.enabled }}
                   mkdir -p /opt/certs;
                   ln -sf /mnt/disk0/certs /opt/certs/yugabyte;
