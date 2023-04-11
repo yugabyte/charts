@@ -465,7 +465,7 @@ data:
         metric_relabel_configs:
           # Only keep the metrics which we care about
           - source_labels: ["__name__", "unit"]
-            regex: "^kube_pod_container_resource_requests$;core"
+            regex: "kube_pod_container_resource_requests;core"
             action: keep
           # Save the name of the metric so we can group_by since we cannot by __name__ directly...
           - source_labels: ["__name__"]
