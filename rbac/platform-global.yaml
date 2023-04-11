@@ -88,6 +88,8 @@ rules:
   - "delete"
   - "create"
   - "patch"
+  - "get"
+  - "list"
 - apiGroups:
   - ""
   resources:
