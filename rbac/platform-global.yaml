@@ -61,6 +61,24 @@ rules:
   - "create"
   - "patch"
   - "delete"
+- apiGroups:
+  - "multicluster.x-k8s.io"
+  resources:
+  - "serviceexports"
+  verbs:
+  - "get"
+  - "create"
+  - "patch"
+  - "delete"
+- apiGroups:
+  - "net.gke.io"
+  resources:
+  - "serviceexports"
+  verbs:
+  - "get"
+  - "create"
+  - "patch"
+  - "delete"
 ## We don't use ServiceMonitor in platform
 # - apiGroups:
 #   - "monitoring.coreos.com"
