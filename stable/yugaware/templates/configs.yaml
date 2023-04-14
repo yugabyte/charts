@@ -394,7 +394,11 @@ data:
             - 'container_cpu_usage_seconds_total{pod=~"(.*)yb-(.*)"}'
             - 'container_memory_working_set_bytes{pod=~"(.*)yb-(.*)"}'
             # kube-state-metrics
-            - 'kube_pod_container_resource_requests_cpu_cores{pod=~"(.*)yb-(.*)"}'
+            # Supports >= OCP v4.4
+            # OCP v4.4 has upgraded the KSM from 1.8.0 to 1.9.5.
+            # https://docs.openshift.com/container-platform/4.4/release_notes/ocp-4-4-release-notes.html#ocp-4-4-cluster-monitoring-version-updates
+            # - 'kube_pod_container_resource_requests_cpu_cores{pod=~"(.*)yb-(.*)"}'
+            - 'kube_pod_container_resource_requests{pod=~"(.*)yb-(.*)", unit="core"}'
 
         static_configs:
           - targets:
@@ -414,6 +418,12 @@ data:
             regex: "(.*)"
             target_label: "container_name"
             replacement: "$1"
+          # rename new name of the CPU metric to the old name and label
+          # ref: https://github.com/kubernetes/kube-state-metrics/blob/master/CHANGELOG.md#v200-alpha--2020-09-16
+          - source_labels: ["__name__", "unit"]
+            regex: "kube_pod_container_resource_requests;core"
+            target_label: "__name__"
+            replacement: "kube_pod_container_resource_requests_cpu_cores"
 
       {{- else }}
 
