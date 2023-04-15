@@ -167,7 +167,7 @@ server.pem: {{ $serverPemContent }}
 {{- else -}}
   {{- $result := (lookup "v1" "Secret" .Namespace .Name).data -}}
   {{- if $result -}}
-{{- $serverPemContent := ( printf "%s\n%s" index $result "server.key" index $result "server.crt" ) -}}
+{{- $serverPemContent := ( index $result "server.pem" ) -}}
 server.pem: {{ $serverPemContent }}
   {{- else -}}
     {{- $cert := genSelfSignedCert $root.Values.tls.hostname nil nil 3560 -}}
