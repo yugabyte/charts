@@ -162,7 +162,10 @@ Get or generate server key cert in pem format
 {{- define "getOrCreateServerPem" -}}
 {{- $root := .Root -}}
 {{- if and $root.Values.tls.certificate $root.Values.tls.key -}}
-{{- $serverPemContent := ( printf "%s\n%s" $root.Values.tls.key $root.Values.tls.certificate ) -}}
+{{- $decodedKey := $root.Values.tls.key | b64dec -}}
+{{- $decodedCert := $root.Values.tls.certificate | b64dec -}}
+{{- $serverPemContentTemp := ( printf "%s\n%s" $decodedKey $decodedCert ) -}}
+{{- $serverPemContent := $serverPemContentTemp | b64enc -}}
 server.pem: {{ $serverPemContent }}
 {{- else -}}
   {{- $result := (lookup "v1" "Secret" .Namespace .Name).data -}}
