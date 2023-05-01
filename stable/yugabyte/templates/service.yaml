@@ -52,7 +52,7 @@ data:
   {{- $nodeNewStyle = printf "%s-%s-%d.%s.%s-%s.%s.svc.clusterset.local" (include "yugabyte.fullname" $root) $service.label $index $root.Values.multicluster.kubernetesClusterId (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
 {{- end -}}
 
-{{- if (and $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod) -}}
+{{- if (or $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod) -}}
   {{- $nodeOldStyle = printf "%s-%d.%s.svc.%s" $service.label $index $root.Release.Namespace $root.Values.domainName }}
   {{- $nodeNewStyle = printf "%s-%s-%d.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index $root.Release.Namespace $root.Values.domainName }}
 {{- end -}}
@@ -64,7 +64,7 @@ data:
 {{- if $root.Values.multicluster.createServiceExports -}}
   {{- $dns1 = printf "*.%s.%s-%s.%s.svc.clusterset.local" $root.Values.multicluster.kubernetesClusterId (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
 {{- end -}}
-{{- if (and $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod) -}}
+{{- if (or $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod) -}}
   {{- $dns1 = printf "*.%s.svc.%s" $root.Release.Namespace $root.Values.domainName }}
 {{- end -}}
 {{- $rootCA := buildCustomCert $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key -}}
@@ -386,7 +386,7 @@ spec:
           {{- if $rpcPreflight -}}{{ $rpcPreflight | nindent 12 }}{{ end -}}
           {{- $broadcastAddr := include "yugabyte.server_broadcast_address" $serviceValues -}}
           {{/* skip bind check for Istio multi-cluster, we cannot/don't bind to service IP */}}
-          {{- if (not (and $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod)) }}
+          {{- if (not (or $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod)) }}
             {{- $broadcastPort := index $service.ports "tcp-rpc-port" -}}
             {{- $broadcastDict := dict "Addr" $broadcastAddr "Port" $broadcastPort -}}
             {{- $broadcastPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $broadcastDict) -}}

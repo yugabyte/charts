@@ -206,7 +206,7 @@ Get files from fs data directories for readiness / liveness probes.
 Generate server FQDN.
 */}}
 {{- define "yugabyte.server_fqdn" -}}
-  {{- if (and .Values.istioCompatibility.enabled .Values.multicluster.createServicePerPod) -}}
+  {{- if (or .Values.istioCompatibility.enabled .Values.multicluster.createServicePerPod) -}}
     {{- printf "$(HOSTNAME).$(NAMESPACE).svc.%s" .Values.domainName -}}
   {{- else if (and .Values.oldNamingStyle .Values.multicluster.createServiceExports) -}}
     {{ $membershipName := required "A valid membership name is required! Please set multicluster.kubernetesClusterId" .Values.multicluster.kubernetesClusterId }}
