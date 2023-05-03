@@ -28,9 +28,13 @@ image:
     name: yugabyte/thirdparty-deps
 
   postgres:
+    # For non default postgres image, set postgres.sampleConfig values accordingly.
     registry: ""
     tag: '14.8'
     name: postgres
+    # Postgres postgresql.conf.sample location on container. This will be used to mount
+    # configmap with custom settings.
+    sampleConfLocation: /usr/share/postgresql/postgresql.conf.sample    
 
   postgres-upgrade:
     registry: ""
@@ -105,6 +109,33 @@ postgres:
   # DO NOT CHANGE if using OCP Certified helm chart
   user: postgres
   dbname: yugaware
+
+  # DO NOT CHANGE for standard images
+  # The settings below are applied to postgresql.sample.conf. This is required because
+  # postgres initdb would not respect custom settings otherwise. Note: Only huge_pages = off
+  # is different from default value( try ).
+  sampleConfig:
+    max_connections: 100
+    shared_buffers: 128MB
+    dynamic_shared_memory_type: posix
+    max_wal_size: 1GB
+    min_wal_size: 80MB
+    wal_buffers: 4MB
+    logging_collector: on
+    log_filename: postgresql-%a.log
+    log_truncate_on_rotation: on
+    log_rotation_age: 1d
+    log_rotation_size: 0
+    log_timezone: UTC
+    datestyle: 'iso, mdy'
+    timezone: UTC
+    lc_messages: en_US.utf8
+    lc_monetary: en_US.utf8
+    lc_numeric: en_US.utf8
+    lc_time: en_US.utf8
+    default_text_search_config: pg_catalog.english
+    listen_addresses: '*'
+    huge_pages: off
 
   service:
     ## Expose internal Postgres as a Service

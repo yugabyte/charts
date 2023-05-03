@@ -151,6 +151,12 @@ spec:
             items:
               - key: pg-prerun.sh
                 path: pg-prerun.sh
+        - name: pg-sample-config
+          configMap:
+            name: {{ .Release.Name }}-pg-sample-config
+            items:
+              - key: postgresql.conf.sample
+                path: postgresql.conf.sample
       initContainers:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -239,12 +245,6 @@ spec:
         - name: postgres
           image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args:
-          {{- if and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io") }}
-          - "run-postgresql"
-          {{- end }}
-          - "-c"
-          - "huge_pages=off"
           {{- if .Values.securityContext.enabled }}
           securityContext:
             runAsUser: {{ required "runAsUser cannot be empty" .Values.securityContext.runAsUser }}
@@ -316,6 +316,9 @@ spec:
               mountPath: /var/lib/postgresql/data
               subPath: postgres_data_14
               {{- end }}
+            - name: pg-sample-config
+              mountPath: {{ .Values.image.postgres.sampleConfLocation }}
+              subPath: postgresql.conf.sample
         {{ end }}
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}

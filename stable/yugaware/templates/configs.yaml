@@ -277,6 +277,23 @@ data:
 
     mkdir -p $PGDATA && chown -R $PG_UID:$PG_GID $PGDATA;
 {{- end }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-pg-sample-config
+  labels:
+    app: {{ template "yugaware.name" . }}
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+data:
+  postgresql.conf.sample: |
+    {{- range $conf_key, $conf_value := .Values.postgres.sampleConfig }}
+    {{ $conf_key }} = {{ squote $conf_value }}
+    {{- end }}
+
 {{- if .Values.useNginxProxy }}
 ---
 apiVersion: v1
