@@ -52,7 +52,7 @@ data:
   {{- $nodeNewStyle = printf "%s-%s-%d.%s.%s-%s.%s.svc.clusterset.local" (include "yugabyte.fullname" $root) $service.label $index $root.Values.multicluster.kubernetesClusterId (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
 {{- end -}}
 
-{{- if (or $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod) -}}
+{{- if $root.Values.multicluster.createServicePerPod -}}
   {{- $nodeOldStyle = printf "%s-%d.%s.svc.%s" $service.label $index $root.Release.Namespace $root.Values.domainName }}
   {{- $nodeNewStyle = printf "%s-%s-%d.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index $root.Release.Namespace $root.Values.domainName }}
 {{- end -}}
@@ -64,7 +64,7 @@ data:
 {{- if $root.Values.multicluster.createServiceExports -}}
   {{- $dns1 = printf "*.%s.%s-%s.%s.svc.clusterset.local" $root.Values.multicluster.kubernetesClusterId (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
 {{- end -}}
-{{- if (or $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod) -}}
+{{- if $root.Values.multicluster.createServicePerPod -}}
   {{- $dns1 = printf "*.%s.svc.%s" $root.Release.Namespace $root.Values.domainName }}
 {{- end -}}
 {{- $rootCA := buildCustomCert $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key -}}
