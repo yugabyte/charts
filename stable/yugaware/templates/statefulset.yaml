@@ -120,12 +120,14 @@ spec:
           secret:
             secretName: {{ .Release.Name }}-yugaware-prometheus-remote-write-tls
         {{- end }}
+        {{- if not (and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io")) }}
         - name: pg-upgrade-11-to-14
           configMap:
             name: {{ .Release.Name }}-yugaware-pg-upgrade
             items:
               - key: pg-upgrade-11-to-14.sh
                 path: pg-upgrade-11-to-14.sh
+        {{- end }}
       initContainers:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -156,6 +158,7 @@ spec:
           - name: init-container-script
             mountPath: /init-container
           {{- end }}
+        {{- if not (and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io")) }}
         - image: {{ include "full_image" (dict "containerName" "postgres-upgrade" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: postgres-upgrade
@@ -188,6 +191,7 @@ spec:
           - name: yugaware-storage
             mountPath: /pg_upgrade_logs
             subPath: postgres_data_14
+        {{- end }}
       containers:
         {{ if not .Values.postgres.external.host }}
         - name: postgres
@@ -241,9 +245,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_db
-            {{- end }}
+            {{- else }}
+            # The RH Postgres image doesn't allow this directory to be changed.
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
+            {{- end }}
           ports:
             - containerPort: 5432
               name: postgres
@@ -255,8 +261,13 @@ spec:
 
           volumeMounts:
             - name: yugaware-storage
+              {{- if and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io") }}
+              mountPath: /var/lib/pgsql/data
+              subPath: postgres_data_13
+              {{- else }}
               mountPath: /var/lib/postgresql/data
               subPath: postgres_data_14
+              {{- end }}
         {{ end }}
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
