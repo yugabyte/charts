@@ -232,6 +232,7 @@ data:
     }
 {{ end }}
 ---
+{{- if not (and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io")) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -257,6 +258,7 @@ data:
       docker-upgrade pg_upgrade | tee -a /pg_upgrade_logs/pg_upgrade_11_to_14.log;
       echo "host all all all scram-sha-256" >> "${PGDATANEW}/pg_hba.conf";
     fi
+{{- end }}
 {{- if .Values.securityContext.enabled }}
 ---
 apiVersion: "v1"
