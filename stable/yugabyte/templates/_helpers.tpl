@@ -267,7 +267,7 @@ Generate server web interface.
 Generate server CQL proxy bind address.
 */}}
 {{- define "yugabyte.cql_proxy_bind_address" -}}
-  {{- if .Values.multicluster.createServiceExports -}}
+  {{- if or .Values.istioCompatibility.enabled .Values.multicluster.createServiceExports -}}
     0.0.0.0:{{ index .Service.ports "tcp-yql-port" -}}
   {{- else -}}
     {{- include "yugabyte.server_fqdn" . -}}

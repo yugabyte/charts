@@ -385,8 +385,8 @@ spec:
           {{- $rpcPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $rpcDict) -}}
           {{- if $rpcPreflight -}}{{ $rpcPreflight | nindent 12 }}{{ end -}}
           {{- $broadcastAddr := include "yugabyte.server_broadcast_address" $serviceValues -}}
-          {{/* skip bind check for Istio multi-cluster, we cannot/don't bind to service IP */}}
-          {{- if (not (or $root.Values.istioCompatibility.enabled $root.Values.multicluster.createServicePerPod)) }}
+          {{/* skip bind check for servicePerPod multi-cluster, we cannot/don't bind to service IP */}}
+          {{- if not $root.Values.multicluster.createServicePerPod }}
             {{- $broadcastPort := index $service.ports "tcp-rpc-port" -}}
             {{- $broadcastDict := dict "Addr" $broadcastAddr "Port" $broadcastPort -}}
             {{- $broadcastPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $broadcastDict) -}}
