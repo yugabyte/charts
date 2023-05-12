@@ -243,7 +243,7 @@ we stick to 0.0.0.0, which works for master.
 */}}
 {{- define "yugabyte.rpc_bind_address" -}}
   {{- $port := index .Service.ports "tcp-rpc-port" -}}
-  {{- if .Values.istioCompatibility.enabled -}}
+  {{- if (or .Values.istioCompatibility.enabled .Values.multicluster.createServicePerPod) -}}
     {{- if (eq .Service.name "yb-masters") -}}
       0.0.0.0:{{ $port }}
     {{- else -}}
