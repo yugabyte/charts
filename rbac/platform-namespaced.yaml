@@ -113,6 +113,7 @@ rules:
   verbs:
   - "get"                       # required for single pod
   - "list"                      # required for get pods
+  - "delete"                    # required by rolling restart
 - apiGroups:
   - ""
   resources:
