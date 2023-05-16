@@ -19,9 +19,9 @@ logging.basicConfig(
 
 
 def generate_schema_json(values_file, path_for_schema, additional_properties=False):
-    """Generate schema.json from values.yaml. Use yq and quicktype to generate the schema"""
+    """Generate schema.json from values.yaml. Use quicktype to generate the schema"""
     # verify yq and quicktype exists
-    for command_should_present in ["yq", "quicktype"]:
+    for command_should_present in ["quicktype"]:
         if not which(command_should_present):
             raise Exception(f"{command_should_present} command does not exists")
 
@@ -33,16 +33,10 @@ def generate_schema_json(values_file, path_for_schema, additional_properties=Fal
         os.path.abspath(path_for_schema), "values.schema.json"
     )
 
-    yaml_cmd = subprocess.Popen(
-        f"yq {abs_path_values} -o=json".split(" "),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        universal_newlines=True,
-    )
+    with open(abs_path_values, "r", encoding="UTF-8") as yaml_file:
+        values_yaml = yaml.safe_load(yaml_file)
 
-    yaml_cmd_output, yaml_cmd_errors = yaml_cmd.communicate()
-    if yaml_cmd_errors:
-        raise Exception(yaml_cmd_errors)
+    yaml_to_json = json.dumps(values_yaml)
 
     quicktype_cmd = f"quicktype --lang schema --out {abs_path_schema}".split(" ")
 
@@ -53,7 +47,7 @@ def generate_schema_json(values_file, path_for_schema, additional_properties=Fal
         stderr=subprocess.PIPE,
         universal_newlines=True,
     )
-    schema_generation.stdin.write(yaml_cmd_output)
+    schema_generation.stdin.write(yaml_to_json)
     _, errors = schema_generation.communicate()
 
     if errors:
