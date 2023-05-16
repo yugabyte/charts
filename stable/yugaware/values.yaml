@@ -22,7 +22,7 @@ image:
 
   postgres:
     registry: ""
-    tag: '14.7'
+    tag: '14.8'
     name: postgres
 
   postgres-upgrade:
@@ -32,12 +32,12 @@ image:
 
   prometheus:
     registry: ""
-    tag: v2.42.0
+    tag: v2.43.0
     name: prom/prometheus
 
   nginx:
     registry: ""
-    tag: 1.23.3
+    tag: 1.23.4
     name: nginxinc/nginx-unprivileged
 
 yugaware:
