@@ -157,6 +157,10 @@ spec:
             items:
               - key: postgresql.conf.sample
                 path: postgresql.conf.sample
+          {{- if .Values.postgres.extraVolumes -}}
+            {{- include "yugaware.isExtraVolumesMappingExists" .Values.postgres -}}
+            {{- .Values.postgres.extraVolumes | toYaml | nindent 8 -}}
+          {{ end }}
       initContainers:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -319,6 +323,10 @@ spec:
             - name: pg-sample-config
               mountPath: {{ .Values.image.postgres.sampleConfLocation }}
               subPath: postgresql.conf.sample
+         {{- if .Values.postgres.extraVolumeMounts -}}
+          {{- include "yugaware.isExtraVolumesMappingExists" .Values.postgres -}}
+          {{- .Values.postgres.extraVolumeMounts | toYaml | nindent 12 -}}
+        {{- end -}}
         {{ end }}
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
