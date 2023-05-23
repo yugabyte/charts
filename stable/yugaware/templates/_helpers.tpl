@@ -193,3 +193,41 @@ Check export of nss_wrapper environment variables required
       {{- printf "false" -}}
   {{- end -}}
 {{- end -}}
+
+
+{{/*
+  Verify the extraVolumes and extraVolumeMounts mappings.
+  Every extraVolumes should have extraVolumeMounts
+*/}}
+{{- define "yugaware.isExtraVolumesMappingExists" -}}
+  {{- $lenExtraVolumes := len .extraVolumes -}}
+  {{- $lenExtraVolumeMounts := len .extraVolumeMounts -}}
+
+  {{- if and (eq $lenExtraVolumeMounts 0) (gt $lenExtraVolumes 0) -}}
+    {{- fail "You have not provided the extraVolumeMounts for extraVolumes." -}}
+  {{- else if and (eq $lenExtraVolumes 0) (gt $lenExtraVolumeMounts 0) -}}
+    {{- fail "You have not provided the extraVolumes for extraVolumeMounts." -}}
+  {{- else if and (gt $lenExtraVolumes 0) (gt $lenExtraVolumeMounts 0) -}}
+      {{- $volumeMountsList := list -}}
+      {{- range .extraVolumeMounts -}}
+        {{- $volumeMountsList = append $volumeMountsList .name -}}
+      {{- end -}}
+
+      {{- $volumesList := list -}}
+      {{- range .extraVolumes -}}
+        {{- $volumesList = append $volumesList .name -}}
+      {{- end -}}
+
+      {{- range $volumesList -}}
+        {{- if not (has . $volumeMountsList) -}}
+          {{- fail (printf "You have not provided the extraVolumeMounts for extraVolume %s" .) -}}
+        {{- end -}}
+      {{- end -}}
+
+      {{- range $volumeMountsList -}}
+        {{- if not (has . $volumesList) -}}
+          {{- fail (printf "You have not provided the extraVolumes for extraVolumeMounts %s" .) -}}
+        {{- end -}}
+      {{- end -}}
+  {{- end -}}
+{{- end -}}
