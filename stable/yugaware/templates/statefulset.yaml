@@ -151,6 +151,10 @@ spec:
             items:
               - key: pg-prerun.sh
                 path: pg-prerun.sh
+          {{- if .Values.postgres.extraVolumes -}}
+            {{- include "yugaware.isExtraVolumesMappingExists" .Values.postgres -}}
+            {{- .Values.postgres.extraVolumes | toYaml | nindent 8 -}}
+          {{ end }}
       initContainers:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -316,6 +320,10 @@ spec:
               mountPath: /var/lib/postgresql/data
               subPath: postgres_data_14
               {{- end }}
+         {{- if .Values.postgres.extraVolumeMounts -}}
+          {{- include "yugaware.isExtraVolumesMappingExists" .Values.postgres -}}
+          {{- .Values.postgres.extraVolumeMounts | toYaml | nindent 12 -}}
+        {{- end -}}
         {{ end }}
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
