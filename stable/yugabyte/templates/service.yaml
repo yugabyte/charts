@@ -248,49 +248,70 @@ spec:
       {{- end }}
       terminationGracePeriodSeconds: 300
       affinity:
-        # Set the anti-affinity selector scope to YB masters.
+        # Set the anti-affinity selector scope to YB masters and tservers.
+        {{- $nodeAffinityData := dict}}
+        {{- if eq .name "yb-masters" -}}
+        {{- $nodeAffinityData = get $root.Values.master.affinity "nodeAffinity" | default (dict) -}}
+        {{- else -}}
+        {{- $nodeAffinityData = get $root.Values.tserver.affinity "nodeAffinity" | default (dict) -}}
+        {{- end -}}
         {{ if $root.Values.AZ }}
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: failure-domain.beta.kubernetes.io/zone
-                operator: In
-                values:
-                - {{ $root.Values.AZ }}
-            - matchExpressions:
-              - key: topology.kubernetes.io/zone
-                operator: In
-                values:
-                - {{ $root.Values.AZ }}
+          {{- $userSelectorTerms := dig "requiredDuringSchedulingIgnoredDuringExecution" "nodeSelectorTerms" "" $nodeAffinityData | default (list) -}}
+          {{- $baseAffinity := include "yugabyte.multiAZNodeAffinity" $root | fromYaml -}}
+          {{- $requiredSchedule := (list) -}}
+          {{- if $userSelectorTerms -}}
+            {{- range $userSelectorTerms -}}
+              {{- $userTerm := . -}}
+              {{- range $baseAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms -}}
+                {{- $matchExpr := concat .matchExpressions $userTerm.matchExpressions | dict "matchExpressions" -}}
+                {{- $requiredSchedule = mustMerge $matchExpr $userTerm | append $requiredSchedule -}}
+              {{- end -}}
+            {{- end -}}
+          {{- else -}}
+            {{- $requiredSchedule = $baseAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms -}}          
+          {{- end -}}
+
+          {{- with $baseAffinity.requiredDuringSchedulingIgnoredDuringExecution -}}
+            {{- $_ := set . "nodeSelectorTerms" $requiredSchedule -}}
+          {{- end -}}
+          {{- $nodeAffinityData = mustMerge $baseAffinity $nodeAffinityData -}}
+        {{- end -}}
+
+        {{- $podAntiAffinityData := dict -}}
+        {{- $basePodAntiAffinity := include "yugabyte.podAntiAffinity" ($appLabelArgs) | fromYaml -}}
+        {{- if eq .name "yb-masters" -}}
+          {{- with $root.Values.master.affinity -}}
+            {{- $userPodAntiAffinity := get . "podAntiAffinity" | default (dict) -}}
+            {{- if $userPodAntiAffinity -}}
+              {{- $preferredList := dig "preferredDuringSchedulingIgnoredDuringExecution" "" $userPodAntiAffinity | default (list) | concat $basePodAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution}}
+              {{- $_ := set $basePodAntiAffinity "preferredDuringSchedulingIgnoredDuringExecution" $preferredList -}}
+            {{- end -}}
+            {{- $podAntiAffinityData = mustMerge $basePodAntiAffinity $userPodAntiAffinity -}}
+          {{- end -}}
+        {{- else -}}
+          {{- with $root.Values.tserver.affinity -}}
+            {{- $userPodAntiAffinity := get . "podAntiAffinity" | default (dict) -}}
+            {{- if $userPodAntiAffinity -}}
+              {{- $preferredList := dig "preferredDuringSchedulingIgnoredDuringExecution" "" $userPodAntiAffinity | default (list) | concat $basePodAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution}}
+              {{- $_ := set $basePodAntiAffinity "preferredDuringSchedulingIgnoredDuringExecution" $preferredList -}}
+            {{- end -}}
+            {{- $podAntiAffinityData = mustMerge $basePodAntiAffinity $userPodAntiAffinity -}}
+          {{- end -}}
+        {{- end -}}
+
+        {{- if eq .name "yb-masters" -}}
+        {{- if $nodeAffinityData -}}
+        {{- $_ := set $root.Values.master.affinity "nodeAffinity" $nodeAffinityData -}}
+        {{- end -}}
+        {{- $_ := set $root.Values.master.affinity "podAntiAffinity" $podAntiAffinityData -}}
+        {{ toYaml $root.Values.master.affinity | nindent 8 }}
+        {{- else -}}
+        {{- if $nodeAffinityData -}}
+        {{- $_ := set $root.Values.tserver.affinity "nodeAffinity" $nodeAffinityData -}}
+        {{- end -}}
+        {{- $_ := set $root.Values.tserver.affinity "podAntiAffinity" $podAntiAffinityData -}}
+        {{ toYaml $root.Values.tserver.affinity | nindent 8 }}
         {{ end }}
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                {{- if $root.Values.oldNamingStyle }}
-                - key: app
-                  operator: In
-                  values:
-                  - "{{ .label }}"
-                {{- else }}
-                - key: app.kubernetes.io/name
-                  operator: In
-                  values:
-                  - "{{ .label }}"
-                - key: release
-                  operator: In
-                  values:
-                  - {{ $root.Release.Name | quote }}
-                {{- end }}
-              topologyKey: kubernetes.io/hostname
-        {{- if eq .name "yb-masters" }}
-        {{- with $root.Values.master.affinity }}{{ toYaml . | nindent 8 }}{{ end }}
-        {{- else }}
-        {{- with $root.Values.tserver.affinity }}{{ toYaml . | nindent 8 }}{{ end }}
-        {{- end }}
       containers:
       - name: "{{ .label }}"
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
