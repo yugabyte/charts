@@ -355,3 +355,51 @@ Set consistent issuer name.
       {{- end -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+  Default nodeAffinity for multi-az deployments
+*/}}
+{{- define "yugabyte.multiAZNodeAffinity" -}}
+requiredDuringSchedulingIgnoredDuringExecution:
+  nodeSelectorTerms:
+  - matchExpressions:
+    - key: failure-domain.beta.kubernetes.io/zone
+      operator: In
+      values:
+      - {{ .Values.AZ }}
+  - matchExpressions:
+    - key: topology.kubernetes.io/zone
+      operator: In
+      values:
+      - {{ .Values.AZ }}
+{{- end -}}
+
+{{/*
+  Default podAntiAffinity for master and tserver
+
+  This requires "appLabelArgs" to be passed in - defined in service.yaml
+  we have a .root and a .label in appLabelArgs
+*/}}
+{{- define "yugabyte.podAntiAffinity" -}}
+preferredDuringSchedulingIgnoredDuringExecution:
+- weight: 100
+  podAffinityTerm:
+    labelSelector:
+      matchExpressions:
+      {{- if .root.Values.oldNamingStyle }}
+      - key: app
+        operator: In
+        values:
+        - "{{ .label }}"
+      {{- else }}
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+        - "{{ .label }}"
+      - key: release
+        operator: In
+        values:
+        - {{ .root.Release.Name | quote }}
+      {{- end }}
+    topologyKey: kubernetes.io/hostname
+{{- end -}}

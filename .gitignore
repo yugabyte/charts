@@ -1,3 +1,4 @@
 # editor and IDE
 .idea
 *.iml
+stable/yugabyte/tests/__snapshot__/
