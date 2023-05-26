@@ -212,7 +212,7 @@ Generate server FQDN.
     {{ $membershipName := required "A valid membership name is required! Please set multicluster.kubernetesClusterId" .Values.multicluster.kubernetesClusterId }}
     {{- printf "$(HOSTNAME).%s.%s.$(NAMESPACE).svc.clusterset.local" $membershipName .Service.name -}}
   {{- else if .Values.oldNamingStyle -}}
-    {{- printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .Service.name .Values.domainName -}}  
+    {{- printf "$(HOSTNAME).%s.$(NAMESPACE).svc.%s" .Service.name .Values.domainName -}}
   {{- else -}}
     {{- if .Values.multicluster.createServiceExports -}}
       {{ $membershipName := required "A valid membership name is required! Please set multicluster.kubernetesClusterId" .Values.multicluster.kubernetesClusterId }}
@@ -267,7 +267,7 @@ Generate server web interface.
 Generate server CQL proxy bind address.
 */}}
 {{- define "yugabyte.cql_proxy_bind_address" -}}
-  {{- if or .Values.istioCompatibility.enabled .Values.multicluster.createServiceExports -}}
+  {{- if or .Values.istioCompatibility.enabled .Values.multicluster.createServiceExports .Values.multicluster.createServicePerPod -}}
     0.0.0.0:{{ index .Service.ports "tcp-yql-port" -}}
   {{- else -}}
     {{- include "yugabyte.server_fqdn" . -}}
