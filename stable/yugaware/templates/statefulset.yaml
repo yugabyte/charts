@@ -161,6 +161,10 @@ spec:
             {{- include "yugaware.isExtraVolumesMappingExists" .Values.postgres -}}
             {{- .Values.postgres.extraVolumes | toYaml | nindent 8 -}}
           {{ end }}
+          {{- if .Values.yugaware.extraVolumes -}}
+            {{- include "yugaware.isExtraVolumesMappingExists" .Values.yugaware -}}
+            {{- .Values.yugaware.extraVolumes | toYaml | nindent 8 -}}
+          {{ end }}
       initContainers:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -326,7 +330,7 @@ spec:
          {{- if .Values.postgres.extraVolumeMounts -}}
           {{- include "yugaware.isExtraVolumesMappingExists" .Values.postgres -}}
           {{- .Values.postgres.extraVolumeMounts | toYaml | nindent 12 -}}
-        {{- end -}}
+         {{- end -}}
         {{ end }}
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
@@ -462,6 +466,10 @@ spec:
             mountPath: /opt/certs/
             readOnly: true
         {{- end }}
+        {{- if .Values.yugaware.extraVolumeMounts -}}
+          {{- include "yugaware.isExtraVolumesMappingExists" .Values.yugaware -}}
+          {{- .Values.yugaware.extraVolumeMounts | toYaml | nindent 10 -}}
+        {{- end -}}
       {{- if .Values.useNginxProxy }}
         - name: nginx
           image: {{ include "full_image" (dict "containerName" "nginx" "root" .) }}
