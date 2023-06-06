@@ -102,9 +102,6 @@ yugaware:
 
   universe_boot_script: ""
 
-  kubernetes_operator_enabled: false
-  kubernetes_operator_namespace: ""
-
   extraEnv: []
 
   ## Extra volumes

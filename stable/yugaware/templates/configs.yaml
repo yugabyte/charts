@@ -70,10 +70,6 @@ data:
   {{- if .Values.yugaware.universe_boot_script }}
       universe_boot_script = "/data/universe-boot-script.sh"
   {{- end }}
-  {{- if .Values.yugaware.kubernetes_operator_enabled }}
-      kubernetesOperator.enabled = true
-      kubernetesOperatorNamespace= "{{.Values.yugaware.kubernetes_operator_namespace}}"
-  {{- end }}
       cloud.enabled = {{ .Values.yugaware.cloud.enabled }}
       cloud.requestIdHeader = "{{ .Values.yugaware.cloud.requestIdHeader }}"
       devops.home = /opt/yugabyte/devops

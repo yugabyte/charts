@@ -36,13 +36,6 @@ kind: ClusterRole
 metadata:
   name: {{ .Release.Name }}
 rules:
-- apiGroups:
-  - operator.yugabyte.io
-  resources:
-  - ybuniverse
-  - ybuniverses
-  - ybuniverses/status
-  verbs: ["get", "create", "delete", "patch", "list", "watch", "update"]
 - apiGroups: ["policy"]
   resources:
   - poddisruptionbudgets
