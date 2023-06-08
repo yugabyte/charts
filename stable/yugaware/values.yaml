@@ -101,6 +101,11 @@ yugaware:
     maxUnavailable: 0
 
   universe_boot_script: ""
+  # Control YBA k8s operator deployment.
+  kubernetesOperatorEnabled: false
+  # Set namespace the operator watches for custom resources.
+  # If default ""  the YBA k8s operator watches all namespaces. 
+  kubernetesOperatorNamespace: ""
 
   extraEnv: []
 
