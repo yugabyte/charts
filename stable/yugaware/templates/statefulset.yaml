@@ -158,6 +158,9 @@ spec:
       initContainers:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.initContainers.prometheusConfiguration.resources }}
+          resources: {{- toYaml .Values.initContainers.prometheusConfiguration.resources | nindent 12 }}
+          {{ end -}}
           name: prometheus-configuration
           {{- if .Values.securityContext.enabled }}
           command:
@@ -189,6 +192,9 @@ spec:
         - image: {{ include "full_image" (dict "containerName" "postgres-upgrade" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           name: postgres-upgrade
+          {{- if .Values.initContainers.postgresUpgrade.resources }}
+          resources: {{- toYaml .Values.initContainers.postgresUpgrade.resources | nindent 12 }}
+          {{ end -}}
           command:
           - 'bash'
           - '-c'
@@ -222,6 +228,9 @@ spec:
         {{- if .Values.securityContext.enabled }}
         - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           name: postgres-init
+          {{- if .Values.initContainers.postgresInit.resources }}
+          resources: {{- toYaml .Values.initContainers.postgresInit.resources | nindent 12 }}
+          {{ end -}}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/bin/bash", "/pg_prerun/pg-prerun.sh"]
           env:

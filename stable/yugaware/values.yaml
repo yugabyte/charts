@@ -132,7 +132,7 @@ postgres:
     ## JDBC connection parameters including the leading `?`.
     jdbcParams: ""
 
-  
+
   ## Extra volumes
   ## extraVolumesMounts are mandatory for each extraVolumes.
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#volume-v1-core
@@ -305,3 +305,24 @@ jdbcParams: ""
 ## app's deployer image against a Kubernetes cluster >= 1.21.
 # pdbPolicyVersionOverride: "v1beta1"
 pdbPolicyVersionOverride: ""
+
+initContainers:
+  prometheusConfiguration:
+    resources:
+      ## https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
+      ## Use the above link to learn more about Kubernetes resources configuration.
+      requests:
+        cpu: "0.25"
+        memory: 500Mi
+
+  postgresUpgrade:
+    resources:
+      requests:
+        cpu: "0.5"
+        memory: 500Mi
+
+  postgresInit:
+    resources:
+      requests:
+        cpu: "0.25"
+        memory: 500Mi
