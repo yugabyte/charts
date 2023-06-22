@@ -371,7 +371,7 @@ spec:
         {{- include "yugabyte.addenvsecrets" $data | nindent 8 }}
         {{- end }}
         {{- if and $root.Values.tls.enabled $root.Values.tls.clientToServer (ne .name "yb-masters") }}
-        - name: SSL_CERTFILE
+        - name: SSL_ROOT_CERTFILE
           value: /root/.yugabytedb/root.crt
         {{- end }}
         resources:
@@ -478,7 +478,7 @@ spec:
               --allow_insecure_connections={{ $root.Values.tls.insecure }} \
             {{- end }}
               --rpc_bind_addresses={{ $rpcAddr }} \
-              --server_broadcast_addresses={{ $broadcastAddr }} \
+              --server_broadcast_addresses={{ $root.Values.master.serverBroadcastAddress | default $broadcastAddr }} \
               --webserver_interface={{ $webserverAddr }}
           {{- else }}
             {{- $cqlAddr := include "yugabyte.cql_proxy_bind_address" $serviceValues -}}
@@ -514,7 +514,7 @@ spec:
               --undefok=num_cpus,enable_ysql \
               --use_node_hostname_for_local_tserver=true \
             {{- if $root.Values.authCredentials.ysql.password }}
-              --ysql_enable_auth=true \
+              --ysql_enable_auth=true 
             {{- end }}
             {{- if or $root.Values.authCredentials.ycql.user $root.Values.authCredentials.ycql.password }}
               --use_cassandra_authentication=true \
