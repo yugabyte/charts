@@ -1,5 +1,4 @@
 {{- if .Values.multicluster.createServicePerPod }}
-{{- $root := . -}}
 {{- range $server := .Values.Services }}
 {{- range $replicaNum := until (int (ternary $.Values.replicas.master $.Values.replicas.tserver (eq $server.name "yb-masters"))) }}
 {{- $appLabelArgs := dict "label" $server.label "root" $ -}}
@@ -16,15 +15,15 @@ metadata:
 spec:
   ports:
     {{- range $label, $port := $server.ports }}
-      {{- if (eq $label "grpc-ybc-port")}}
-        {{- if (($root.Values.ybc.enabled))}}
+    {{- if (eq $label "grpc-ybc-port") }}
+    {{- if $.Values.ybc.enabled }}
     - name: {{ $label | quote }}
       port: {{ $port }}
-        {{- end}}
-      {{- else}}
+    {{- end }}
+    {{- else }}
     - name: {{ $label | quote }}
       port: {{ $port }}
-      {{- end}}
+    {{- end }}
     {{- end}}
   selector:
     statefulset.kubernetes.io/pod-name: {{ $podName | quote }}
