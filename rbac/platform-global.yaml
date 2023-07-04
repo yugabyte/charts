@@ -127,6 +127,22 @@ rules:
   - "events"
   verbs:
   - "list"
+# required to scrape metrics from external clusters
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - list
+  - get
+  - watch
+# required to scrape metrics from external clusters
+- apiGroups:
+  - ""
+  resources:
+  - nodes/proxy
+  verbs:
+  - get
 ---
 
 apiVersion: rbac.authorization.k8s.io/v1

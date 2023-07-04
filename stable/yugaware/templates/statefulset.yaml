@@ -358,6 +358,9 @@ spec:
             subPath: prometheus.yml
           - name: yugaware-storage
             mountPath: /prometheus/
+          - mountPath: /opt/yugabyte/yugaware/data/keys/
+            name: yugaware-storage
+            subPath: data/keys
           {{- if .Values.prometheus.scrapeNodes }}
           - name: yugaware-storage
             mountPath: /opt/yugabyte/prometheus/targets
