@@ -92,8 +92,15 @@ spec:
   clusterIP: None
   ports:
     {{- range $label, $port := .ports }}
+    {{- if (eq $label "grpc-ybc-port") }}
+    {{- if $root.Values.ybc.enabled }}
     - name: {{ $label | quote }}
       port: {{ $port }}
+    {{- end }}
+    {{- else }}
+    - name: {{ $label | quote }}
+      port: {{ $port }}
+    {{- end }}
     {{- end}}
   selector:
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
@@ -113,10 +120,10 @@ metadata:
     {{- include "yugabyte.labels" $root | indent 4 }}
     service-type: "endpoint"
 spec:
-  {{ if eq $root.Release.Service "Tiller" }}
+  {{- if eq $root.Release.Service "Tiller" }}
   clusterIP:
-  {{ else }}
-  {{ if $endpoint.clusterIP }}
+  {{- else }}
+  {{- if $endpoint.clusterIP }}
   clusterIP: {{ $endpoint.clusterIP }}
   {{- end }}
   {{- end }}
@@ -541,8 +548,10 @@ spec:
           {{- end }}
         ports:
           {{- range $label, $port := .ports }}
+          {{- if not (eq $label "grpc-ybc-port") }}
           - containerPort: {{ $port }}
             name: {{ $label | quote }}
+          {{- end }}
           {{- end}}
         volumeMounts:
           {{- if (eq .name "yb-tservers") }}
@@ -633,6 +642,11 @@ spec:
               sleep 60;
               /home/yugabyte/tools/k8s_ybc_parent.py status || /home/yugabyte/tools/k8s_ybc_parent.py start;
             done
+        {{- with index $service.ports "grpc-ybc-port" }}
+        ports:
+          - containerPort: {{ . }}
+            name: "grpc-ybc-port"
+        {{- end }}
         volumeMounts:
           - name: tserver-tmp
             mountPath: /tmp

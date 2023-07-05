@@ -167,6 +167,8 @@ Services:
       http-ycql-met: "12000"
       http-yedis-met: "11000"
       http-ysql-met: "13000"
+      grpc-ybc-port: "18018"
+
 
 ## Should be set to true only if Istio is being used. This also adds
 ## the Istio sidecar injection labels to the pods.
