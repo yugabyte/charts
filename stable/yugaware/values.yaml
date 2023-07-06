@@ -21,12 +21,7 @@ image:
   ## Docker config JSON File name
   ## If set, this file content will be used to automatically create secret named as above
   pullSecretFile: ""
-
-  thirdparty-deps:
-    registry: quay.io
-    tag: latest
-    name: yugabyte/thirdparty-deps
-
+  
   postgres:
     # For non default postgres image, set postgres.sampleConfig values accordingly.
     registry: ""
