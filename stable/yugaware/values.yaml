@@ -18,11 +18,6 @@ image:
   ## If set, this file content will be used to automatically create secret named as above
   pullSecretFile: ""
 
-  thirdparty-deps:
-    registry: quay.io
-    tag: latest
-    name: yugabyte/thirdparty-deps
-
   postgres:
     registry: ""
     tag: '14.8'
