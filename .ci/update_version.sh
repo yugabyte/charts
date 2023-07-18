@@ -9,6 +9,20 @@ function version_gt() {
   test "$(echo -e "$1\n$2" | sort -V | head -n 1)" != "$1"
 }
 
+function is_semver_compatible() {
+  local version="$1"
+  local number_of_dots
+  number_of_dots=$(grep -o '\.' <<< "${version}" | wc -l)
+
+  if [[ ${number_of_dots} -gt 2 ]]; then
+    # format: 2.18.0.1
+    return 1
+  else
+    # format: 2.18.0+1
+    return 0
+  fi
+}
+
 
 if [[ $# < 1 || $# > 2 ]]; then
   echo "Incorrect number of arguments. Usage: ${0%*/} <version> [<docker-tag>]" 1>&2
@@ -16,8 +30,10 @@ if [[ $# < 1 || $# > 2 ]]; then
   exit 1
 fi
 
-release_version="$1"
+input_release_version="$1"
+release_version="${input_release_version//+/.}"
 docker_image_tag="$2"
+
 # appVersion mentioned in Charts.yaml
 current_version="$(grep -r "^appVersion" "stable/yugabyte/Chart.yaml" | awk '{ print $2 }')"
 if ! version_gt "${release_version}" "${current_version%-b*}" ; then
@@ -47,6 +63,10 @@ fi
 files_to_update_version=("stable/yugabyte/Chart.yaml" "stable/yugaware/Chart.yaml")
 files_to_update_tag=("stable/yugabyte/values.yaml" "stable/yugaware/values.yaml")
 chart_release_version="$(echo "${release_version}" | grep -o '[0-9]\+.[0-9]\+.[0-9]\+')"
+
+if is_semver_compatible "${input_release_version}"; then
+  chart_release_version="${input_release_version}"
+fi
 
 # Update appVersion and version in Chart.yaml
 for file in "${files_to_update_version[@]}"; do
