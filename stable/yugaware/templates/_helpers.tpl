@@ -231,3 +231,31 @@ Check export of nss_wrapper environment variables required
       {{- end -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+  Get Security Context.
+*/}}
+{{- define "getSecurityContext" }}
+securityContext:
+  runAsUser: {{ required "runAsUser cannot be empty" .Values.securityContext.runAsUser }}
+  runAsGroup: {{ .Values.securityContext.runAsGroup | default 0 }}
+  runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+{{- end -}}
+
+{{/*
+  Get TServer/Master flags to start yugabyted.
+*/}}
+{{- define "getYbdbFlags" -}}
+  {{- $flagsList := "" -}}
+  {{- if .flags -}}
+  {{- range $key, $value := .flags -}}
+  {{- if not $flagsList -}}
+  {{- $flagsList = printf "%s=%v" $key $value -}}
+  {{- else -}}
+  {{- $flagsList = printf "%s,%s=%v" $flagsList $key $value -}}
+  {{- end -}}
+  {{- end -}}
+  {{- end -}}
+  {{- printf $flagsList -}}
+  
+{{- end -}}

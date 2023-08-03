@@ -78,7 +78,7 @@ spec:
     matchLabels:
       app: {{ .Release.Name }}-yugaware
 {{- end }}
-{{- if .Values.postgres.service.enabled }}
+{{- if and (not .Values.useYugabyteDB) .Values.postgres.service.enabled }}
 ---
 apiVersion: v1
 kind: Service

@@ -137,6 +137,7 @@ spec:
           secret:
             secretName: {{ .Release.Name }}-yugaware-prometheus-remote-write-tls
         {{- end }}
+        {{- if not .Values.useYugabyteDB }}
         {{- if not (and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io")) }}
         - name: pg-upgrade-11-to-14
           configMap:
@@ -165,6 +166,20 @@ spec:
             {{- include "yugaware.isExtraVolumesMappingExists" .Values.yugaware -}}
             {{- .Values.yugaware.extraVolumes | toYaml | nindent 8 -}}
           {{ end }}
+        {{- else }}
+        - name: ybdb-init
+          configMap:
+            name: {{ .Release.Name }}-yugaware-ybdb
+            items:
+              - key: ybdb-prerun.sh
+                path: ybdb-prerun.sh
+        - name: ybdb-create-yugaware-db
+          configMap:
+            name: {{ .Release.Name }}-yugaware-ybdb
+            items:
+              - key: ybdb-create-yugaware-db.sh
+                path: ybdb-create-yugaware-db.sh 
+        {{- end}}
       initContainers:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -178,10 +193,7 @@ spec:
             - '-c'
             - |
               cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && /bin/bash /init-container/init-permissions.sh;
-          securityContext:
-            runAsUser: {{ .Values.securityContext.runAsUser }}
-            runAsGroup: {{ .Values.securityContext.runAsGroup }}
-            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+          {{- include "getSecurityContext" . | indent 10 }}
           {{- else }}
           command: ["cp", "/default_prometheus_config/prometheus.yml", "/prometheus_configs/prometheus.yml"]
           {{- end }}
@@ -198,6 +210,7 @@ spec:
           - name: init-container-script
             mountPath: /init-container
           {{- end }}
+        {{- if not .Values.useYugabyteDB }}
         {{- if not (and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io")) }}
         - image: {{ include "full_image" (dict "containerName" "postgres-upgrade" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -238,8 +251,8 @@ spec:
         {{- if .Values.securityContext.enabled }}
         - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           name: postgres-init
-          {{- if .Values.initContainers.postgresInit.resources }}
-          resources: {{- toYaml .Values.initContainers.postgresInit.resources | nindent 12 }}
+          {{- if .Values.initContainers.dbInit.resources }}
+          resources: {{- toYaml .Values.initContainers.dbInit.resources | nindent 12 }}
           {{ end -}}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/bin/bash", "/pg_prerun/pg-prerun.sh"]
@@ -257,16 +270,37 @@ spec:
           - name: pg-init
             mountPath: /pg_prerun
         {{- end }}
+        {{- else }}
+        - image: {{ include "full_image" (dict "containerName" "ybdb" "root" .) }}
+          name: ybdb-init
+          {{- if .Values.initContainers.dbInit.resources }}
+          resources: {{- toYaml .Values.initContainers.dbInit.resources | nindent 12 }}
+          {{ end -}}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash", "/ybdb_prerun/ybdb-prerun.sh"]
+          env:
+          - name: YBDB_DATA
+            value: /var/lib/ybdb
+          {{- if .Values.securityContext.enabled }}
+          - name: YBDB_UID
+            value: {{ .Values.securityContext.runAsUser | quote }}
+          - name: YBDB_GID
+            value: {{ .Values.securityContext.runAsGroup | quote }}
+          {{- end }}
+          volumeMounts:
+          - name: yugaware-storage
+            mountPath: /var/lib/ybdb
+            subPath: ybdb_data
+          - name: ybdb-init
+            mountPath: /ybdb_prerun
+        {{- end }}
       containers:
-        {{ if not .Values.postgres.external.host }}
+        {{ if not ( or .Values.useYugabyteDB .Values.postgres.external.host) }}
         - name: postgres
           image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.securityContext.enabled }}
-          securityContext:
-            runAsUser: {{ required "runAsUser cannot be empty" .Values.securityContext.runAsUser }}
-            runAsGroup: {{ .Values.securityContext.runAsGroup | default 0 }}
-            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+          {{- include "getSecurityContext" . | indent 10 }}
           {{- end }}
           env:
             - name: POSTGRES_USER
@@ -341,14 +375,62 @@ spec:
           {{- .Values.postgres.extraVolumeMounts | toYaml | nindent 12 -}}
          {{- end -}}
         {{ end }}
+
+        # Check if yugabytedb is enabled.
+        {{- if .Values.useYugabyteDB }}
+        - name: ybdb
+          image: {{ include "full_image" (dict "containerName" "ybdb" "root" .) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.securityContext.enabled }}
+          {{- include "getSecurityContext" . | indent 10 }}
+          {{- end }}
+          env:
+          - name: POSTGRES_USER
+            value: {{ .Values.yugabytedb.user }}
+          - name: POSTGRES_PASSWORD
+            value: ""
+          - name: POSTGRES_DB
+            value: {{ .Values.yugabytedb.dbname }}
+          ports:
+          - containerPort: {{ .Values.yugabytedb.config.ysqlPort | default "5433" }}
+            name: ybdb
+          - containerPort: 15433
+            name: yugabyted-ui
+          
+          {{- if .Values.yugabytedb.resources }}
+          resources:
+          {{ toYaml .Values.yugabytedb.resources | nindent 12 }}
+          {{- end }}
+
+          volumeMounts:
+          - name: yugaware-storage
+            mountPath: /var/lib/ybdb
+            subPath: ybdb_data
+          - name: ybdb-create-yugaware-db
+            mountPath: /ybdb-create-yugware-db
+          
+          command: ["/home/yugabyte/bin/yugabyted", "start"]
+          args:
+            - --base_dir=/var/lib/ybdb
+            - --daemon=false
+            - --advertise_address={{ .Values.yugabytedb.config.advertiseAddress | default "127.0.0.1" }}
+            - --ysql_port={{ .Values.yugabytedb.config.ysqlPort | default "5433" }}
+            - --tserver_webserver_port={{ .Values.yugabytedb.config.tserverWebserverPort }}
+            - --ui={{ .Values.yugabytedb.service.enabled }}
+            - --tserver_flags={{ include "getYbdbFlags" (dict "flags" .Values.yugabytedb.config.tserverFlags)}}
+            - --master_flags={{ include "getYbdbFlags" (dict "flags" .Values.yugabytedb.config.masterFlags)}}
+          # Wait for YBDB to become healthy, and create yugaware db.
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/bash", "/ybdb-create-yugware-db/ybdb-create-yugaware-db.sh"]
+          {{- end }}
+
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.securityContext.enabled }}
-          securityContext:
-            runAsUser: {{ .Values.securityContext.runAsUser }}
-            runAsGroup: {{ .Values.securityContext.runAsGroup }}
-            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+          {{- include "getSecurityContext" . | nindent 10 }}
           {{- else if (not .Values.ocpCompatibility.enabled) }}
           securityContext:
             runAsUser: 0
@@ -397,10 +479,7 @@ spec:
         - name: yugaware
           image: {{ include "full_yugaware_image" . }}
           {{- if .Values.securityContext.enabled }}
-          securityContext:
-            runAsUser: {{ .Values.securityContext.runAsUser }}
-            runAsGroup: {{ .Values.securityContext.runAsGroup }}
-            runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+          {{- include "getSecurityContext" . | nindent 10 }}
           {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
 

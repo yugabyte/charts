@@ -32,7 +32,7 @@ data:
 
     db {
       default.dbname=${POSTGRES_DB}
-  {{ if .Values.postgres.external.host }}
+  {{ if and (not .Values.useYugabyteDB) .Values.postgres.external.host }}
       default.host="{{ .Values.postgres.external.host }}"
       default.port={{ .Values.postgres.external.port }}
   {{ else if eq .Values.ip_version_support "v6_only" }}
@@ -40,6 +40,9 @@ data:
   {{ else }}
       default.host="127.0.0.1"
   {{ end }}
+  {{- if .Values.useYugabyteDB }}
+      default.port={{ .Values.yugabytedb.config.ysqlPort | default "5433" }}
+  {{- end }}
       default.url="jdbc:postgresql://"${db.default.host}":"${db.default.port}"/"${db.default.dbname}${db.default.params}
       default.params="{{ .Values.jdbcParams }}"
       default.username=${POSTGRES_USER}
@@ -233,6 +236,7 @@ data:
       }
     }
 {{ end }}
+{{- if not .Values.useYugabyteDB }}
 ---
 {{- if not (and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io")) }}
 apiVersion: v1
@@ -296,6 +300,7 @@ data:
     {{ $conf_key }} = {{ squote $conf_value }}
     {{- end }}
 
+{{- end }}
 {{- if .Values.useNginxProxy }}
 ---
 apiVersion: v1

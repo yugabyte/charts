@@ -9,6 +9,10 @@ nameOverride: ""
 # until they start creating a separate pool
 useNginxProxy: false
 
+# Use YugabyteDB as the backend DB for YB Anywhere (Yugaware)
+# instead of PostgreSQL.
+useYugabyteDB: false
+
 image:
   commonRegistry: ""
   # Setting commonRegistry to say, quay.io overrides the registry settings for all images
@@ -45,6 +49,12 @@ image:
     registry: ""
     tag: 1.25.1
     name: nginxinc/nginx-unprivileged
+  
+  ybdb:
+    registry: ""
+    tag: 2.18.1.0-b84
+    name: yugabytedb/yugabyte
+
 
 yugaware:
   replicas: 1
@@ -121,7 +131,7 @@ yugaware:
   # - name: custom-nfs-vol
   #   mountPath: /home/yugabyte/nfs-backup
   extraVolumeMounts: []
-
+  
 ## Configure PostgreSQL part of the application
 postgres:
   # DO NOT CHANGE if using OCP Certified helm chart
@@ -199,6 +209,39 @@ postgres:
   # - name: custom-nfs-vol
   #   mountPath: /home/yugabyte/nfs-backup
   extraVolumeMounts: []
+
+## Configure YBDB part of the application
+yugabytedb:
+  user: yugabyte
+  dbname: yugaware
+
+  config:
+    advertiseAddress : "127.0.0.1"
+    # Default tserver_webserver_port is 9000, but it's used by yugaware.  
+    tserverWebserverPort: 9010
+    ysqlPort: "" 
+    tserverFlags:
+      yb_enable_read_committed_isolation: true
+    masterFlags: {}
+    enableColocatedTables: true
+    startupRetryCount: 10
+
+
+  service:
+    ## Expose Yugabyted UI as a Service
+    enabled: false
+    ## Additional Service annotations
+    annotations: {}
+    ## Service type
+    type: "LoadBalancer"
+    ## IP address for the LoadBalancer, works only if supported by the cloud provider
+    loadBalancerIP: ""
+    yugabytedUiPort: 15433
+  
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
 
 tls:
   enabled: false
@@ -370,8 +413,9 @@ initContainers:
         cpu: "0.5"
         memory: 500Mi
 
-  postgresInit:
+  dbInit:
     resources:
       requests:
         cpu: "0.25"
         memory: 500Mi
+
