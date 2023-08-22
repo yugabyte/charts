@@ -39,7 +39,7 @@ image:
 
   nginx:
     registry: ""
-    tag: 1.25.0
+    tag: 1.25.1
     name: nginxinc/nginx-unprivileged
 
 yugaware:
