@@ -82,7 +82,12 @@ spec:
       {{- include "yugabyte.labels" $root | indent 6 }}
   issuerRef:
     name:  {{ include "yugabyte.tls_cm_issuer" $root | quote }}
-    {{- if $root.Values.tls.certManager.useClusterIssuer }}
+    {{- if $root.Values.tls.certManager.issuerRef.group }}
+    group: {{ $root.Values.tls.certManager.issuerRef.group }}
+    {{- end }}
+    {{- if $root.Values.tls.certManager.issuerRef.kind }}
+    kind: {{ $root.Values.tls.certManager.issuerRef.kind }}
+    {{- else if $root.Values.tls.certManager.useClusterIssuer }}
     kind: ClusterIssuer
     {{- else }}
     kind: Issuer
@@ -126,7 +131,12 @@ spec:
       {{- include "yugabyte.labels" $root | indent 6 }}
   issuerRef:
     name:  {{ include "yugabyte.tls_cm_issuer" $root | quote }}
-    {{- if $root.Values.tls.certManager.useClusterIssuer }}
+    {{- if $root.Values.tls.certManager.issuerRef.group }}
+    group: {{ $root.Values.tls.certManager.issuerRef.group }}
+    {{- end }}
+    {{- if $root.Values.tls.certManager.issuerRef.kind }}
+    kind: {{ $root.Values.tls.certManager.issuerRef.kind }}
+    {{- else if $root.Values.tls.certManager.useClusterIssuer }}
     kind: ClusterIssuer
     {{- else }}
     kind: Issuer

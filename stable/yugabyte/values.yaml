@@ -79,6 +79,9 @@ tls:
     clusterIssuer: cluster-ca
     # Name of Issuer to use when useClusterIssuer is false
     issuer: yugabyte-ca
+    issuerRef:
+      group:
+      kind:
     certificates:
       # The lifetime before cert-manager will issue a new certificate.
       # The re-issued certificates will not be automatically reloaded by the service.
