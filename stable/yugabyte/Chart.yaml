@@ -1,6 +1,6 @@
 apiVersion: v2
 name: yugabyte
-version: 2.19.0
+version: 2.19.1
 appVersion: 2.19.0.0-b190
 kubeVersion: ">=1.17.0-0"
 home: https://www.yugabyte.com
