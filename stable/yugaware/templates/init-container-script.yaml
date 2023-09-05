@@ -46,4 +46,6 @@ data:
         echo "All pem files already have permission set to 400"
       fi
     fi
+    # Update provision_instance.py script to correct permissions.
+    chown -R "$TARGET_USER":"$TARGET_GROUP" /opt/yugabyte/yugaware/data/provision/
 {{- end }}
