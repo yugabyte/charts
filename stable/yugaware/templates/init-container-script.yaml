@@ -47,5 +47,7 @@ data:
       fi
     fi
     # Update provision_instance.py script to correct permissions.
-    chown -R "$TARGET_USER":"$TARGET_GROUP" /opt/yugabyte/yugaware/data/provision/
+    if [[ -d "/opt/yugabyte/yugaware/data/provision/" ]]; then
+      chown -R "$TARGET_USER":"$TARGET_GROUP" /opt/yugabyte/yugaware/data/provision/
+    fi
 {{- end }}

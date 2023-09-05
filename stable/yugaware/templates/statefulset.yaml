@@ -175,9 +175,9 @@ spec:
           {{- if .Values.securityContext.enabled }}
           env:
           - name: TARGET_USER 
-            value: {{ .Values.securityContext.runAsUser }} 
+            value: "{{ .Values.securityContext.runAsUser }}"
           - name: TARGET_GROUP 
-            value: {{ .Values.securityContext.fsGroup }} 
+            value: "{{ .Values.securityContext.fsGroup }}"
           command:
             - 'bash'
             - '-c'
