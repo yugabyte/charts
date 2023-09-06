@@ -29,6 +29,7 @@ rules:
   - "statefulsets"
   verbs:
   - "get"
+  - "list"
   - "delete"
   - "create"
   - "patch"
@@ -126,6 +127,8 @@ rules:
   resources:
   - "persistentvolumeclaims"
   verbs:
+  - "get"                       # required for pvc expansion
+  - "patch"
   - "list"                      # required for label selectors
   - "delete"
 - apiGroups:
