@@ -38,10 +38,7 @@ metadata:
 rules:
 - apiGroups:
   - operator.yugabyte.io
-  resources:
-  - ybuniverse
-  - ybuniverses
-  - ybuniverses/status
+  resources: ["*"]
   verbs: ["get", "create", "delete", "patch", "list", "watch", "update"]
 - apiGroups: ["policy"]
   resources:
