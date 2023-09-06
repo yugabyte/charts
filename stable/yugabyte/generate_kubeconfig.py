@@ -103,6 +103,7 @@ def get_secrets_for_sa(sa_name, namespace):
             + sa_name
             + '")].metadata.name}"',
         ],
+        namespace,
         as_json=False,
     )
     return secrets.strip('"').split()
