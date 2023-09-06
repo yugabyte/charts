@@ -173,11 +173,6 @@ spec:
           {{ end -}}
           name: prometheus-configuration
           {{- if .Values.securityContext.enabled }}
-          env:
-          - name: TARGET_USER 
-            value: "{{ .Values.securityContext.runAsUser }}"
-          - name: TARGET_GROUP 
-            value: "{{ .Values.securityContext.fsGroup }}"
           command:
             - 'bash'
             - '-c'
