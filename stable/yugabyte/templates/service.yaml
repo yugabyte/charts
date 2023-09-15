@@ -348,8 +348,13 @@ spec:
           exec:
             command:
             - bash
+            - -v
             - -c
-            - touch {{ template "yugabyte.fs_data_dirs_probe_files" $storageInfo }}
+            - |
+              {{- include "yugabyte.fs_data_dirs_probe" $storageInfo | nindent 14 }};
+              exit_code="$?";
+              echo "disk check exited with: ${exit_code}";
+              exit "${exit_code}"
           failureThreshold: 3
           periodSeconds: 10
           successThreshold: 1
@@ -407,7 +412,7 @@ spec:
             fi && \
           {{- end }}
           {{- if (and (not $root.Values.storage.ephemeral) (not $root.Values.preflight.skipAll)) }}
-            touch {{ template "yugabyte.fs_data_dirs_probe_files" $storageInfo }} && \
+          {{- include "yugabyte.fs_data_dirs_probe" $storageInfo | nindent 12 }} && \
           {{- end }}
           {{- $rpcAddr := include "yugabyte.rpc_bind_address" $serviceValues -}}
           {{- $rpcPort := index $service.ports "tcp-rpc-port" -}}
