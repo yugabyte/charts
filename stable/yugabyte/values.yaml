@@ -286,6 +286,21 @@ networkAnnotation: {}
 
 commonLabels: {}
 
+## @param dnsPolicy DNS Policy for pod
+## ref: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
+## E.g.
+## dnsPolicy: ClusterFirst
+dnsPolicy: ""
+## @param dnsConfig DNS Configuration pod
+## ref: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
+## E.g.
+## dnsConfig:
+##   options:
+##   - name: ndots
+##     value: "4"
+dnsConfig: {}
+
+
 master:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
   ## This might override the default affinity from service.yaml
