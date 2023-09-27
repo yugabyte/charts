@@ -323,11 +323,11 @@ spec:
         {{- $_ := set $root.Values.tserver.affinity "podAntiAffinity" $podAntiAffinityData -}}
         {{ toYaml $root.Values.tserver.affinity | nindent 8 }}
         {{ end }}
-      {{- if $root.Values.dnsConfig }}
-      dnsConfig: {{- toYaml $root.Values.dnsConfig | nindent 8 }}
+      {{- with $root.Values.dnsConfig }}
+      dnsConfig: {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if $root.Values.dnsPolicy }}
-      dnsPolicy: {{ $root.Values.dnsPolicy | quote }}
+      {{- with $root.Values.dnsPolicy }}
+      dnsPolicy: {{ . | quote }}
       {{- end }}
       containers:
       - name: "{{ .label }}"
