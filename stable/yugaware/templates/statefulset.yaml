@@ -180,6 +180,12 @@ spec:
               - key: ybdb-create-yugaware-db.sh
                 path: ybdb-create-yugaware-db.sh 
         {{- end}}
+      {{- with .Values.dnsConfig }}
+      dnsConfig: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dnsPolicy }}
+      dnsPolicy: {{ . | quote }}
+      {{- end }}
       initContainers:
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
