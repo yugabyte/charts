@@ -379,6 +379,10 @@ master:
   #   mountPath: /home/yugabyte/nfs-backup
   extraVolumeMounts: []
 
+  ## Set service account for master DB pods. The service account
+  ## should exist in the namespace where the master DB pods are brought up.
+  serviceAccount: ""
+
 
 tserver:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
@@ -467,6 +471,10 @@ tserver:
   # - name: custom-nfs-vol
   #   path: /home/yugabyte/nfs-backup
   extraVolumeMounts: []
+
+  ## Set service account for tserver DB pods. The service account
+  ## should exist in the namespace where the tserver DB pods are brought up.
+  serviceAccount: ""
 
 helm2Legacy: false
 
