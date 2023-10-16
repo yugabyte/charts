@@ -30,7 +30,7 @@ image:
 
   prometheus:
     registry: ""
-    tag: v2.46.0
+    tag: v2.47.1
     name: prom/prometheus
 
   nginx:
