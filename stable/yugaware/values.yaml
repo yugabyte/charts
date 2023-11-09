@@ -106,11 +106,20 @@ yugaware:
     maxUnavailable: 0
 
   universe_boot_script: ""
-  # Control YBA k8s operator deployment.
+  # Control YBA k8s operator deployments
   kubernetesOperatorEnabled: false
   # Set namespace the operator watches for custom resources.
   # If default ""  the YBA k8s operator watches all namespaces.
   kubernetesOperatorNamespace: ""
+
+  # Create an initial user for YugabyteDB Anywhere. A user is required for YBA workflows.
+  defaultUser: 
+    enabled: false
+    username: yugabyte_k8s
+    # Please set the password. Templating will fail if it is not set.
+    password: ""
+    code: k8soperator
+    email: yugabyte_k8s@yugabyte.com
 
   extraEnv: []
 
