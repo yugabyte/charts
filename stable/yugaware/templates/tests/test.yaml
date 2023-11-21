@@ -9,6 +9,7 @@ metadata:
   annotations:
     "helm.sh/hook": test
 spec:
+  terminationGracePeriodSeconds: 30
   imagePullSecrets:
   - name: {{ .Values.image.pullSecret }}
   containers:
