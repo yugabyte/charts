@@ -83,6 +83,7 @@ yugaware:
   pod:
     annotations: {}
     labels: {}
+    terminationGracePeriodSeconds: 30
   health:
     username: ""
     password: ""
