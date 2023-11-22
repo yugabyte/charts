@@ -1,3 +1,6 @@
+{{- if and (not .Values.rbac.create) (.Values.yugaware.kubernetesOperatorEnabled) }}
+{{- fail "Must use rbac if Kubernetes operator is enabled" }}
+{{- end }}
 {{ if not .Values.yugaware.serviceAccount }}
 apiVersion: v1
 kind: ServiceAccount
