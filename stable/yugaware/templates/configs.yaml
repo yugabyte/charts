@@ -456,6 +456,7 @@ data:
             replacement: "kube_pod_container_resource_requests_cpu_cores"
 
       {{- else }}
+      {{- if .Values.prometheus.scrapeKubernetesNodes }}
 
       - job_name: 'kubernetes-nodes'
 
@@ -578,6 +579,7 @@ data:
             regex: "(.*)yb-(.*)"
             action: keep
 
+      {{- end }}
       {{- end }}
 
       - job_name: 'platform'

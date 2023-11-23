@@ -386,12 +386,19 @@ dnsConfig: {}
 
 ## Don't want prometheus to scrape nodes and evaluate alert rules in some cases (for example - cloud).
 prometheus:
+  ## Setting this to false will disable scraping of TServer and Master
+  ## nodes (could be pods or VMs)
   scrapeNodes: true
   evaluateAlertRules: true
   retentionTime: 15d
   queryConcurrency: 20
   queryMaxSamples: 5000000
   queryTimeout: 30s
+  ## Set this to false to disable scraping of Kubernetes worker
+  ## nodes. Setting this to false will results in blank graphs of
+  ## resource utilization for Kubernetes universes. Useful for
+  ## scenarios where only VM based universes are being created.
+  scrapeKubernetesNodes: true
 
   resources:
     requests:
