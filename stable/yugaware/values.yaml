@@ -31,11 +31,6 @@ image:
     tag: v2.47.1
     name: prom/prometheus
 
-  nginx:
-    registry: ""
-    tag: 1.25.1
-    name: nginxinc/nginx-unprivileged
-
 yugaware:
   replicas: 1
   storage: 100Gi
@@ -75,6 +70,12 @@ yugaware:
     # See https://kubernetes.io/docs/tasks/run-application/configure-pdb/
     # Note that the default of 0 doesn't really make sense since a StatefulSet isn't allowed to schedule extra replicas. However it is maintained as the default while we do additional testing. This value will likely change in the future.
     maxUnavailable: 0
+
+  # In case client wants to enable the additional headers to the YBA's http response
+  # Previously, it was possible via nginx, but given that we no longer have it, we can
+  # expose the same as application config/runtime config.
+  # Example: ["X-Content-Type-Options: nosniff", "Keep-Alive: timeout=5, max=1000"]
+  custom_headers: []
 
 ## Configure PostgreSQL part of the application
 postgres:
@@ -133,18 +134,6 @@ domainName: "cluster.local"
 helm2Legacy: false
 
 ip_version_support: "v4_only" # v4_only, v6_only are the only supported values at the moment
-
-nginx:
-  workerConnections: 1024
-  db_node_proxy_enabled: false
-
-  # max size of file upload allowed by YB platform
-  upload_size: 10G
-
-  resources:
-    requests:
-      cpu: 0.25
-      memory: 300Mi
 
 rbac:
   ## Set this to false if you don't have enough permissions to create

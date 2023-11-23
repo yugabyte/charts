@@ -54,6 +54,14 @@ data:
       default = ["com.yugabyte.yw.models.*"]
     }
 
+    {{- if .Values.tls.enabled }}
+    https.port = 9443
+    play.server.https.keyStore {
+      path = /opt/certs/server.pem
+      type = PEM
+    }
+    {{- end }}
+
     yb {
   {{- if .Values.yugaware.universe_boot_script }}
       universe_boot_script = "/data/universe-boot-script.sh"
@@ -86,6 +94,12 @@ data:
       kubernetes.storageClass = "{{ .Values.yugaware.storageClass }}"
       kubernetes.pullSecretName = "{{ .Values.image.pullSecret }}"
       url = "https://{{ .Values.tls.hostname }}"
+      # GKE MCS takes 7 to 10 minutes to setup DNS
+      wait_for_server_timeout = 15 minutes
+    {{- if .Values.tls.enabled }}
+      security.headers.hsts_enabled = true
+    {{- end }}
+      security.headers.custom_headers = {{ include "customHeaders" . }}
     }
 
     play.filters {
@@ -131,7 +145,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ .Release.Name }}-yugaware-tls-cert
+  name: {{ .Release.Name }}-yugaware-tls-pem
   labels:
     app: "{{ template "yugaware.name" . }}"
     chart: "{{ template "yugaware.chart" . }}"
@@ -139,65 +153,9 @@ metadata:
     heritage: {{ .Release.Service | quote }}
 type: Opaque
 data:
-  server.crt: {{ .Values.tls.certificate }}
-  server.key: {{ .Values.tls.key }}
+{{- include "getOrCreateServerPem" (dict "Namespace" .Release.Namespace "Root" . "Name" (printf "%s%s" .Release.Name "-yugaware-tls-pem")) | nindent 2 }}
 {{- end }}
 
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ .Release.Name }}-yugaware-nginx-config
-  labels:
-    app: {{ template "yugaware.name" . }}
-    chart: {{ template "yugaware.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
-data:
-  default.conf: |
-{{- if .Values.tls.enabled }}
-    # Ref: https://www.nginx.com/blog/http-strict-transport-security-hsts-and-nginx/
-    server {
-      listen  {{ eq .Values.ip_version_support "v6_only" | ternary "[::]:8080" "8080" }};
-      server_name {{ .Values.tls.hostname }};
-      return  301  https://$host$request_uri;
-    }  
-{{- end }}
-
-    server {
-{{- if .Values.tls.enabled }}
-      listen       8443 ssl;
-      ssl_certificate /opt/certs/server.crt;
-      ssl_certificate_key /opt/certs/server.key;
-{{- if .Values.tls.sslProtocols }}
-      ssl_protocols {{ include "validate_nginx_ssl_protocols" . }};
-{{- end }}
-      server_name  {{ .Values.tls.hostname }};
-      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-{{- else }}
-      listen       {{ eq .Values.ip_version_support "v6_only" | ternary "[::]:8080" "8080" }};
-      server_name  {{ .Values.tls.hostname }};
-{{- end }}
-      proxy_http_version 1.1;
-      proxy_set_header X-Real-IP  $remote_addr;
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $scheme;
-      proxy_set_header Host $host;
-
-      location / {
-        proxy_pass http://{{ eq .Values.ip_version_support "v6_only" | ternary "[::1]" "127.0.0.1" }}:9000;
-      }
-{{- if .Values.nginx.db_node_proxy_enabled }}
-      location ~ "^/universes/.+/proxy/(?!(169.254.|127.))(.+):(7000|9000|9300|12000|13000)/(metrics|prometheus-metrics)$" {
-        proxy_pass "http://$2:$3/$4$is_args$args";
-    }
-{{- end }}
-
-      location ~ /settings/ha/internal/upload$ {
-        proxy_pass http://{{ eq .Values.ip_version_support "v6_only" | ternary "[::1]" "127.0.0.1" }}:9000;
-        client_max_body_size {{ .Values.nginx.upload_size }};
-      }
-    }
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -224,52 +182,7 @@ data:
       docker-upgrade pg_upgrade | tee -a /pg_upgrade_logs/pg_upgrade_11_to_14.log;
       echo "host all all all scram-sha-256" >> "${PGDATANEW}/pg_hba.conf";
     fi
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ .Release.Name }}-yugaware-nginx-main-config
-  labels:
-    app: {{ template "yugaware.name" . }}
-    chart: {{ template "yugaware.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
-data:
-  nginx.conf: |
-    worker_processes  1;
 
-    error_log  /var/log/nginx/error.log warn;
-    pid        /tmp/nginx.pid;
-
-    events {
-      worker_connections  {{ .Values.nginx.workerConnections }};
-    }
-
-    http {
-      proxy_temp_path /tmp/proxy_temp;
-      client_body_temp_path /tmp/client_temp;
-      fastcgi_temp_path /tmp/fastcgi_temp;
-      uwsgi_temp_path /tmp/uwsgi_temp;
-      scgi_temp_path /tmp/scgi_temp;
-
-      include       /etc/nginx/mime.types;
-      default_type  application/octet-stream;
-
-      log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-                        '$status $body_bytes_sent "$http_referer" '
-                        '"$http_user_agent" "$http_x_forwarded_for"';
-
-      access_log  /var/log/nginx/access.log  main;
-
-      sendfile        on;
-      #tcp_nopush     on;
-
-      keepalive_timeout  65;
-
-      #gzip  on;
-
-      include /etc/nginx/conf.d/*.conf;
-    }
 {{- if .Values.prometheus.remoteWrite.tls.enabled }}
 ---
 apiVersion: v1

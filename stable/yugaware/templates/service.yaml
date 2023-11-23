@@ -27,11 +27,11 @@ spec:
 {{- if .Values.tls.enabled }}
   - name: ui-tls
     port: 443
-    targetPort: 8443
+    targetPort: 9443
 {{- end }}
   - name: ui
     port: 80
-    targetPort: 8080
+    targetPort: 9000
   - name: metrics
     port: 9090
   selector:
