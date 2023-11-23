@@ -131,6 +131,12 @@ yugaware:
   # - name: custom-nfs-vol
   #   mountPath: /home/yugabyte/nfs-backup
   extraVolumeMounts: []
+
+  # In case client wants to enable the additional headers to the YBA's http response
+  # Previously, it was possible via nginx, but given that we no longer have it, we can
+  # expose the same as application config/runtime config.
+  # Example: ["X-Content-Type-Options: nosniff", "Keep-Alive: timeout=5, max=1000"]
+  custom_headers: []
   
 ## Configure PostgreSQL part of the application
 postgres:
