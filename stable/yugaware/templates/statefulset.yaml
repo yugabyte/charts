@@ -29,6 +29,7 @@ spec:
 {{ toYaml .Values.yugaware.pod.labels | indent 8 }}
 {{- end }}
     spec:
+      terminationGracePeriodSeconds: {{ .Values.yugaware.pod.terminationGracePeriodSeconds }}
       serviceAccountName: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
       imagePullSecrets:
       - name: {{ .Values.image.pullSecret }}
