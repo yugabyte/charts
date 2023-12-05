@@ -121,6 +121,26 @@ enableLoadBalancer: true
 
 ybc:
   enabled: false
+  ## https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
+  ## Use the above link to learn more about Kubernetes resources configuration.
+  # resources:
+  #   requests:
+  #     cpu: "1"
+  #     memory: 1Gi
+  #   limits:
+  #     cpu: "1"
+  #     memory: 1Gi
+
+ybCleanup: {}
+  ## https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
+  ## Use the above link to learn more about Kubernetes resources configuration.
+  # resources:
+  #   requests:
+  #     cpu: "1"
+  #     memory: 1Gi
+  #   limits:
+  #     cpu: "1"
+  #     memory: 1Gi
 
 domainName: "cluster.local"
 
@@ -304,10 +324,10 @@ dnsConfig: {}
 master:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
   ## This might override the default affinity from service.yaml
-  # To successfully merge, we need to follow rules for merging nodeSelectorTerms that kubernentes 
-  # has. Each new node selector term is ORed together, and each match expression or match field in 
-  # a single selector is ANDed together. 
-  # This means, if a pod needs to be scheduled on a label 'custom_label_1' with a value 
+  # To successfully merge, we need to follow rules for merging nodeSelectorTerms that kubernentes
+  # has. Each new node selector term is ORed together, and each match expression or match field in
+  # a single selector is ANDed together.
+  # This means, if a pod needs to be scheduled on a label 'custom_label_1' with a value
   # 'custom_value_1', we need to add this 'subterm' to each of our pre-defined node affinity
   # terms.
   #
@@ -390,10 +410,10 @@ master:
 tserver:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
   ## This might override the default affinity from service.yaml
-  # To successfully merge, we need to follow rules for merging nodeSelectorTerms that kubernentes 
-  # has. Each new node selector term is ORed together, and each match expression or match field in 
-  # a single selector is ANDed together. 
-  # This means, if a pod needs to be scheduled on a label 'custom_label_1' with a value 
+  # To successfully merge, we need to follow rules for merging nodeSelectorTerms that kubernentes
+  # has. Each new node selector term is ORed together, and each match expression or match field in
+  # a single selector is ANDed together.
+  # This means, if a pod needs to be scheduled on a label 'custom_label_1' with a value
   # 'custom_value_1', we need to add this 'subterm' to each of our pre-defined node affinity
   # terms.
   #

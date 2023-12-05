@@ -285,7 +285,7 @@ spec:
               {{- end -}}
             {{- end -}}
           {{- else -}}
-            {{- $requiredSchedule = $baseAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms -}}          
+            {{- $requiredSchedule = $baseAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms -}}
           {{- end -}}
 
           {{- with $baseAffinity.requiredDuringSchedulingIgnoredDuringExecution -}}
@@ -628,6 +628,9 @@ spec:
           - name: {{ $root.Values.oldNamingStyle | ternary "datadir0" (printf "%s0" (include "yugabyte.volume_name" $root)) }}
             mountPath: /var/yugabyte/cores
             subPath: cores
+        {{- if $root.Values.ybCleanup.resources }}
+        resources: {{ toYaml $root.Values.ybCleanup.resources | nindent 10 }}
+        {{- end }}
       {{- end }}
 
       {{- if and (eq .name "yb-tservers") ($root.Values.ybc.enabled) }}
@@ -686,17 +689,20 @@ spec:
           {{- include "yugabyte.isExtraVolumesMappingExists" $root.Values.tserver -}}
           {{- $root.Values.tserver.extraVolumeMounts | toYaml | nindent 10 -}}
           {{- end -}}
+        {{- if $root.Values.ybc.resources }}
+        resources: {{ toYaml $root.Values.ybc.resources | nindent 10 }}
+        {{- end }}
       {{- end}}
 
       volumes:
         {{- if (eq .name "yb-masters") }}
         - name: debug-hooks-volume
-          configMap: 
+          configMap:
             name: {{ include "yugabyte.fullname" $root }}-master-hooks
             defaultMode: 0755
         {{- else if (eq .name "yb-tservers") }}
         - name: debug-hooks-volume
-          configMap: 
+          configMap:
             name: {{ include "yugabyte.fullname" $root }}-tserver-hooks
             defaultMode: 0755
         - name: tserver-tmp
