@@ -12,7 +12,3 @@
     To prevent errors while applying upgrade with --reuse-values and --set flags after introducing 
     new variables, default values can be specified in this file.
 */}}
-
-{{- define "get_nginx_proxyReadTimeoutSec" -}}
-    {{ .Values.nginx.proxyReadTimeoutSec | default 600 }}
-{{- end -}}
