@@ -14,11 +14,6 @@ image:
     tag: v4.11.0
     name: openshift4/ose-prometheus
 
-  nginx:
-    registry: registry.access.redhat.com
-    tag: 1-60.1665590917
-    name: ubi8/nginx-120
-
 rbac:
   create: false
 

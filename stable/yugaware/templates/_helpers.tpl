@@ -70,18 +70,6 @@ In both cases, image.tag can be used to customize the tag of the yugaware image.
 {{- end -}}
 
 {{/*
-Validate Nginx SSL protocols
-*/}}
-{{- define "validate_nginx_ssl_protocols" -}}
-  {{- $sslProtocolsRegex := `^((TLSv(1|1\.[1-3]))(?: ){0,1}){1,4}$` -}}
-  {{- if not (regexMatch $sslProtocolsRegex .Values.tls.sslProtocols) -}}
-    {{- fail (cat "Please specify valid tls.sslProtocols, must match regex:" $sslProtocolsRegex) -}}
-  {{- else -}}
-    {{- .Values.tls.sslProtocols -}}
-  {{- end -}}
-{{- end -}}
-
-{{/*
 Get or generate PG password
 Source - https://github.com/helm/charts/issues/5167#issuecomment-843962731
 */}}
@@ -131,6 +119,68 @@ Make list of allowed CORS origins
 "https://{{ .Values.tls.hostname }}"
 {{- else -}}
 "http://{{ .Values.tls.hostname }}"
+{{- end -}}
+]
+{{- end -}}
+
+{{/*
+Get or generate server cert and key
+*/}}
+{{- define "getOrCreateServerCert" -}}
+{{- $root := .Root -}}
+{{- if and $root.Values.tls.certificate $root.Values.tls.key -}}
+server.key: {{ $root.Values.tls.key }}
+server.crt: {{ $root.Values.tls.certificate }}
+{{- else -}}
+  {{- $result := (lookup "v1" "Secret" .Namespace .Name).data -}}
+  {{- if $result -}}
+server.key: {{ index $result "server.key" }}
+server.crt: {{ index $result "server.crt" }}
+  {{- else -}}
+    {{- $cert := genSelfSignedCert $root.Values.tls.hostname nil nil 3560 -}}
+server.key: {{ $cert.Key | b64enc }}
+server.crt: {{ $cert.Cert | b64enc }}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Get or generate server key cert in pem format
+*/}}
+{{- define "getOrCreateServerPem" -}}
+{{- $root := .Root -}}
+{{- if and $root.Values.tls.certificate $root.Values.tls.key -}}
+{{- $decodedKey := $root.Values.tls.key | b64dec -}}
+{{- $decodedCert := $root.Values.tls.certificate | b64dec -}}
+{{- $serverPemContentTemp := ( printf "%s\n%s" $decodedKey $decodedCert ) -}}
+{{- $serverPemContent := $serverPemContentTemp | b64enc -}}
+server.pem: {{ $serverPemContent }}
+{{- else -}}
+  {{- $result := (lookup "v1" "Secret" .Namespace .Name).data -}}
+  {{- if $result -}}
+{{- $serverPemContent := ( index $result "server.pem" ) -}}
+server.pem: {{ $serverPemContent }}
+  {{- else -}}
+    {{- $cert := genSelfSignedCert $root.Values.tls.hostname nil nil 3560 -}}
+{{- $serverPemContentTemp := ( printf "%s\n%s" $cert.Key $cert.Cert ) -}}
+{{- $serverPemContent := $serverPemContentTemp | b64enc -}}
+server.pem: {{ $serverPemContent }}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Make list of custom http headers
+*/}}
+{{- define "customHeaders" -}}
+[
+{{- $headers := .Values.yugaware.custom_headers -}}
+{{- range $index, $element := $headers -}}
+  {{- if ne $index (sub (len $headers) 1) -}}
+    {{- . | quote }},
+  {{- else -}}
+    {{- . | quote }}
+  {{- end -}}
 {{- end -}}
 ]
 {{- end -}}

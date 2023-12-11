@@ -84,18 +84,6 @@ spec:
                     - key: universe_boot_script
                       path: universe-boot-script.sh
             {{- end }}
-        - name: nginx-config
-          configMap:
-            name: {{ .Release.Name }}-yugaware-nginx-config
-            items:
-              - key: default.conf
-                path: default.conf
-        - name: nginx-main-config
-          configMap:
-            name: {{ .Release.Name }}-yugaware-nginx-main-config
-            items:
-              - key: nginx.conf
-                path: nginx.conf
         - name: prometheus-config
           configMap:
             name: {{ .Release.Name }}-yugaware-prometheus-config
@@ -111,9 +99,12 @@ spec:
                 path: init-permissions.sh
         {{- end }}
         {{- if .Values.tls.enabled }}
-        - name: {{  .Release.Name }}-yugaware-tls-cert
+        - name: {{  .Release.Name }}-yugaware-tls-pem
           secret:
-            secretName: {{ .Release.Name }}-yugaware-tls-cert
+            secretName: {{ .Release.Name }}-yugaware-tls-pem
+            items:
+            - key: server.pem
+              path: server.pem
         {{- end }}
         {{- if .Values.prometheus.remoteWrite.tls.enabled }}
         - name: {{  .Release.Name }}-yugaware-prometheus-remote-write-tls
@@ -391,29 +382,11 @@ spec:
           - name: yugaware-storage
             mountPath: /prometheus_configs
             subPath: prometheus.yml
-        - name: nginx
-          image: {{ include "full_image" (dict "containerName" "nginx" "root" .) }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args: ["nginx", "-g", "daemon off;"]
-          ports:
-          - containerPort: 8080
-
-          {{- if .Values.nginx.resources }}
-          resources:
-{{ toYaml .Values.nginx.resources | indent 12 }}
-          {{- end }}
-
-          volumeMounts:
-          - mountPath: /etc/nginx/conf.d/
-            name: nginx-config
-          - mountPath: /etc/nginx/nginx.conf
-            subPath: nginx.conf
-            name: nginx-main-config
-          {{- if .Values.tls.enabled }}
-          - name: {{  .Release.Name }}-yugaware-tls-cert
+        {{- if .Values.tls.enabled }}
+          - name: {{  .Release.Name }}-yugaware-tls-pem
             mountPath: /opt/certs/
             readOnly: true
-          {{- end }}
+        {{- end }}
 {{ if .Values.sidecars }}
 {{ toYaml .Values.sidecars | indent 8 }}
 {{ end }}
