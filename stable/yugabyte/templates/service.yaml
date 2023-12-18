@@ -503,7 +503,9 @@ spec:
             {{- end }}
               --rpc_bind_addresses={{ $rpcAddr }} \
               --server_broadcast_addresses={{ $broadcastAddr }} \
-              --webserver_interface={{ $webserverAddr }}
+              --webserver_interface={{ $webserverAddr }} \
+              --master_enable_metrics_snapshotter={{ $root.Values.metricsSnapshotter.enabled }} \
+              --metrics_snapshotter_tserver_metrics_whitelist={{ join "," $root.Values.metricsSnapshotter.whitelist }}
           {{- else }}
             {{- $cqlAddr := include "yugabyte.cql_proxy_bind_address" $serviceValues -}}
             {{- $cqlPort := index $service.ports "tcp-yql-port" -}}
@@ -565,7 +567,10 @@ spec:
             {{- else }}
               --enable_ysql=false \
             {{- end }}
-              --cql_proxy_bind_address={{ $cqlAddr }}
+              --cql_proxy_bind_address={{ $cqlAddr }} \
+              --tserver_enable_metrics_snapshotter={{ $root.Values.metricsSnapshotter.enabled }} \
+              --metrics_snapshotter_interval_ms={{ $root.Values.metricsSnapshotter.interval }} \
+              --metrics_snapshotter_tserver_metrics_whitelist={{ join "," $root.Values.metricsSnapshotter.whitelist }}
           {{- end }}
         ports:
           {{- range $label, $port := .ports }}
@@ -632,7 +637,47 @@ spec:
         resources: {{ toYaml $root.Values.ybCleanup.resources | nindent 10 }}
         {{- end }}
       {{- end }}
-
+      {{- if $root.Values.yugabytedUi.enabled }}
+      - name: yugabyted-ui
+        image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        env:
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        command:
+          - "/sbin/tini"
+          - "--"
+        args:
+          - "/bin/bash"
+          - "-c"
+          - |
+            /home/yugabyte/bin/yugabyted-ui \
+            {{- $rpcAddr := include "yugabyte.rpc_bind_address" $serviceValues }}
+              -database_host={{ $rpcAddr }} \
+            {{- $webserverAddr := include "yugabyte.webserver_interface" $serviceValues }}
+              -bind_address={{ $webserverAddr }} \
+            {{- $masterPort := "7000" }}
+            {{- $tserverPort := "9000" }}
+            {{- range $root.Values.Services -}}
+              {{- if eq .name "yb-masters" -}}
+                {{- $masterPort = index .ports "http-ui" -}}
+              {{- else if eq .name "yb-tservers" -}}
+                {{- $tserverPort = index .ports "http-ui" -}}
+              {{- end -}}
+            {{- end }}
+              -master_ui_port={{ $masterPort }} \
+              -tserver_ui_port={{ $tserverPort }} \
+            {{- if $root.Values.tls.enabled }}
+              -secure={{ $root.Values.tls.enabled }} \
+              -database_password={{ $root.Values.authCredentials.ycql.password }} \
+            {{- end }}
+      {{- end }}
       {{- if and (eq .name "yb-tservers") ($root.Values.ybc.enabled) }}
       - name: yb-controller
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
