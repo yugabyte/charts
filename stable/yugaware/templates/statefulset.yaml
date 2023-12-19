@@ -179,7 +179,7 @@ spec:
             name: {{ .Release.Name }}-yugaware-ybdb
             items:
               - key: ybdb-create-yugaware-db.sh
-                path: ybdb-create-yugaware-db.sh 
+                path: ybdb-create-yugaware-db.sh
         {{- end}}
       {{- with .Values.dnsConfig }}
       dnsConfig: {{- toYaml . | nindent 8 }}
@@ -403,7 +403,7 @@ spec:
             name: ybdb
           - containerPort: 15433
             name: yugabyted-ui
-          
+
           {{- if .Values.yugabytedb.resources }}
           resources:
           {{ toYaml .Values.yugabytedb.resources | nindent 12 }}
@@ -415,7 +415,7 @@ spec:
             subPath: ybdb_data
           - name: ybdb-create-yugaware-db
             mountPath: /ybdb-create-yugware-db
-          
+
           command: ["/home/yugabyte/bin/yugabyted", "start"]
           args:
             - --base_dir=/var/lib/ybdb
@@ -447,6 +447,10 @@ spec:
           resources:
 {{ toYaml .Values.prometheus.resources | indent 12 }}
           {{ end }}
+          {{- with .Values.prometheus.extraEnv }}
+          env:
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
 
           volumeMounts:
           - name: yugaware-storage
