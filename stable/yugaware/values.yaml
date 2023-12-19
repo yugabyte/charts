@@ -428,6 +428,9 @@ prometheus:
   #   value: "5Gi"
   extraEnv: []
 
+  ## Enabling 'selfmonitor' allows Prometheus to collect and monitor its metrics.
+  selfMonitor: true
+
 # Arbitrary key=value config entries for application.docker.conf
 additionalAppConf:
   stringConf: {}
