@@ -36,55 +36,167 @@ kind: ClusterRole
 metadata:
   name: {{ .Release.Name }}
 rules:
-- apiGroups: ["policy"]
-  resources:
-  - poddisruptionbudgets
-  verbs: ["get", "create", "delete", "patch"]
-- apiGroups: [""]
-  resources:
-  - services
-  verbs: ["get", "delete", "create", "patch", "list", "watch"]
-- apiGroups: ["apps"]
-  resources:
-  - statefulsets
-  verbs: ["get", "delete", "create", "patch", "scale"]
-- apiGroups: [""]
-  resources:
-  - secrets
-  verbs: ["create", "list", "get", "delete", "update", "patch"]
-- apiGroups: ["cert-manager.io"]
-  resources:
-  - certificates
-  verbs: ["create", "delete", "get", "patch"]
-- apiGroups: [""]
-  resources:
-  - nodes
-  - nodes/proxy
-  - services
-  - endpoints
-  - pods
-  - pods/exec
-  - configmaps      # added configmaps resource
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]   # added all verbs for configmaps
+# Set of permissions required for operator
 - apiGroups:
-  - extensions
+  - operator.yugabyte.io
   resources:
-  - ingresses
-  verbs: ["get", "list", "watch"]
-- nonResourceURLs: ["/metrics"]
-  verbs: ["get"]
-- apiGroups: [""]
+  - "*"
+  verbs:
+  - "get"
+  - "create"
+  - "delete"
+  - "patch"
+  - "list"
+  - "watch"
+  - "update"
+# Set of permissions required to install, upgrade, delete the yugabyte chart
+- apiGroups:
+  - "policy"
   resources:
-  - namespaces
-  - secrets
-  - pods/portforward
-  - events          # added events resource
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]  # added all verbs for events
-- apiGroups: ["", "extensions"]
+  - "poddisruptionbudgets"
+  verbs:
+  - "get"
+  - "create"
+  - "delete"
+  - "patch"
+- apiGroups:
+  - ""
   resources:
-  - deployments
-  - services
-  verbs: ["create", "get", "list", "watch", "update", "delete"]
+  - "services"
+  verbs:
+  - "get"
+  - "delete"
+  - "create"
+  - "patch"
+- apiGroups:
+  - "apps"
+  resources:
+  - "statefulsets"
+  verbs:
+  - "get"
+  - "list"
+  - "delete"
+  - "create"
+  - "patch"
+- apiGroups:
+  - ""
+  resources:
+  - "secrets"
+  verbs:
+  - "create"
+  - "list"
+  - "get"
+  - "delete"
+  - "update"
+  - "patch"
+- apiGroups:
+  - "cert-manager.io"
+  resources:
+  - "certificates"
+  verbs:
+  - "create"
+  - "delete"
+  - "get"
+  - "patch"
+- apiGroups:
+  - ""
+  resources:
+  - "configmaps"
+  verbs:
+  - "get"
+  - "create"
+  - "patch"
+  - "delete"
+# Set of permissions required by YBA to manage YB DB universes
+- apiGroups:
+  - ""
+  resources:
+  - "namespaces"
+  verbs:
+  - "delete"
+  - "create"
+  - "patch"
+  - "get"
+  - "list"
+- apiGroups:
+  - ""
+  resources:
+  - "pods"
+  verbs:
+  - "get"
+  - "list"
+  - "delete"
+- apiGroups:
+  - ""
+  resources:
+  - "services"
+  verbs:
+  - "get"
+  - "list"
+- apiGroups:
+  - ""
+  resources:
+  - "persistentvolumeclaims"
+  verbs:
+  - "get"
+  - "patch"
+  - "list"
+  - "delete"
+- apiGroups:
+  - ""
+  resources:
+  - "pods/exec"
+  verbs:
+  - "create"
+- apiGroups:
+  - "apps"
+  resources:
+  - "statefulsets/scale"
+  verbs:
+  - "patch"
+- apiGroups:
+  - ""
+  resources:
+  - "events"
+  verbs:
+  - "list"
+# required to scrape resource metrics like CPU, memory, etc.
+- apiGroups:
+  - ""
+  resources:
+  - "nodes"
+  verbs:
+  - "list"
+  - "get"
+  - "watch"
+# required to scrape resource metrics like CPU, memory, etc.
+- apiGroups:
+  - ""
+  resources:
+  - "nodes/proxy"
+  verbs:
+  - "get"
+# Ref: https://github.com/yugabyte/charts/commit/4a5319972385666487a7bc2cd0c35052f2cfa4c5
+- apiGroups:
+  - ""
+  resources:
+  - "events"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+  - "create"
+  - "update"
+  - "patch"
+  - "delete"
+- apiGroups:
+  - ""
+  resources:
+  - "configmaps"
+  verbs:
+  - "list"
+  - "watch"
+  - "update"
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
