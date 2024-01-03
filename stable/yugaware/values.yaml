@@ -112,6 +112,8 @@ yugaware:
   # Set namespace the operator watches for custom resources.
   # If default ""  the YBA k8s operator watches all namespaces.
   kubernetesOperatorNamespace: ""
+  # Crash YBA if operator thread is not initialised correctly
+  kubernetesOperatorCrashOnFailure: true
 
   # Create an initial user for YugabyteDB Anywhere. A user is required for YBA workflows.
   defaultUser:
