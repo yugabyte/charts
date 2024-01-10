@@ -708,13 +708,6 @@ spec:
         - name: tserver-tmp
           emptyDir: {}
         {{- end }}
-        {{ if not $root.Values.storage.ephemeral }}
-        {{- range $index := until (int ($storageInfo.count)) }}
-        - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
-          hostPath:
-            path: /mnt/disks/ssd{{ $index }}
-        {{- end }}
-        {{- end }}
         {{- if $root.Values.tls.enabled }}
         {{- if $root.Values.tls.certManager.enabled }}
         {{- /* certManager enabled */}}
