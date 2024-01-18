@@ -376,12 +376,12 @@ requiredDuringSchedulingIgnoredDuringExecution:
     - key: failure-domain.beta.kubernetes.io/zone
       operator: In
       values:
-      - {{ .Values.AZ }}
+      - {{ quote .Values.AZ }}
   - matchExpressions:
     - key: topology.kubernetes.io/zone
       operator: In
       values:
-      - {{ .Values.AZ }}
+      - {{ quote .Values.AZ }}
 {{- end -}}
 
 {{/*
