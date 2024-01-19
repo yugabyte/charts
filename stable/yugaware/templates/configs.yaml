@@ -582,6 +582,20 @@ data:
 
       {{- end }}
       {{- end }}
+ 
+      {{- if and (not .Values.useNginxProxy) (.Values.tls.enabled) }}
+      
+      - job_name: 'platform'
+        metrics_path: "/api/v1/prometheus_metrics"
+        scheme: https
+        tls_config:
+          insecure_skip_verify: true
+        static_configs:
+          - targets: [
+            '{{ eq .Values.ip_version_support "v6_only" | ternary "[::1]" "127.0.0.1" }}:9443'
+          ]
+
+      {{- else }}
 
       - job_name: 'platform'
         metrics_path: "/api/v1/prometheus_metrics"
@@ -590,7 +604,12 @@ data:
             '{{ eq .Values.ip_version_support "v6_only" | ternary "[::1]" "127.0.0.1" }}:9000'
           ]
 
+      {{- end }}
+
+
+
       {{- if .Values.prometheus.selfMonitor }}
+      
       - job_name: 'prometheus'
         metrics_path: "/metrics"
         static_configs:
