@@ -8,7 +8,7 @@ nameOverride: ""
 
 Image:
   repository: "yugabytedb/yugabyte"
-  tag: 2.19.3.0-b140
+  tag: latest
   pullPolicy: IfNotPresent
   pullSecretName: ""
 
@@ -115,6 +115,22 @@ gflags:
   tserver: {}
 #   use_cassandra_authentication: false
 
+yugabytedUi:
+  enabled: true
+
+metricsSnapshotter:
+  enabled: true
+  # time between each metric snapshot in ms
+  interval: 11000
+  whitelist:
+    - handler_latency_yb_tserver_TabletServerService_Read_count
+    - handler_latency_yb_tserver_TabletServerService_Write_count
+    - handler_latency_yb_tserver_TabletServerService_Read_sum
+    - handler_latency_yb_tserver_TabletServerService_Write_sum
+    - disk_usage
+    - cpu_usage
+    - node_up
+
 PodManagementPolicy: Parallel
 
 enableLoadBalancer: true
@@ -177,6 +193,7 @@ Services:
     ports:
       http-ui: "7000"
       tcp-rpc-port: "7100"
+      yugabyted-ui: "15433"
 
   - name: "yb-tservers"
     label: "yb-tserver"
@@ -191,6 +208,7 @@ Services:
       http-yedis-met: "11000"
       http-ysql-met: "13000"
       grpc-ybc-port: "18018"
+      yugabyted-ui: "15433"
 
 
 ## Should be set to true only if Istio is being used. This also adds
@@ -504,6 +522,7 @@ helm2Legacy: false
 ip_version_support: "v4_only" # v4_only, v6_only are the only supported values at the moment
 
 # For more https://docs.yugabyte.com/latest/reference/configuration/yugabyted/#environment-variables
+# Note: for yugabyted-ui to work properly with credentials, ysql/ycql passwords must be the same
 authCredentials:
   ysql:
     user: ""
