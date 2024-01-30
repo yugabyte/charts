@@ -21,7 +21,8 @@ def main(release):
     tags = dict()
     for tag_obj in json_response['results']:
         tag = tag_obj['name']
-        if tag.startswith(release.version):
+        # Skip tags with architecture i.e. 2.18.5.1-b1-x86_64
+        if tag.startswith(release.version) and tag.count("-") == 1:
             build_number = int(tag[tag.rindex("-b")+2:])
             tags[build_number] = tag
     if not tags:
