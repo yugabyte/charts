@@ -30,6 +30,10 @@ resource:
       memory: 2Gi
     limits:
       cpu: "2"
+      ## Ensure the 'memory' value is strictly in 'Gi' or 'G' format. Deviating from these formats
+      ## may result in setting an incorrect value for the 'memory_limit_hard_bytes' flag.
+      ## Avoid using floating numbers for the numeric part of 'memory'. Doing so may lead to
+      ## the 'memory_limit_hard_bytes' being set to 0, as the function expects integer values.
       memory: 2Gi
   tserver:
     requests:
@@ -37,6 +41,10 @@ resource:
       memory: 4Gi
     limits:
       cpu: "2"
+      ## Ensure the 'memory' value is strictly in 'Gi' or 'G' format. Deviating from these formats
+      ## may result in setting an incorrect value for the 'memory_limit_hard_bytes' flag.
+      ## Avoid using floating numbers for the numeric part of 'memory'. Doing so may lead to
+      ## the 'memory_limit_hard_bytes' being set to 0, as the function expects integer values.
       memory: 4Gi
 
 replicas:
@@ -371,6 +379,9 @@ master:
   ## should exist in the namespace where the master DB pods are brought up.
   serviceAccount: ""
 
+  ## Memory limit hard % (between 1-100) of the memory limit.
+  memoryLimitHardPercentage: 85
+
 
 tserver:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
@@ -463,6 +474,10 @@ tserver:
   ## Set service account for tserver DB pods. The service account
   ## should exist in the namespace where the tserver DB pods are brought up.
   serviceAccount: ""
+
+  ## Memory limit hard % (between 1-100) of the memory limit.
+  memoryLimitHardPercentage: 85
+
 
 helm2Legacy: false
 
