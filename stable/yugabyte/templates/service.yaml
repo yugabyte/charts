@@ -489,7 +489,7 @@ spec:
               --enable_ysql=false \
             {{- end }}
               --metric_node_name=$(HOSTNAME) \
-              --memory_limit_hard_bytes={{ template "yugabyte.memory_hard_limit" $root.Values.resource.master }} \
+              --memory_limit_hard_bytes={{ template "yugabyte.memory_hard_limit" dict "size" $root.Values.resource.master.limits.memory "limitPercent" $root.Values.master.memoryLimitHardPercentage }} \
               --stderrthreshold=0 \
               --num_cpus={{ ceil $root.Values.resource.master.requests.cpu }} \
               --undefok=num_cpus,enable_ysql \
@@ -532,7 +532,7 @@ spec:
               --tserver_master_addrs={{ template "yugabyte.master_addresses" $root }} \
             {{- end }}
               --metric_node_name=$(HOSTNAME) \
-              --memory_limit_hard_bytes={{ template "yugabyte.memory_hard_limit" $root.Values.resource.tserver }} \
+              --memory_limit_hard_bytes={{ template "yugabyte.memory_hard_limit" dict "size" $root.Values.resource.tserver.limits.memory "limitPercent" $root.Values.tserver.memoryLimitHardPercentage }} \
               --stderrthreshold=0 \
               --num_cpus={{ ceil $root.Values.resource.tserver.requests.cpu }} \
               --undefok=num_cpus,enable_ysql \
