@@ -147,12 +147,23 @@ Create Volume name.
 {{- end -}}
 
 {{/*
-Derive the memory hard limit for each POD based on the memory limit.
-Since the memory is represented in <x>GBi, we use this function to convert that into bytes.
-Multiplied by 870 since 0.85 * 1024 ~ 870 (floating calculations not supported).
+Derive the memory hard limit in bytes for Master and Tserver components based on
+a given memory size and a limit percentage.
+
+The function expects two parameters:
+1. 'size': Specifies memory in 'G' or 'Gi' format (e.g., "2Gi").
+2. 'limitPercent': An integer representing the percentage of the memory limit (e.g., 85 for 85%).
+
+It uses a base multiplier of 1000 for 'G' units and 1024 for 'Gi' units.
 */}}
 {{- define "yugabyte.memory_hard_limit" -}}
-  {{- printf "%d" .limits.memory | regexFind "\\d+" | mul 1024 | mul 1024 | mul 870 -}}
+  {{- $baseMultiplier := 1000 -}}
+  {{- if .size | toString | regexMatch "^[0-9]+Gi$" -}}
+    {{- $baseMultiplier = 1024 -}}
+  {{- end -}}
+  {{- $limit_percent := .limitPercent -}}
+  {{- $multiplier := int (div (mul $limit_percent $baseMultiplier) 100) -}}
+  {{- printf "%d" .size | regexFind "\\d+" | mul $baseMultiplier | mul $baseMultiplier | mul $multiplier -}}
 {{- end -}}
 
 {{/*
