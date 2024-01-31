@@ -22,3 +22,10 @@ serviceEndpoints:
     app: "yb-tserver"
     ports:
       ysql-port: "5433"
+
+  - name: "yugabyted-ui-service"
+    type: LoadBalancer
+    app: "yb-master"
+    sessionAffinity: ClientIP
+    ports:
+      yugabyted-ui: "15433"
