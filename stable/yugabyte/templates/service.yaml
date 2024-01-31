@@ -97,6 +97,11 @@ spec:
     - name: {{ $label | quote }}
       port: {{ $port }}
     {{- end }}
+    {{- else if (eq $label "yugabyted-ui") }}
+    {{- if $root.Values.yugabytedUi.enabled }}
+    - name: {{ $label | quote }}
+      port: {{ $port }}
+    {{- end }}
     {{- else }}
     - name: {{ $label | quote }}
       port: {{ $port }}
@@ -108,6 +113,7 @@ spec:
 {{- if $root.Values.enableLoadBalancer }}
 {{- range $endpoint :=  $root.Values.serviceEndpoints }}
 {{- if eq $service.label $endpoint.app }}
+{{- if (or (ne $endpoint.name "yugabyted-ui-service") $root.Values.yugabytedUi.enabled) }}
 ---
 apiVersion: v1
 kind: Service
@@ -133,12 +139,20 @@ spec:
       port: {{ $port }}
     {{- end}}
   selector:
+    {{- if eq $endpoint.name "yugabyted-ui-service"}}
+    yugabytedUi: "true"
+    {{- else }}
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
+    {{- end }}
   type: {{ $endpoint.type }}
   externalTrafficPolicy: {{ $endpoint.externalTrafficPolicy | default "Cluster" }}
   {{- if $endpoint.loadBalancerIP }}
   loadBalancerIP: {{ $endpoint.loadBalancerIP }}
   {{- end }}
+  {{- if eq $endpoint.name "yugabyted-ui-service"}}
+  sessionAffinity: {{ $endpoint.sessionAffinity }}
+  {{- end }}
+{{- end}}
 {{- end}}
 {{- end}}
 {{- end}}
@@ -233,6 +247,9 @@ spec:
         {{- with $root.Values.master.podLabels }}{{ toYaml . | nindent 8 }}{{ end }}
         {{- else }}
         {{- with $root.Values.tserver.podLabels }}{{ toYaml . | nindent 8 }}{{ end }}
+        {{- end }}
+        {{- if $root.Values.yugabytedUi.enabled }}
+        yugabytedUi: "true"
         {{- end }}
     spec:
       {{- if $root.Values.Image.pullSecretName }}
@@ -503,7 +520,11 @@ spec:
             {{- end }}
               --rpc_bind_addresses={{ $rpcAddr }} \
               --server_broadcast_addresses={{ $broadcastAddr }} \
-              --webserver_interface={{ $webserverAddr }}
+              --webserver_interface={{ $webserverAddr }} \
+            {{- if $root.Values.yugabytedUi.enabled }}
+              --master_enable_metrics_snapshotter={{ $root.Values.yugabytedUi.metricsSnapshotter.enabled }} \
+              --metrics_snapshotter_tserver_metrics_whitelist={{ join "," $root.Values.yugabytedUi.metricsSnapshotter.whitelist }}
+            {{- end }}
           {{- else }}
             {{- $cqlAddr := include "yugabyte.cql_proxy_bind_address" $serviceValues -}}
             {{- $cqlPort := index $service.ports "tcp-yql-port" -}}
@@ -565,11 +586,21 @@ spec:
             {{- else }}
               --enable_ysql=false \
             {{- end }}
-              --cql_proxy_bind_address={{ $cqlAddr }}
+              --cql_proxy_bind_address={{ $cqlAddr }} \
+            {{- if $root.Values.yugabytedUi.enabled }}
+              --tserver_enable_metrics_snapshotter={{ $root.Values.yugabytedUi.metricsSnapshotter.enabled }} \
+              --metrics_snapshotter_interval_ms={{ $root.Values.yugabytedUi.metricsSnapshotter.interval }} \
+              --metrics_snapshotter_tserver_metrics_whitelist={{ join "," $root.Values.yugabytedUi.metricsSnapshotter.whitelist }}
+            {{- end }}
           {{- end }}
         ports:
           {{- range $label, $port := .ports }}
-          {{- if not (eq $label "grpc-ybc-port") }}
+          {{- if (eq $label "yugabyted-ui") }}
+          {{- if $root.Values.yugabytedUi.enabled }}
+          - containerPort: {{ $port }}
+            name: {{ $label | quote }}
+          {{- end }}
+          {{- else if not (eq $label "grpc-ybc-port") }}
           - containerPort: {{ $port }}
             name: {{ $label | quote }}
           {{- end }}
@@ -631,6 +662,78 @@ spec:
         {{- if $root.Values.ybCleanup.resources }}
         resources: {{ toYaml $root.Values.ybCleanup.resources | nindent 10 }}
         {{- end }}
+      {{- end }}
+
+      {{- if $root.Values.yugabytedUi.enabled }}
+      - name: yugabyted-ui
+        image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        env:
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        command:
+          - "/sbin/tini"
+          - "--"
+        args:
+          - "/bin/bash"
+          - "-c"
+          - |
+            {{- if $root.Values.yugabytedUi.recoverWithoutFailure }}
+            while true; do
+            {{- end }}
+            /home/yugabyte/bin/yugabyted-ui \
+            {{- $rpcAddr := include "yugabyte.rpc_bind_address" $serviceValues }}
+              -database_host={{ $rpcAddr }} \
+            {{- $webserverAddr := include "yugabyte.webserver_interface" $serviceValues }}
+              -bind_address={{ $webserverAddr }} \
+            {{- $masterPort := "7000" }}
+            {{- $tserverPort := "9000" }}
+            {{- $ysqlPort := "5433" }}
+            {{- $ycqlPort := "9042" }}
+            {{- range $root.Values.Services -}}
+              {{- if eq .name "yb-masters" -}}
+                {{- $masterPort = index .ports "http-ui" -}}
+              {{- else if eq .name "yb-tservers" -}}
+                {{- $tserverPort = index .ports "http-ui" -}}
+                {{- $ysqlPort = index .ports "tcp-ysql-port" -}}
+                {{- $ycqlPort = index .ports "tcp-yql-port" -}}
+              {{- end -}}
+            {{- end }}
+              -ysql_port={{ $ysqlPort }} \
+              -ycql_port={{ $ycqlPort }} \
+              -master_ui_port={{ $masterPort }} \
+              -tserver_ui_port={{ $tserverPort }} \
+            {{- if $root.Values.tls.enabled }}
+              -secure={{ $root.Values.tls.enabled }} \
+            {{- end }}
+            {{- if $root.Values.authCredentials.ysql.user }}
+              -ysql_username={{ $root.Values.authCredentials.ysql.user }} \
+            {{- end }}
+            {{- if $root.Values.authCredentials.ycql.user }}
+              -ycql_username={{ $root.Values.authCredentials.ycql.user }} \
+            {{- end }}
+            {{- if $root.Values.authCredentials.ysql.password }}
+              -ysql_password={{ $root.Values.authCredentials.ysql.password }} \
+            {{- end }}
+            {{- if $root.Values.authCredentials.ycql.password }}
+              -ycql_password={{ $root.Values.authCredentials.ycql.password }} \
+            {{- end }}
+            || echo "ERROR: yugabyted-ui failed. This might be because your yugabyte \
+            version is older than 2.21.0. If this is the case, set yugabytedUi.enabled to false \
+            in helm to disable yugabyted-ui, or upgrade to a version 2.21.0 or newer."; \
+            {{- if $root.Values.yugabytedUi.recoverWithoutFailure }}
+            echo "Attempting restart in {{ $root.Values.yugabytedUi.recoveryInterval }}."
+            trap break TERM INT; \
+            sleep {{ $root.Values.yugabytedUi.recoveryInterval }} & wait; \
+            trap - TERM INT;
+            done \
+            {{- end }}
       {{- end }}
 
       {{- if and (eq .name "yb-tservers") ($root.Values.ybc.enabled) }}

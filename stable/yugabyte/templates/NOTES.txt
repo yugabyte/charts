@@ -23,3 +23,7 @@
   {{- range .Values.Services }}
   kubectl delete pvc --namespace {{ $root.Release.Namespace }} -l app={{.label}}
   {{- end }}
+{{ if $root.Values.yugabytedUi.enabled }}
+NOTE: The yugabyted UI is now available and is enabled by default. It requires version 2.21.0 or greater.
+If you are using a custom image of YugabyteDB that is older than 2.21.0, please disable the UI by setting yugabytedUi.enabled to false.
+{{- end }}

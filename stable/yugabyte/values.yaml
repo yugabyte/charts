@@ -123,6 +123,26 @@ gflags:
   tserver: {}
 #   use_cassandra_authentication: false
 
+yugabytedUi:
+  enabled: true
+  # If recoverWithoutFailure is true, yugabyted-ui will automatically try to restart itself
+  # instead of failing and causing the pod to restart
+  recoverWithoutFailure: true
+  recoveryInterval: 30s
+  # metricsSnapshotter must be enabled for yugabytedUi to properly display metrics
+  metricsSnapshotter:
+    enabled: true
+    # time between each metric snapshot in ms
+    interval: 11000
+    whitelist:
+      - handler_latency_yb_tserver_TabletServerService_Read_count
+      - handler_latency_yb_tserver_TabletServerService_Write_count
+      - handler_latency_yb_tserver_TabletServerService_Read_sum
+      - handler_latency_yb_tserver_TabletServerService_Write_sum
+      - disk_usage
+      - cpu_usage
+      - node_up
+
 PodManagementPolicy: Parallel
 
 enableLoadBalancer: true
@@ -177,6 +197,18 @@ serviceEndpoints:
       tcp-yedis-port: "6379"
       tcp-ysql-port: "5433"
 
+  - name: "yugabyted-ui-service"
+    type: LoadBalancer
+    annotations: {}
+    clusterIP: ""
+    ## Sets the Service's externalTrafficPolicy
+    externalTrafficPolicy: ""
+    app: "yb-master"
+    loadBalancerIP: ""
+    sessionAffinity: ClientIP
+    ports:
+      yugabyted-ui: "15433"
+
 Services:
   - name: "yb-masters"
     label: "yb-master"
@@ -185,6 +217,7 @@ Services:
     ports:
       http-ui: "7000"
       tcp-rpc-port: "7100"
+      yugabyted-ui: "15433"
 
   - name: "yb-tservers"
     label: "yb-tserver"
@@ -199,6 +232,7 @@ Services:
       http-yedis-met: "11000"
       http-ysql-met: "13000"
       grpc-ybc-port: "18018"
+      yugabyted-ui: "15433"
 
 
 ## Should be set to true only if Istio is being used. This also adds
