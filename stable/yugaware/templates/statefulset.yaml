@@ -510,6 +510,10 @@ spec:
             - name: LD_PRELOAD
               value: "/usr/lib64/libnss_wrapper.so"
           {{- end }}
+            - name: POD_NAME 
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name 
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
