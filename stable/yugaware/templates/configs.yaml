@@ -109,6 +109,9 @@ data:
       security.headers.hsts_enabled = true
     {{- end }}
       security.headers.custom_headers = {{ include "customHeaders" . }}
+    {{- if eq .Values.ip_version_support "v6_only" }}
+      env_proxy_selector.enabled = false
+    {{- end }}
     }
 
     play.filters {
