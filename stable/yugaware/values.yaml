@@ -91,7 +91,7 @@ yugaware:
         max: 600 # maximum expected time for yugaware to start, k8s will restart pod on timeout
       livenessProbe:
         periodSeconds: 30 # query period
-        failureThreshold: 3 # number of failed checks to restart pod
+        failureThreshold: 10 # number of failed checks to restart pod
   health:
     username: ""
     password: ""
