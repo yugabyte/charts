@@ -158,7 +158,7 @@ It uses a base multiplier of 1000 for 'G' units and 1024 for 'Gi' units.
 */}}
 {{- define "yugabyte.memory_hard_limit" -}}
   {{- $baseMultiplier := 1000 -}}
-  {{- if .size | toString | regexMatch "^[0-9]+Gi$" -}}
+  {{- if .size | toString | hasSuffix "Gi"  -}}
     {{- $baseMultiplier = 1024 -}}
   {{- end -}}
   {{- $limit_percent := .limitPercent -}}
