@@ -8,7 +8,7 @@ jobs:
     if: github.event.client_payload.prerelease == 'false'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: "Configure git"
@@ -31,7 +31,7 @@ jobs:
           exit 1
         fi
         echo "Extracted the version number '${version_number}'."
-        echo "::set-output name=yb_version::${version_number}"
+        echo "yb_version=${version_number}" >> "$GITHUB_ENV"
     - name: "Switch to correct branch"
       id: switch-branch
       run: |
@@ -49,7 +49,7 @@ jobs:
           git checkout -b ${branch_name} origin/master
         fi
         echo "Extracted the branch: '${branch_name}'"
-        echo "::set-output name=yb_branch::${branch_name}"
+        echo "yb_branch=${branch_name}" >> "$GITHUB_ENV"
     - name: "Check python version and install dependencies"
       run: |
         python3 --version
@@ -58,7 +58,7 @@ jobs:
       id: update-version
       continue-on-error: true
       run: |
-        .ci/update_version.sh '${{steps.extract-version.outputs.yb_version}}'
+        .ci/update_version.sh "${yb_version}"
     - name: "Push the changes"
       if: steps.update-version.outcome == 'success'
       run: |
@@ -66,8 +66,8 @@ jobs:
         git diff
         git add ./stable/yugabyte/Chart.yaml ./stable/yugaware/Chart.yaml \
                 ./stable/yugabyte/values.yaml ./stable/yugaware/values.yaml ./stable/yugabyte/app-readme.md
-        git commit -m "Update the version to ${{steps.extract-version.outputs.yb_version}}"
-        git push origin ${{steps.switch-branch.outputs.yb_branch}}
+        git commit -m "Update the version to ${yb_version}"
+        git push origin "${yb_branch}"
     - name: "Show git status in case of failure"
       if: steps.update-version.outcome == 'failure'
       run: |
@@ -83,7 +83,7 @@ jobs:
       continue-on-error: true
       run: |
         # Following script updates files only if higher version is passed.
-        .ci/update_version.sh '${{steps.extract-version.outputs.yb_version}}'
+        .ci/update_version.sh "${yb_version}"
     - name: "Push the changes to master branch"
       if: steps.update-master-version.outcome == 'success'
       run: |
@@ -91,7 +91,7 @@ jobs:
         git diff
         git add ./stable/yugabyte/Chart.yaml ./stable/yugaware/Chart.yaml \
                 ./stable/yugabyte/values.yaml ./stable/yugaware/values.yaml ./stable/yugabyte/app-readme.md
-        git commit -m "Update the version to ${{steps.extract-version.outputs.yb_version}}"
+        git commit -m "Update the version to ${yb_version}"
         git push origin HEAD:master
     - name: "Show git status in case of failure"
       if: steps.update-master-version.outcome == 'failure'
