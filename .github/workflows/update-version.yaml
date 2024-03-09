@@ -31,7 +31,7 @@ jobs:
           exit 1
         fi
         echo "Extracted the version number '${version_number}'."
-        echo "::set-output name=yb_version::${version_number}"
+        echo "yb_version=${version_number}" >> "$GITHUB_OUTPUT"
     - name: "Switch to correct branch"
       id: switch-branch
       run: |
@@ -49,7 +49,7 @@ jobs:
           git checkout -b ${branch_name} origin/master
         fi
         echo "Extracted the branch: '${branch_name}'"
-        echo "::set-output name=yb_branch::${branch_name}"
+        echo "yb_branch=${branch_name}" >> "$GITHUB_OUTPUT"
     - name: "Check python version and install dependencies"
       run: |
         python3 --version
