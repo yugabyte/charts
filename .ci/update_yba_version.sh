@@ -43,8 +43,8 @@ fi
 
 chart_release_version="$(echo "${release_version}" | grep -o '[0-9]\+.[0-9]\+.[0-9]\+')"
 
-if is_semver_compatible "${input_release_version}"; then
-  chart_release_version="${input_release_version}"
+if is_semver_compatible "${release_version}"; then
+  chart_release_version="${release_version}"
 fi
 
 # Update appVersion and version in Chart.yaml
