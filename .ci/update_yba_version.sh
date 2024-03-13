@@ -38,7 +38,7 @@ current_version="$(grep -r "^appVersion" "stable/yugaware/Chart.yaml" | awk '{ p
 if ! version_gt "${release_version}" "${current_version%-b*}" ; then
   echo "Release version is either older or equal to the current version: " \
     "'${release_version}' <= '${current_version%-b*}'" 1>&2
-  exit 1
+  exit 3
 fi
 
 chart_release_version="$(echo "${release_version}" | grep -o '[0-9]\+.[0-9]\+.[0-9]\+')"
