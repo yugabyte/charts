@@ -5,7 +5,8 @@ from re import match
 from requests import request
 from sys import exit
 
-DOCKER_TAGS_URL = "https://registry.hub.docker.com/v2/repositories/yugabytedb/yugabyte/tags"
+DOCKER_TAGS_URL = "https://registry.hub.docker.com/v2/repositories/" + \
+                  "yugabytedb/yugabyte/tags?page_size=100"
 
 
 def main(release):
