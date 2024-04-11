@@ -485,6 +485,8 @@ spec:
           {{- end }}
           {{- if eq .name "yb-masters" }}
             exec ${k8s_parent} /home/yugabyte/bin/yb-master \
+              --max_log_size="256" \
+              --undefok="enable_ysql" \
             {{- if not $root.Values.storage.ephemeral }}
               --fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }} \
             {{- else }}
@@ -539,6 +541,8 @@ spec:
               {{- if $ysqlPreflight -}}{{ $ysqlPreflight | nindent 12 }}{{ end -}}
             {{- end }}
             exec ${k8s_parent} /home/yugabyte/bin/yb-tserver \
+              --max_log_size="256" \
+              --undefok="enable_ysql" \
             {{- if not $root.Values.storage.ephemeral }}
               --fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }} \
             {{- else }}
