@@ -1,6 +1,6 @@
 apiVersion: v1
-appVersion: 2.14.1.0-b36
-version: 2.14.1
+appVersion: 2.14.16.0-b17
+version: 2.14.16
 home: https://www.yugabyte.com
 description: YugaWare is YugaByte Database's Orchestration and Management console.
 name: yugaware
