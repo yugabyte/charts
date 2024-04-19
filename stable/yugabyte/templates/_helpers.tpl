@@ -424,3 +424,99 @@ preferredDuringSchedulingIgnoredDuringExecution:
       {{- end }}
     topologyKey: kubernetes.io/hostname
 {{- end -}}
+
+{{/*
+  YB Master ports
+*/}}
+{{- define "yugabyte.yb_masters.ports" -}}
+{{- $masterPorts := dict -}}
+{{- range .Values.Services -}}
+  {{- if eq .name "yb-masters" -}}
+    {{- range $key, $value := .ports -}}
+      {{- $masterPorts = set $masterPorts $key $value -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- toYaml $masterPorts -}}
+{{- end -}}
+
+{{/*
+  Readiness Probe for Master
+*/}}
+{{- define "yugabyte.master.readinessProbe" -}}
+{{- if .Values.master.customReadinessProbe -}}
+{{- toYaml .Values.master.customReadinessProbe }}
+{{- else if .Values.master.readinessProbe.enabled -}}
+{{- toYaml (omit .Values.master.readinessProbe "enabled") }}
+httpGet:
+  path: /
+  port: {{ index (include "yugabyte.yb_masters.ports" .| fromYaml) "http-ui" }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+  YB Tservers ports
+*/}}
+{{- define "yugabyte.yb_tservers.ports" -}}
+{{- $tserverPorts := dict -}}
+{{- range .Values.Services }}
+  {{- if eq .name "yb-tservers" }}
+    {{- range $key, $value := .ports }}
+      {{- $tserverPorts = set $tserverPorts $key $value }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- toYaml $tserverPorts -}}
+{{- end -}}
+
+{{/*
+  Readiness Probe for Tserver
+  Use ".Values.authCredentials.ysql.password" while setting ysql credentials through YB DB values.yaml
+  Use ".Values.gflags.tserver.ysql_enable_auth" while setting ysql credentials through YBA
+*/}}
+{{- define "yugabyte.tserver.readinessProbe" -}}
+{{- if .Values.tserver.customReadinessProbe -}}
+{{- toYaml .Values.tserver.customReadinessProbe }}
+{{- else if .Values.tserver.readinessProbe.enabled -}}
+{{- toYaml (omit .Values.tserver.readinessProbe "enabled") }}
+exec:
+  command:
+  - bash
+  - -v
+  - -c
+  - |
+    {{- if not .Values.disableYsql }}
+    {{- if (or .Values.authCredentials.ysql.password (eq .Values.gflags.tserver.ysql_enable_auth "true")) }}
+    unix_socket=$(find /tmp -name ".yb.*");
+    ysqlsh_output=$(ysqlsh -U yugabyte -h "${unix_socket}" -d system_platform -c "\\conninfo");
+    exit_code="$?";
+    {{- else }}
+    ysqlsh_output=$(ysqlsh -U yugabyte -h 127.0.0.1 -p {{ index (include "yugabyte.yb_tservers.ports" . | fromYaml) "tcp-ysql-port" }} -d system_platform -c "\\conninfo");
+    exit_code="$?";
+    {{- end }}
+
+    if [[ $exit_code -ne 0 ]]; then
+      echo "Error while executing ysqlsh command. Exit code: ${exit_code}";
+      echo "Error: ${ysqlsh_output}";
+      exit "${exit_code}"
+    fi
+    {{- end }}
+
+    {{- if not (eq .Values.gflags.tserver.start_cql_proxy "false") }}
+    {{- if (and .Values.tls.enabled .Values.tls.clientToServer) }}
+    ycqlsh_output=$(ycqlsh --debug --ssl -e "SHOW HOST" "$HOSTNAME" {{ index (include "yugabyte.yb_tservers.ports" . | fromYaml) "tcp-yql-port" }} 2>&1);
+    {{- else }}
+    ycqlsh_output=$(ycqlsh --debug -e "SHOW HOST" "$HOSTNAME" {{ index (include "yugabyte.yb_tservers.ports" . | fromYaml) "tcp-yql-port" }} 2>&1);
+    {{- end }}
+    exit_code="$?";
+
+    if [[ $exit_code -ne 0 && "${ycqlsh_output}" != *"Remote end requires authentication"* ]]; then
+      echo "Error while executing ycqlsh command. Exit code: ${exit_code}";
+      echo "Error: ${ycqlsh_output}";
+      exit "${exit_code}"
+    fi
+    {{- end }}
+
+    exit 0
+{{- end -}}
+{{- end -}}

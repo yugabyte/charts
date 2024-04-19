@@ -451,6 +451,29 @@ master:
   ## Memory limit hard % (between 1-100) of the memory limit.
   memoryLimitHardPercentage: 85
 
+  ## Readiness Probe
+  readinessProbe:
+    enabled: false
+    initialDelaySeconds: 30
+    periodSeconds: 20
+    timeoutSeconds: 10
+    failureThreshold: 3
+    successThreshold: 1
+
+  ## Custom readinessProbe that overrides the default one
+  ## Example: HTTP based Master readinessProbe
+  # customReadinessProbe:
+  #   initialDelaySeconds: 30
+  #   periodSeconds: 20
+  #   timeoutSeconds: 10
+  #   failureThreshold: 3
+  #   successThreshold: 1
+  #   httpGet:
+  #     path: /
+  #     port: 7000
+  ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes
+  customReadinessProbe: {}
+
 
 tserver:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
@@ -547,6 +570,29 @@ tserver:
   ## Memory limit hard % (between 1-100) of the memory limit.
   memoryLimitHardPercentage: 85
 
+  ## Readiness Probe
+  readinessProbe:
+    enabled: false
+    initialDelaySeconds: 30
+    periodSeconds: 20
+    timeoutSeconds: 10
+    failureThreshold: 3
+    successThreshold: 1
+
+  ## Custom readinessProbe that overrides the default one
+  ## Enabling it will overrides the tserver.readinessProbe
+  ## Example: HTTP based Tserver readinessProbe
+  # customReadinessProbe:
+  #   initialDelaySeconds: 30
+  #   periodSeconds: 20
+  #   timeoutSeconds: 10
+  #   failureThreshold: 3
+  #   successThreshold: 1
+  #   httpGet:
+  #     path: /
+  #     port: 9000
+  ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes
+  customReadinessProbe: {}
 
 helm2Legacy: false
 

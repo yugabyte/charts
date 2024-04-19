@@ -90,6 +90,9 @@ metadata:
     service-type: "headless"
 spec:
   clusterIP: None
+  {{- if (or (include "yugabyte.master.readinessProbe" $root) (include "yugabyte.tserver.readinessProbe" $root)) }}
+  publishNotReadyAddresses: true
+  {{- end }}
   ports:
     {{- range $label, $port := .ports }}
     {{- if (eq $label "grpc-ybc-port") }}
@@ -387,6 +390,11 @@ spec:
           successThreshold: 1
           timeoutSeconds: 1
         {{- end }}
+        {{- if (and (eq .name "yb-masters") (include "yugabyte.master.readinessProbe" $root)) }}
+        readinessProbe: {{- include "yugabyte.master.readinessProbe" $root | nindent 10 }}
+        {{- else if (and (eq .name "yb-tservers") (include "yugabyte.tserver.readinessProbe" $root)) }}
+        readinessProbe: {{- include "yugabyte.tserver.readinessProbe" $root | nindent 10 }}
+        {{- end }}
         env:
         - name: POD_IP
           valueFrom:
@@ -564,6 +572,9 @@ spec:
               --use_node_hostname_for_local_tserver=true \
             {{- if $root.Values.authCredentials.ysql.password }}
               --ysql_enable_auth=true \
+              {{- if (include "yugabyte.tserver.readinessProbe" $root) }}
+              --ysql_hba_conf_csv="local all yugabyte trust" \
+              {{- end }}
             {{- end }}
             {{- if or $root.Values.authCredentials.ycql.user $root.Values.authCredentials.ycql.password }}
               --use_cassandra_authentication=true \
