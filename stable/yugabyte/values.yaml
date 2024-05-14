@@ -498,6 +498,13 @@ master:
   ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes
   customStartupProbe: {}
 
+  ## Checksum for master gflags secret. If set to empty, statefulset
+  ## will calculate new checksum value and decide whether to restart pods
+  ## based on the result of comparing previous checksum value and new value.
+  ## If previous value is provided again, there will be no Pod restart
+  ## for gflags changes.
+  gflagsChecksum: ""
+
 
 tserver:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
@@ -640,6 +647,12 @@ tserver:
   ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes
   customStartupProbe: {}
 
+  ## Checksum for tserver gflags secret. If set to empty, statefulset
+  ## will calculate new checksum value and decide whether to restart pods
+  ## based on the result of comparing previous checksum value and new value.
+  ## If previous value is provided again, there will be no Pod restart
+  ## for gflags changes.
+  gflagsChecksum: ""
 
 helm2Legacy: false
 

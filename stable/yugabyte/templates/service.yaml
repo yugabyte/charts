@@ -221,9 +221,10 @@ spec:
       {{- include "yugabyte.appselector" ($appLabelArgs) | indent 6 }}
   template:
     metadata:
-      {{- if eq .name "yb-masters" }}
-      {{- if (or $root.Values.networkAnnotation $root.Values.master.podAnnotations $root.Values.tls.enabled) }}
       annotations:
+      {{- if eq .name "yb-masters" }}
+        checksum/gflags: {{ (not $root.Values.master.gflagsChecksum) | ternary (include (print $root.Template.BasePath "/master-gflags-secret.yaml") $root | sha256sum) $root.Values.master.gflagsChecksum }}
+      {{- if (or $root.Values.networkAnnotation $root.Values.master.podAnnotations $root.Values.tls.enabled) }}
       {{- with $root.Values.networkAnnotation }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- with $root.Values.master.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- if $root.Values.tls.enabled }}
@@ -231,8 +232,8 @@ spec:
       {{- end }}
       {{- end }}
       {{- else }}
+        checksum/gflags: {{ (not $root.Values.tserver.gflagsChecksum) | ternary (include (print $root.Template.BasePath "/tserver-gflags-secret.yaml") $root | sha256sum) $root.Values.tserver.gflagsChecksum }}
       {{- if (or $root.Values.networkAnnotation $root.Values.tserver.podAnnotations $root.Values.tls.enabled) }}
-      annotations:
       {{- with $root.Values.networkAnnotation }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- with $root.Values.tserver.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- if $root.Values.tls.enabled }}
@@ -497,49 +498,10 @@ spec:
             fi && \
           {{- end }}
           {{- if eq .name "yb-masters" }}
+            mkdir -p /tmp/yugabyte/master/conf && \
+            envsubst < /opt/master/conf/server.conf.template > /tmp/yugabyte/master/conf/server.conf && \
             exec ${k8s_parent} /home/yugabyte/bin/yb-master \
-              --max_log_size="256" \
-              --undefok="enable_ysql" \
-            {{- if not $root.Values.storage.ephemeral }}
-              --fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }} \
-            {{- else }}
-              --fs_data_dirs=/var/yugabyte \
-            {{- end }}
-            {{- if eq $root.Values.ip_version_support "v6_only" }}
-              --net_address_filter=ipv6_external,ipv6_non_link_local,ipv6_all,ipv4_external,ipv4_all \
-            {{- end }}
-            {{- if $root.Values.isMultiAz }}
-              --master_addresses={{ $root.Values.masterAddresses }} \
-              --replication_factor={{ $root.Values.replicas.totalMasters }} \
-            {{- else }}
-              --master_addresses={{ template "yugabyte.master_addresses" $root }} \
-              --replication_factor={{ $root.Values.replicas.master }} \
-            {{- end }}
-            {{- if not $root.Values.disableYsql }}
-              --enable_ysql=true \
-            {{- else }}
-              --enable_ysql=false \
-            {{- end }}
-              --metric_node_name=$(HOSTNAME) \
-              --memory_limit_hard_bytes={{ template "yugabyte.memory_hard_limit" dict "size" $root.Values.resource.master.limits.memory "limitPercent" $root.Values.master.memoryLimitHardPercentage }} \
-              --stderrthreshold=0 \
-              --num_cpus={{ ceil $root.Values.resource.master.requests.cpu }} \
-              --undefok=num_cpus,enable_ysql \
-            {{- range $flag, $override := $root.Values.gflags.master }}
-              --{{ $flag }}={{ quote $override }} \
-            {{- end }}
-            {{- if $root.Values.tls.enabled }}
-              --certs_dir=/opt/certs/yugabyte \
-              --use_node_to_node_encryption={{ $root.Values.tls.nodeToNode }} \
-              --allow_insecure_connections={{ $root.Values.tls.insecure }} \
-            {{- end }}
-              --rpc_bind_addresses={{ $rpcAddr }} \
-              --server_broadcast_addresses={{ $broadcastAddr }} \
-              --webserver_interface={{ $webserverAddr }} \
-            {{- if $root.Values.yugabytedUi.enabled }}
-              --master_enable_metrics_snapshotter={{ $root.Values.yugabytedUi.metricsSnapshotter.enabled }} \
-              --metrics_snapshotter_tserver_metrics_whitelist={{ join "," $root.Values.yugabytedUi.metricsSnapshotter.whitelist }}
-            {{- end }}
+              --flagfile /tmp/yugabyte/master/conf/server.conf
           {{- else }}
             {{- $cqlAddr := include "yugabyte.cql_proxy_bind_address" $serviceValues -}}
             {{- $cqlPort := index $service.ports "tcp-yql-port" -}}
@@ -553,65 +515,10 @@ spec:
               {{- $ysqlPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $ysqlDict) -}}
               {{- if $ysqlPreflight -}}{{ $ysqlPreflight | nindent 12 }}{{ end -}}
             {{- end }}
-            exec ${k8s_parent} /home/yugabyte/bin/yb-tserver \
-              --max_log_size="256" \
-              --undefok="enable_ysql" \
-            {{- if not $root.Values.storage.ephemeral }}
-              --fs_data_dirs={{ template "yugabyte.fs_data_dirs" $storageInfo }} \
-            {{- else }}
-              --fs_data_dirs=/var/yugabyte \
-            {{- end }}
-            {{- if eq $root.Values.ip_version_support "v6_only" }}
-              --net_address_filter=ipv6_external,ipv6_non_link_local,ipv6_all,ipv4_external,ipv4_all \
-            {{- end }}
-            {{- if $root.Values.isMultiAz }}
-              --tserver_master_addrs={{ $root.Values.masterAddresses }} \
-            {{- else }}
-              --tserver_master_addrs={{ template "yugabyte.master_addresses" $root }} \
-            {{- end }}
-              --metric_node_name=$(HOSTNAME) \
-              --memory_limit_hard_bytes={{ template "yugabyte.memory_hard_limit" dict "size" $root.Values.resource.tserver.limits.memory "limitPercent" $root.Values.tserver.memoryLimitHardPercentage }} \
-              --stderrthreshold=0 \
-              --num_cpus={{ ceil $root.Values.resource.tserver.requests.cpu }} \
-              --undefok=num_cpus,enable_ysql \
-              --use_node_hostname_for_local_tserver=true \
-            {{- if $root.Values.authCredentials.ysql.password }}
-              --ysql_enable_auth=true \
-              {{- if (include "yugabyte.tserver.readinessProbe" $root) }}
-              --ysql_hba_conf_csv="local all yugabyte trust" \
-              {{- end }}
-            {{- end }}
-            {{- if or $root.Values.authCredentials.ycql.user $root.Values.authCredentials.ycql.password }}
-              --use_cassandra_authentication=true \
-            {{- end }}
-            {{- range $flag, $override := $root.Values.gflags.tserver }}
-              --{{ $flag }}={{ quote $override }} \
-            {{- end }}
-            {{- if $root.Values.tls.enabled }}
-              --certs_dir=/opt/certs/yugabyte \
-              --use_node_to_node_encryption={{ $root.Values.tls.nodeToNode }} \
-              --allow_insecure_connections={{ $root.Values.tls.insecure }} \
-              --use_client_to_server_encryption={{ $root.Values.tls.clientToServer }} \
-              --certs_for_client_dir=/opt/certs/yugabyte \
-              {{- if $root.Values.tserver.serverBroadcastAddress }}
-              --cert_node_filename={{ include "yugabyte.server_fqdn" $serviceValues }} \
-              {{- end }}
-            {{- end }}
-              --rpc_bind_addresses={{ $rpcAddr }} \
-              --server_broadcast_addresses={{ $root.Values.tserver.serverBroadcastAddress | default $broadcastAddr }} \
-              --webserver_interface={{ $webserverAddr }} \
-            {{- if not $root.Values.disableYsql }}
-              --enable_ysql=true \
-              --pgsql_proxy_bind_address={{ $ysqlAddr }} \
-            {{- else }}
-              --enable_ysql=false \
-            {{- end }}
-              --cql_proxy_bind_address={{ $cqlAddr }} \
-            {{- if $root.Values.yugabytedUi.enabled }}
-              --tserver_enable_metrics_snapshotter={{ $root.Values.yugabytedUi.metricsSnapshotter.enabled }} \
-              --metrics_snapshotter_interval_ms={{ $root.Values.yugabytedUi.metricsSnapshotter.interval }} \
-              --metrics_snapshotter_tserver_metrics_whitelist={{ join "," $root.Values.yugabytedUi.metricsSnapshotter.whitelist }}
-            {{- end }}
+              mkdir -p /tmp/yugabyte/tserver/conf && \
+              envsubst < /opt/tserver/conf/server.conf.template > /tmp/yugabyte/tserver/conf/server.conf && \
+              exec ${k8s_parent} /home/yugabyte/bin/yb-tserver \
+                --flagfile /tmp/yugabyte/tserver/conf/server.conf
           {{- end }}
         ports:
           {{- range $label, $port := .ports }}
@@ -629,6 +536,11 @@ spec:
           {{- if (eq .name "yb-tservers") }}
           - name: tserver-tmp
             mountPath: /tmp
+          - name: tserver-gflags
+            mountPath: /opt/tserver/conf
+          {{- else if (eq .name "yb-masters") }}
+          - name: master-gflags
+            mountPath: /opt/master/conf
           {{- end }}
           - name: debug-hooks-volume
             mountPath: /opt/debug_hooks_config
@@ -823,10 +735,18 @@ spec:
           configMap:
             name: {{ include "yugabyte.fullname" $root }}-master-hooks
             defaultMode: 0755
+        - name: master-gflags
+          secret:
+            secretName: {{ include "yugabyte.fullname" $root }}-master-gflags
+            defaultMode: 0755
         {{- else if (eq .name "yb-tservers") }}
         - name: debug-hooks-volume
           configMap:
             name: {{ include "yugabyte.fullname" $root }}-tserver-hooks
+            defaultMode: 0755
+        - name: tserver-gflags
+          secret:
+            secretName: {{ include "yugabyte.fullname" $root }}-tserver-gflags
             defaultMode: 0755
         - name: tserver-tmp
           emptyDir: {}
