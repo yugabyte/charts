@@ -23,6 +23,11 @@ function is_semver_compatible() {
   fi
 }
 
+force_update="False"
+if [[ "$1" == "--force" ]]; then
+  force_update="True"
+  shift
+fi
 
 if [[ $# != 2 ]]; then
   echo "Incorrect number of arguments. Usage: ${0%*/} <version> <docker-tag>" 1>&2
@@ -38,7 +43,11 @@ current_version="$(grep -r "^appVersion" "stable/yugabyte/Chart.yaml" | awk '{ p
 if ! version_gt "${release_version}" "${current_version%-b*}" ; then
   echo "Release version is either older or equal to the current version: " \
     "'${release_version}' <= '${current_version%-b*}'" 1>&2
-  exit 3
+  if [[ "$force_update" == "True" ]]; then
+    echo "Continuing with forced-update."
+  else
+    exit 3
+  fi
 fi
 
 chart_release_version="$(echo "${release_version}" | grep -o '[0-9]\+.[0-9]\+.[0-9]\+')"
