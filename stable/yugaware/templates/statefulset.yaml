@@ -126,9 +126,18 @@ spec:
             {{- end }}
         {{- end }}
         {{- if and (not .Values.useNginxProxy) (.Values.tls.enabled) }}
+        {{- if .Values.tls.certManager.enabled }}
+        - name: {{ .Release.Name }}-yugaware-tls-cert
+          secret:
+            secretName: {{ .Release.Name }}-yugaware-tls-cert
+        - name: {{ .Release.Name }}-yugaware-tls-pemcfg
+          configMap:
+            name: {{ .Release.Name }}-yugaware-tls-pemcfg
+        {{- else }}
         - name: {{  .Release.Name }}-yugaware-tls-pem
           secret:
             secretName: {{ .Release.Name }}-yugaware-tls-pem
+        {{- end }}
         {{- end }}
         {{- if .Values.prometheus.remoteWrite.tls.enabled }}
         - name: {{  .Release.Name }}-yugaware-prometheus-remote-write-tls
@@ -582,9 +591,18 @@ spec:
             mountPath: /prometheus_configs
             subPath: prometheus.yml
         {{- if and (not .Values.useNginxProxy) (.Values.tls.enabled) }}
+          {{- if .Values.tls.certManager.enabled }}
+          - name: {{  .Release.Name }}-yugaware-tls-cert
+            mountPath: /opt/certs/
+            readOnly: true
+          - name: {{  .Release.Name }}-yugaware-tls-pemcfg
+            mountPath: /opt/cert-config/
+            readOnly: true
+          {{- else }}
           - name: {{  .Release.Name }}-yugaware-tls-pem
             mountPath: /opt/certs/
             readOnly: true
+          {{- end }}
         {{- end }}
         {{- if .Values.yugaware.extraVolumeMounts -}}
           {{- include "yugaware.isExtraVolumesMappingExists" .Values.yugaware -}}

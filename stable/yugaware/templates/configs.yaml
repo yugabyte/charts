@@ -63,10 +63,17 @@ data:
 
     {{- if and (not .Values.useNginxProxy) (.Values.tls.enabled) }}
     https.port = 9443
+    {{- if .Values.tls.certManager.enabled }}
+    play.server.https.keyStore {
+      path = /opt/cert-config/cert-manager.pemcfg
+      type = PEMCFG
+    }
+    {{- else }}
     play.server.https.keyStore {
       path = /opt/certs/server.pem
       type = PEM
     }
+    {{- end }}
     {{- end }}
 
     yb {
@@ -187,6 +194,24 @@ type: Opaque
 data:
 {{- include "getOrCreateServerPem" (dict "Namespace" .Release.Namespace "Root" . "Name" (printf "%s%s" .Release.Name "-yugaware-tls-pem")) | nindent 2 }}
 {{ end }}
+{{- end }}
+
+{{- if and .Values.tls.enabled .Values.tls.certManager.enabled (not .Values.useNginxProxy) }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-yugaware-tls-pemcfg
+  labels:
+    app: "{{ template "yugaware.name" . }}"
+    chart: "{{ template "yugaware.chart" . }}"
+    release: {{ .Release.Name | quote }}
+    heritage: {{ .Release.Service | quote }}
+data:
+  cert-manager.pemcfg: |
+    alias=yba-https
+    source.key=/opt/certs/tls.key
+    source.cert=/opt/certs/tls.crt
 {{- end }}
 
 {{- if .Values.useNginxProxy }}
