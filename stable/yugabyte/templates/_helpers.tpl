@@ -520,3 +520,29 @@ exec:
     exit 0
 {{- end -}}
 {{- end -}}
+
+{{/*
+  Startup Probe for Master
+*/}}
+{{- define "yugabyte.master.startupProbe" -}}
+{{- if .Values.master.customStartupProbe -}}
+{{- toYaml .Values.master.customStartupProbe }}
+{{- else if .Values.master.startupProbe.enabled -}}
+{{- toYaml (omit .Values.master.startupProbe "enabled") }}
+tcpSocket:
+  port: {{ index (include "yugabyte.yb_masters.ports" .| fromYaml) "tcp-rpc-port" }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+  Startup Probe for Tserver
+*/}}
+{{- define "yugabyte.tserver.startupProbe" -}}
+{{- if .Values.tserver.customStartupProbe -}}
+{{- toYaml .Values.tserver.customStartupProbe }}
+{{- else if .Values.tserver.startupProbe.enabled -}}
+{{- toYaml (omit .Values.tserver.startupProbe "enabled") }}
+tcpSocket:
+  port: {{ index (include "yugabyte.yb_tservers.ports" .| fromYaml) "tcp-rpc-port" }}
+{{- end -}}
+{{- end -}}
