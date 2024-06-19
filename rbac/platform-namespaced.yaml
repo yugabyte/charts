@@ -149,6 +149,13 @@ rules:
   - "events"
   verbs:
   - "list"
+# required to validate existance of issuer during provider creation.
+- apiGroups:
+  - "cert-manager.io"
+  resources:
+  - "issuers"
+  verbs:
+  - "get"
 ---
 
 apiVersion: rbac.authorization.k8s.io/v1
