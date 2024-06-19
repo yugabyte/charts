@@ -164,6 +164,8 @@ rules:
   verbs:
   - "list"
 # required to scrape resource metrics like CPU, memory, etc.
+# required to validate zones during provider creation
+# required to auto-fill the zone labels for provider creation
 - apiGroups:
   - ""
   resources:
@@ -200,6 +202,22 @@ rules:
   - "list"
   - "watch"
   - "update"
+# required to validate storage class during provider creation and
+# volume expansion
+- apiGroups:
+  - "storage.k8s.io"
+  resources:
+  - "storageclasses"
+  verbs:
+  - "get"
+# required to validate existance of issuer during provider creation.
+- apiGroups:
+  - "cert-manager.io"
+  resources:
+  - "issuers"
+  - "clusterissuers"
+  verbs:
+  - "get"
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
