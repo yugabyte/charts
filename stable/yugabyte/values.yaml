@@ -474,6 +474,30 @@ master:
   ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes
   customReadinessProbe: {}
 
+  ## Startup probe
+  startupProbe:
+    enabled: false
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 30
+    successThreshold: 1
+
+  ## Custom startupProbe that overrides the default one
+  ## Enabling it will overrides the tserver.startupProbe
+  ## Example: HTTP based Master startupProbe
+  # customStartupProbe:
+  #   initialDelaySeconds: 30
+  #   periodSeconds: 10
+  #   timeoutSeconds: 5
+  #   failureThreshold: 3
+  #   successThreshold: 1
+  #   httpGet:
+  #     path: /
+  #     port: 7000
+  ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes
+  customStartupProbe: {}
+
 
 tserver:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
@@ -586,13 +610,36 @@ tserver:
   #   initialDelaySeconds: 30
   #   periodSeconds: 20
   #   timeoutSeconds: 10
-  #   failureThreshold: 3
-  #   successThreshold: 1
   #   httpGet:
   #     path: /
   #     port: 9000
   ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-readiness-probes
   customReadinessProbe: {}
+
+  ## Startup probe
+  startupProbe:
+    enabled: false
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 30
+    successThreshold: 1
+
+  ## Custom startupProbe that overrides the default one
+  ## Enabling it will overrides the tserver.startupProbe
+  ## Example: HTTP based Tserver startupProbe
+  # customStartupProbe:
+  #   initialDelaySeconds: 30
+  #   periodSeconds: 10
+  #   timeoutSeconds: 5
+  #   failureThreshold: 3
+  #   successThreshold: 1
+  #   httpGet:
+  #     path: /
+  #     port: 9000
+  ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-startup-probes
+  customStartupProbe: {}
+
 
 helm2Legacy: false
 

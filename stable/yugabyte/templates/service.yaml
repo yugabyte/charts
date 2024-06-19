@@ -389,6 +389,11 @@ spec:
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 1
+        {{- if (and (eq .name "yb-masters") (include "yugabyte.master.startupProbe" $root)) }}
+        startupProbe: {{- include "yugabyte.master.startupProbe" $root | nindent 10 }}
+        {{- else if (and (eq .name "yb-tservers") (include "yugabyte.tserver.startupProbe" $root)) }}
+        startupProbe: {{- include "yugabyte.tserver.startupProbe" $root | nindent 10 }}
+        {{- end }}
         {{- end }}
         {{- if (and (eq .name "yb-masters") (include "yugabyte.master.readinessProbe" $root)) }}
         readinessProbe: {{- include "yugabyte.master.readinessProbe" $root | nindent 10 }}
