@@ -272,9 +272,14 @@ yugabytedb:
 tls:
   enabled: false
   hostname: "localhost"
-  ## Expects base 64 encoded values for certificate and key.
+  ## Expects base64 encoded certificate, key, and CA certificate.
+  ## Populate these for non-self-signed certificates.
+  ## All three values should be base64 encoded.
+  ## These will be used to create server.pem and ca.pem files.
+  ## Note: The validity of the provided certificates is not verified.
   certificate: ""
   key: ""
+  ca_certificate: ""
   sslProtocols: "" # if set, override default Nginx SSL protocols setting
   ## cert-manager values
   ## If cert-manager is enabled:
