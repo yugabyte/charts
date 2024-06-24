@@ -103,9 +103,6 @@ spec:
         - name: {{  .Release.Name }}-yugaware-tls-pem
           secret:
             secretName: {{ .Release.Name }}-yugaware-tls-pem
-            items:
-            - key: server.pem
-              path: server.pem
         {{- end }}
         {{- if .Values.prometheus.remoteWrite.tls.enabled }}
         - name: {{  .Release.Name }}-yugaware-prometheus-remote-write-tls

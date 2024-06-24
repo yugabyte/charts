@@ -131,15 +131,21 @@ Get or generate server cert and key
 {{- if and $root.Values.tls.certificate $root.Values.tls.key -}}
 server.key: {{ $root.Values.tls.key }}
 server.crt: {{ $root.Values.tls.certificate }}
+  {{- if $root.Values.tls.ca_certificate -}}
+ca.crt: {{ $root.Values.tls.ca_certificate }}
+  {{- end -}}
 {{- else -}}
   {{- $result := (lookup "v1" "Secret" .Namespace .Name).data -}}
-  {{- if $result -}}
+  {{- if and $result (index $result "server.pem") (index $result "ca.pem") -}}
 server.key: {{ index $result "server.key" }}
 server.crt: {{ index $result "server.crt" }}
+ca.crt: {{ index $result "ca.crt" }}
   {{- else -}}
-    {{- $cert := genSelfSignedCert $root.Values.tls.hostname nil nil 3560 -}}
+    {{- $caCert := genCA $root.Values.tls.hostname 3650 -}}
+    {{- $cert := genSignedCert $root.Values.tls.hostname nil nil 3650 $caCert -}}
 server.key: {{ $cert.Key | b64enc }}
 server.crt: {{ $cert.Cert | b64enc }}
+ca.crt: {{ $caCert.Cert | b64enc }}
   {{- end -}}
 {{- end -}}
 {{- end -}}
@@ -154,17 +160,27 @@ Get or generate server key cert in pem format
 {{- $decodedCert := $root.Values.tls.certificate | b64dec -}}
 {{- $serverPemContentTemp := ( printf "%s\n%s" $decodedKey $decodedCert ) -}}
 {{- $serverPemContent := $serverPemContentTemp | b64enc -}}
+  {{- if $root.Values.tls.ca_certificate -}}
+    {{- $caPemContent := $root.Values.tls.ca_certificate -}}
+ca.pem: {{ $caPemContent }}
+  {{- end}}
 server.pem: {{ $serverPemContent }}
 {{- else -}}
   {{- $result := (lookup "v1" "Secret" .Namespace .Name).data -}}
-  {{- if $result -}}
-{{- $serverPemContent := ( index $result "server.pem" ) -}}
-server.pem: {{ $serverPemContent }}
+    {{- if and $result (index $result "server.pem") (index $result "ca.pem") -}}
+    {{- $serverPemContent := ( index $result "server.pem" ) -}}
+    {{- $caPemContent := ( index $result "ca.pem" ) -}}
+    ca.pem: {{ $caPemContent }}
+    server.pem: {{ $serverPemContent }}
   {{- else -}}
-    {{- $cert := genSelfSignedCert $root.Values.tls.hostname nil nil 3560 -}}
-{{- $serverPemContentTemp := ( printf "%s\n%s" $cert.Key $cert.Cert ) -}}
-{{- $serverPemContent := $serverPemContentTemp | b64enc -}}
+    {{- $caCert := genCA $root.Values.tls.hostname 3650 -}}
+    {{- $cert := genSignedCert $root.Values.tls.hostname nil nil 3650 $caCert -}}
+    {{- $serverPemContentTemp := ( printf "%s\n%s" $cert.Key $cert.Cert ) -}}
+    {{- $serverPemContent := $serverPemContentTemp | b64enc -}}
+    {{- $caPemContentTemp := ( printf "%s" $caCert.Cert ) -}}
+    {{- $caPemContent := $caPemContentTemp | b64enc -}}
 server.pem: {{ $serverPemContent }}
+ca.pem: {{ $caPemContent }}
   {{- end -}}
 {{- end -}}
 {{- end -}}
