@@ -57,6 +57,65 @@ release: {{ .root.Release.Name | quote }}
 {{- end }}
 
 {{/*
+Generate service name.
+*/}}
+{{- define "yugabyte.servicename" }}
+  {{- if eq .scope "Namespaced" }}
+    {{- $prefix := (get (.root.Values.commonLabels | default dict) "app.kubernetes.io/part-of" | default "namespaced") | trunc 43 | trimSuffix "-" }}
+      {{- if $prefix }}
+        {{- printf "%s-%s" $prefix .endpoint.name }}
+      {{- else }}
+        {{- .endpoint.name }}
+      {{- end }}
+  {{- else }}
+    {{- .root.Values.oldNamingStyle | ternary .endpoint.name (printf "%s-%s" (include "yugabyte.fullname" $.root) .endpoint.name) }}
+  {{- end }}
+{{- end }}
+
+{{/*
+Get service scope
+*/}}
+{{- define "yugabyte.servicescope" }}
+  {{- if .endpoint.scope }}
+    {{- .endpoint.scope }}
+  {{- else }}
+    {{- .defaultScope }}
+  {{- end }}
+{{- end }}
+
+{{/*
+Generate namespaced service selector.
+*/}}
+{{- define "yugabyte.namespacedserviceselector" }}
+app.kubernetes.io/name: "{{ .label }}"
+{{- $partof := (get (.root.Values.commonLabels | default dict) "app.kubernetes.io/part-of" | default "")}}
+{{- if $partof }}
+app.kubernetes.io/part-of: "{{ $partof }}"
+{{- end }} 
+{{- end }}
+
+{{/*                                                                                                 
+Checks if a service is required to be installed/upgraded
+*/}}
+{{- define "yugabyte.should_render_service" -}}
+  {{- if eq .scope "AZ" }}
+    {{- "true" }}
+  {{- else }}
+    {{- $namespacedService := (lookup "v1" "Service" .root.Release.Namespace .serviceName) }}
+    {{- if not $namespacedService }}
+      {{- "true" }}
+    {{- else }}
+      {{- $ownerRelease := (get $namespacedService.metadata.annotations "meta.helm.sh/release-name") | default "" }}
+        {{- if eq $ownerRelease .root.Release.Name }}
+          {{- "true" }}
+        {{- else }}
+          {{- "false" }}
+        {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{/*
 Create secrets in DBNamespace from other namespaces by iterating over envSecrets.
 */}}
 {{- define "yugabyte.envsecrets" -}}

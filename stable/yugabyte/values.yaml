@@ -172,9 +172,48 @@ ybCleanup: {}
 
 domainName: "cluster.local"
 
+# ## Enable global service endpoints for tserver/master services across
+# ## zones. Requires common label "app.kubernetes.io/part-of" on resources.
+# globalServiceEndpoints:
+#   tserverGlobalService:
+#     enabled: false
+#     # Will use LoadBalancer only if 'enableLoadBalancer' is true.
+#     # Otherwise, ClusterIP service is created.
+#     type: LoadBalancer
+#     annotations: {}
+#     ## Sets the Service's externalTrafficPolicy
+#     externalTrafficPolicy: ""
+#     app: "yb-tserver"
+#     loadBalancerIP: ""
+#     name: "tserver-global-service"
+#     ports:
+#       tcp-yql-port: "9042"
+#       tcp-yedis-port: "6379"
+#       tcp-ysql-port: "5433"
+
+#   masterGlobalService:
+#     enabled: false
+#     # Will use LoadBalancer only if 'enableLoadBalancer' is true.
+#     # Otherwise, ClusterIP service is created.
+#     type: LoadBalancer
+#     annotations: {}
+#     ## Sets the Service's externalTrafficPolicy
+#     externalTrafficPolicy: ""
+#     app: "yb-master"
+#     loadBalancerIP: ""
+#     name: "master-global-service"
+#     ports:
+#       http-ui: "7000"
+
+## Default service scope to use if not defined in service endpoint definition. 
+## Can be "Namespaced"/"AZ"
+defaultServiceScope: "AZ"
+
 serviceEndpoints:
   - name: "yb-master-ui"
     type: LoadBalancer
+    # Can be AZ/Namespaced
+    scope: "AZ"
     annotations: {}
     clusterIP: ""
     ## Sets the Service's externalTrafficPolicy
@@ -186,6 +225,8 @@ serviceEndpoints:
 
   - name: "yb-tserver-service"
     type: LoadBalancer
+    # Can be AZ/Namespaced
+    scope: "AZ"
     annotations: {}
     clusterIP: ""
     ## Sets the Service's externalTrafficPolicy
@@ -199,6 +240,8 @@ serviceEndpoints:
 
   - name: "yugabyted-ui-service"
     type: LoadBalancer
+    # Can be AZ/Namespaced
+    scope: "AZ"
     annotations: {}
     clusterIP: ""
     ## Sets the Service's externalTrafficPolicy
