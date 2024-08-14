@@ -126,6 +126,7 @@ rules:
   - "get"
   - "list"
   - "delete"
+  - "watch"
 - apiGroups:
   - ""
   resources:
