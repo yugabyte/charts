@@ -24,8 +24,7 @@ image:
   ## Extra pull secrets that may be needed for custom sidecar
   ## containers that user has.
   ## These need to exist in the same ns as the yugaware pod
-  extraPullSecrets:
-    - my-pullsecret
+  extraPullSecrets: []
 
   postgres:
     # For non default postgres image, set postgres.sampleConfig values accordingly.
