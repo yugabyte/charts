@@ -32,7 +32,6 @@ spec:
       terminationGracePeriodSeconds: {{ .Values.yugaware.pod.terminationGracePeriodSeconds }}
       serviceAccountName: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
       imagePullSecrets:
-      imagePullSecrets:
         - name: {{ .Values.image.pullSecret }}
     {{- if .Values.image.extraPullSecrets }}
     {{- range .Values.image.extraPullSecrets }}
