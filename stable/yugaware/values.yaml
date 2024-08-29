@@ -316,6 +316,21 @@ rbac:
 ocpCompatibility:
   enabled: false
 
+sidecarVolumes:
+  ## Extra volumes
+  ## extraVolumesMounts are mandatory for each extraVolumes.
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#volume-v1-core
+  ## Example:
+  extraVolumes: []
+  ## Extra volume mounts
+  ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#volumemount-v1-core
+  ## Example:
+  # extraVolumeMounts:
+  # - name: custom-nfs-vol
+  #   mountPath: /home/yugabyte/nfs-backup
+  extraVolumeMounts: []
+
+
 # Extra containers to add to the pod.
 sidecars: []
 
