@@ -179,6 +179,10 @@ spec:
             {{- include "yugaware.isExtraVolumesMappingExists" .Values.yugaware -}}
             {{- .Values.yugaware.extraVolumes | toYaml | nindent 8 -}}
           {{ end }}
+          {{- if .Values.sidecarVolumes.extraVolumes -}}
+            {{- include "yugaware.isExtraVolumesMappingExists" .Values.sidecarVolumes -}}
+            {{- .Values.sidecarVolumes.extraVolumes | toYaml | nindent 8 -}}
+          {{ end }}
         {{- else }}
         - name: ybdb-init
           configMap:
