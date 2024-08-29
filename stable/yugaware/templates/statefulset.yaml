@@ -31,7 +31,12 @@ spec:
     spec:
       serviceAccountName: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
       imagePullSecrets:
-      - name: {{ .Values.image.pullSecret }}
+        - name: {{ .Values.image.pullSecret }}
+    {{- if .Values.image.extraPullSecrets }}
+    {{- range .Values.image.extraPullSecrets }}
+        - name: {{ . }}
+    {{- end }}
+    {{- end }}
       {{- if .Values.securityContext.enabled }}
       securityContext:
         fsGroup: {{ .Values.securityContext.fsGroup }}
