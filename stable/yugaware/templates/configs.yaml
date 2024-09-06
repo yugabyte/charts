@@ -361,7 +361,6 @@ data:
           target_label: __metrics_path__
           replacement: /api/v1/nodes/${1}/proxy/metrics
         metric_relabel_configs:
-          # Only keep the metrics which we care about
           - source_labels: ["__name__"]
             regex: "kubelet_volume_stats_used_bytes|kubelet_volume_stats_capacity_bytes"
             action: keep
@@ -463,9 +462,9 @@ data:
 
       {{- end }}
       {{- end }}
- 
+
       {{- if and (not .Values.useNginxProxy) (.Values.tls.enabled) }}
-      
+
       - job_name: 'platform'
         metrics_path: "/api/v1/prometheus_metrics"
         scheme: https
@@ -490,7 +489,7 @@ data:
 
 
       {{- if .Values.prometheus.selfMonitor }}
-      
+
       - job_name: 'prometheus'
         metrics_path: "/metrics"
         static_configs:
