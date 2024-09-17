@@ -313,12 +313,12 @@ Generate server broadcast address.
 {{/*
 Generate server RPC bind address.
 
-In case of multi-cluster services (MCS), we set it to $(POD_IP) to
+In case of multi-cluster services (MCS), we set it to ${POD_IP} to
 ensure YCQL uses a resolvable address.
 See https://github.com/yugabyte/yugabyte-db/issues/16155
 
 We use a workaround for above in case of Istio by setting it to
-$(POD_IP) and localhost. Master doesn't support that combination, so
+${POD_IP} and localhost. Master doesn't support that combination, so
 we stick to 0.0.0.0, which works for master.
 */}}
 {{- define "yugabyte.rpc_bind_address" -}}
@@ -327,10 +327,10 @@ we stick to 0.0.0.0, which works for master.
     {{- if (eq .Service.name "yb-masters") -}}
       0.0.0.0:{{ $port }}
     {{- else -}}
-      $(POD_IP):{{ $port }},127.0.0.1:{{ $port }}
+      ${POD_IP}:{{ $port }},127.0.0.1:{{ $port }}
     {{- end -}}
   {{- else if (or .Values.multicluster.createServiceExports .Values.multicluster.createServicePerPod) -}}
-    $(POD_IP):{{ $port }}
+    ${POD_IP}:{{ $port }}
   {{- else -}}
     {{- include "yugabyte.server_fqdn" . -}}
   {{- end -}}
