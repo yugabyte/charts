@@ -170,8 +170,8 @@ server.pem: {{ $serverPemContent }}
     {{- if and $result (index $result "server.pem") (index $result "ca.pem") -}}
     {{- $serverPemContent := ( index $result "server.pem" ) -}}
     {{- $caPemContent := ( index $result "ca.pem" ) -}}
-    ca.pem: {{ $caPemContent }}
-    server.pem: {{ $serverPemContent }}
+ca.pem: {{ $caPemContent }}
+server.pem: {{ $serverPemContent }}
   {{- else -}}
     {{- $caCert := genCA $root.Values.tls.hostname 3650 -}}
     {{- $cert := genSignedCert $root.Values.tls.hostname nil nil 3650 $caCert -}}
