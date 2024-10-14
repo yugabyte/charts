@@ -431,6 +431,8 @@ prometheus:
   queryConcurrency: 20
   queryMaxSamples: 5000000
   queryTimeout: 30s
+  scrapeTimeout: 10s
+  scrapeInterval: 10s
   ## Set this to false to disable scraping of Kubernetes worker
   ## nodes. Setting this to false will results in blank graphs of
   ## resource utilization for Kubernetes universes. Useful for

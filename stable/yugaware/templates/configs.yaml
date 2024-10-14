@@ -424,8 +424,9 @@ metadata:
 data:
   prometheus.yml: |
     global:
-        scrape_interval:     10s
-        evaluation_interval: 10s
+        scrape_interval:     {{ .Values.prometheus.scrapeInterval }}
+        evaluation_interval: {{ .Values.prometheus.scrapeInterval }}
+        scrape_timeout:      {{ .Values.prometheus.scrapeTimeout }}
     rule_files:
       - '/opt/yugabyte/prometheus/rules/yugaware.ad.*.yml'
       - '/opt/yugabyte/prometheus/rules/yugaware.recording-rules.yml'
