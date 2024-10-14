@@ -71,8 +71,12 @@ spec:
       {{- end }}
       volumes:
         - name: yugaware-storage
+        {{- if .Values.yugaware.persistentVolume.enabled }}
           persistentVolumeClaim:
             claimName: {{ .Release.Name }}-yugaware-storage
+        {{- else }}
+          emptyDir: {}
+        {{- end }}
         - name: yugaware-ui
           emptyDir: {}
         - name: yugaware-config
