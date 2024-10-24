@@ -62,6 +62,9 @@ yugaware:
   storageClass: ""
   storageAnnotations: {}
   multiTenant: false
+  ## This is for testing purposes only.
+  persistentVolume:
+    enabled: true
   ## Name of existing ServiceAccount. When provided, the chart won't create a ServiceAccount.
   ## It will attach the required RBAC roles to it.
   ## Helpful in Yugabyte Platform GKE App.
