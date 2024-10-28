@@ -750,7 +750,7 @@ spec:
 TODO: switch to policy/v1 completely when we stop supporting
 Kubernetes versions < 1.21
 */}}
-{{- if $root.Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget" }}
+{{- if and $root.Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget" (eq $root.Values.useOldPodDisruptionBudget true) }}
 apiVersion: policy/v1
 {{- else }}
 apiVersion: policy/v1beta1
