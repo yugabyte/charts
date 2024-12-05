@@ -744,13 +744,13 @@ spec:
         {{- include "yugabyte.isExtraVolumesMappingExists" $root.Values.tserver -}}
         {{- $root.Values.tserver.extraVolumes | toYaml | nindent 8 -}}
         {{- end -}}
-{{- if eq $root.Values.isMultiAz false }}
+{{- if and $root.Values.useOldPodDisruptionBudget (not $root.Values.isMultiAz) }}
 ---
 {{/*
 TODO: switch to policy/v1 completely when we stop supporting
 Kubernetes versions < 1.21
 */}}
-{{- if and ($root.Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget") $root.Values.useOldPodDisruptionBudget }}
+{{- if $root.Capabilities.APIVersions.Has "policy/v1/PodDisruptionBudget" }}
 apiVersion: policy/v1
 {{- else }}
 apiVersion: policy/v1beta1
