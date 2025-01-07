@@ -751,3 +751,16 @@ data:
             regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(_sum|_count)?"
             target_label: "__name__"
             replacement: "rpc_latency$4"
+
+  no_scrape.yml: |
+    global:
+        scrape_interval:     50s
+        evaluation_interval: 50s
+    rule_files:
+      - '/opt/yugabyte/prometheus/rules/yugaware.ad.*.yml'
+      - '/opt/yugabyte/prometheus/rules/yugaware.recording-rules.yml'
+    {{- if .Values.prometheus.remoteWrite.config }}
+    remote_write:
+{{ toYaml .Values.prometheus.remoteWrite.config | indent 6}}
+    {{- end }}
+    scrape_configs: []

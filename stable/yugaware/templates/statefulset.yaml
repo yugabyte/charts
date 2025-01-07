@@ -114,6 +114,8 @@ spec:
             items:
               - key: prometheus.yml
                 path: prometheus.yml
+              - key: no_scrape.yml
+                path: no_scrape.yml
         {{- if .Values.securityContext.enabled }}
         - name: init-container-script
           configMap:
@@ -122,6 +124,12 @@ spec:
               - key: init-permissions.sh
                 path: init-permissions.sh
         {{- end }}
+        - name: prometheus-init-script
+          configMap:
+            name: {{ .Release.Name }}-prometheus-init
+            items:
+              - key: init-prometheus.sh
+                path: init-prometheus.sh
         {{- if and (.Values.tls.enabled) (.Values.useNginxProxy) }}
         - name: {{  .Release.Name }}-yugaware-tls-cert
           secret:
@@ -218,10 +226,14 @@ spec:
             - 'bash'
             - '-c'
             - |
-              cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && /bin/bash /init-container/init-permissions.sh;
+              cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && /bin/bash /init-container/init-permissions.sh && /bin/bash /prometheus-init/init-prometheus.sh;
           {{- include "getSecurityContext" . | indent 10 }}
           {{- else }}
-          command: ["cp", "/default_prometheus_config/prometheus.yml", "/prometheus_configs/prometheus.yml"]
+          command:
+            - 'bash'
+            - '-c'
+            - |
+              cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && /bin/bash /prometheus-init/init-prometheus.sh;
           {{- end }}
           volumeMounts:
           - name: prometheus-config
@@ -229,6 +241,13 @@ spec:
           - name: yugaware-storage
             mountPath: /prometheus_configs
             subPath: prometheus.yml
+          - name: yugaware-storage
+            mountPath: /prometheus
+          - name: yugaware-storage
+            mountPath: /prometheus_data
+            subPath: prometheus_data
+          - name: prometheus-init-script
+            mountPath: /prometheus-init
           {{- if .Values.securityContext.enabled }}
           - name: yugaware-storage
             mountPath: /opt/yugabyte/yugaware/data/
@@ -476,7 +495,8 @@ spec:
             mountPath: /prometheus_configs
             subPath: prometheus.yml
           - name: yugaware-storage
-            mountPath: /prometheus/
+            mountPath: /prometheus_data
+            subPath: prometheus_data
           - mountPath: /opt/yugabyte/yugaware/data/keys/
             name: yugaware-storage
             subPath: data/keys
@@ -497,7 +517,7 @@ spec:
           {{- end }}
           args:
             - --config.file=/prometheus_configs/prometheus.yml
-            - --storage.tsdb.path=/prometheus/
+            - --storage.tsdb.path=/prometheus_data
             - --web.enable-admin-api
             - --web.enable-lifecycle
             - --storage.tsdb.retention.time={{ .Values.prometheus.retentionTime }}
@@ -548,6 +568,17 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_db
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_host
+            - name: POSTGRES_PORT
+              {{- if .Values.postgres.external.host }}
+              value: {{ .Values.postgres.external.port | quote }}
+              {{- else }}
+              value: {{ .Values.useYugabyteDB | ternary (.Values.yugabytedb.config.ysqlPort | default 5433) 5432 | quote }}
+              {{- end }}
             - name: APP_SECRET
               valueFrom:
                 secretKeyRef:
@@ -603,6 +634,11 @@ spec:
           - name: yugaware-storage
             mountPath: /prometheus_configs
             subPath: prometheus.yml
+          - name: prometheus-config
+            mountPath: /default_prometheus_config
+          - name: yugaware-storage
+            mountPath: /prometheus_data
+            subPath: prometheus_data
         {{- if and (not .Values.useNginxProxy) (.Values.tls.enabled) }}
           {{- if .Values.tls.certManager.enabled }}
           - name: {{  .Release.Name }}-yugaware-tls-cert
