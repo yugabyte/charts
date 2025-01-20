@@ -193,6 +193,10 @@ spec:
         checksum/rootCA: {{ cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum }}
       {{- end }}
       {{- end }}
+      {{- if and (eq .name "yb-tservers") ($root.Values.otelCollector.enabled) }}
+        sidecar.opentelemetry.io/inject: {{ $root.Values.oldNamingStyle | ternary "otel-yb-tserver" (printf "otel-%s-%s" (include "yugabyte.fullname" $root) .label) | quote }}
+        checksum/otel: {{ $root.Values.otelCollector | toYaml | sha256sum }} # Required to trigger a pod restart when the config changes
+      {{- end}}
       {{- end }}
       labels:
         {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
@@ -526,6 +530,10 @@ spec:
         env:
         - name: USER
           value: "yugabyte"
+        {{- if $root.Values.otelCollector.enabled }}
+        - name: PRESERVE_AUDIT_LOGS # Allows the exporter sufficient time to collect logs before they are deleted.
+          value: "true"
+        {{- end }}
         command:
           - "/sbin/tini"
           - "--"

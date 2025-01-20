@@ -755,3 +755,54 @@ podSecurityContext:
 legacyVolumeClaimAnnotations: false
 
 useOldPodDisruptionBudget: true
+
+## Set to true to run OTEL collector as a sidecar in tserver pods
+otelCollector:
+  enabled: false
+  image: ""
+  exporters: {} # Add exporters here
+  # exporters:
+  #   datadog:
+  #     api:
+  #       key: <KEY>
+  #       site: datadoghq.com
+  #     retry_on_failure:
+  #       enabled: true
+  #     sending_queue:
+  #       enabled: true
+  #       storage: file_storage/queue
+
+  recievers:
+    ysql:
+      # Set ysql receiver params here, based on log_line_prefix set in ysql_pg.conf
+      lineStartPattern: "(?P<timestamp_with_ms>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}[.]\\d{3} \\w{3})[ ][[](?P<process_id>\\d+)[]][ ]"
+      regex: "(?P<timestamp_with_ms>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}[.]\\d{3} \\w{3})[ ][[](?P<process_id>\\d+)[]][ ](?P<log_level>\\w+):  AUDIT: (?P<audit_type>\\w+),(?P<statement_id>\\d+),(?P<substatement_id>\\d+),(?P<class>\\w+),(?P<command>[^,]+),(?P<object_type>[^,]*),(?P<object_name>[^,]*),(?P<statement>(.|\\n|\\r|\\s)*)"
+      timestamp:
+        layout: '%Y-%m-%d %H:%M:%S.%L %Z'
+        parse_from: 'attributes.timestamp_with_ms'
+  resources: {}
+  # resources:
+  #   requests:
+  #     cpu: "100m"
+  #     memory: "256Mi"
+  #   limits:
+  #     cpu: "200m"
+  #     memory: "512Mi"
+
+  # Add secret environment variables here if using AWS CloudWatch or GCP Log Explorer.
+  secretEnv: [] 
+  # secretEnv:
+  # - envName: AWS_ACCESS_KEY_ID
+  #   envValue:  <key-id>
+  # - envName: AWS_SECRET_ACCESS_KEY
+  #   envValue: <secret-key>
+  # - envName: GOOGLE_APPLICATION_CREDENTIALS_CONTENT
+  #   envValue:  <GCP_CREDENTIALS_JSON_KEY_CONTENT>
+
+  # Alternatively, set `tserver.serviceAccount` to a service account with the necessary permissions 
+  # to utilize IAM roles for access instead of embedding credentials directly.
+  # Additionally, ensure that the appropriate nodeSelector is added to enable the metadata server
+  # for example: for IAM authentication in GKE. 
+  # nodeSelector:
+  #   iam.gke.io/gke-metadata-server-enabled: "true"
+  
