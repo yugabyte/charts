@@ -81,12 +81,9 @@ spec:
       {{- include "yugabyte.applabel" ($appLabelArgs) | indent 6 }}
       {{- include "yugabyte.labels" $root | indent 6 }}
   issuerRef:
-    name:  {{ include "yugabyte.tls_cm_issuer" $root | quote }}
-    {{- if $root.Values.tls.certManager.useClusterIssuer }}
-    kind: ClusterIssuer
-    {{- else }}
-    kind: Issuer
-    {{- end }}
+    name: {{ include "yugabyte.tls_cm_issuer" $root | quote }}
+    kind: {{ include "yugabyte.tls_issuer_kind" $root }}
+    group: {{ include "yugabyte.tls_issuer_group" $root }}
   secretName: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" $service.label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) $service.label) }}
   duration: {{ $root.Values.tls.certManager.certificates.duration | quote }}
   renewBefore: {{ $root.Values.tls.certManager.certificates.renewBefore | quote }}
@@ -110,6 +107,9 @@ spec:
   - {{ printf "%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
   uris: []
   ipAddresses: []
+  {{- if $root.Values.tls.certManager.certificates.commonNameRequired }}
+  commonName: {{ $root.Values.oldNamingStyle | ternary $service.name (printf "%s-%s" (include "yugabyte.fullname" $root) $service.name) | quote }}
+  {{- end }}
 ---
 {{- end }}
 {{- end }}
@@ -125,12 +125,9 @@ spec:
     labels:
       {{- include "yugabyte.labels" $root | indent 6 }}
   issuerRef:
-    name:  {{ include "yugabyte.tls_cm_issuer" $root | quote }}
-    {{- if $root.Values.tls.certManager.useClusterIssuer }}
-    kind: ClusterIssuer
-    {{- else }}
-    kind: Issuer
-    {{- end }}
+    name: {{ include "yugabyte.tls_cm_issuer" $root | quote }}
+    kind: {{ include "yugabyte.tls_issuer_kind" $root }}
+    group: {{ include "yugabyte.tls_issuer_group" $root }}
   secretName:  {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
   duration: {{ $root.Values.tls.certManager.certificates.duration | quote }}
   renewBefore: {{ $root.Values.tls.certManager.certificates.renewBefore | quote }}

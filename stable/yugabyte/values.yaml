@@ -87,6 +87,15 @@ tls:
     clusterIssuer: cluster-ca
     # Name of Issuer to use when useClusterIssuer is false
     issuer: yugabyte-ca
+
+    # Set the below value to true for using custom issuer like AWSPCAClusterIssuer
+    useCustomIssuer: false
+    # if customIssuer is set to true, then below issuer values will get applied
+    customIssuer:
+      kind: Issuer
+      name: yugabyte-ca
+      group: cert-manager.io
+
     certificates:
       # The lifetime before cert-manager will issue a new certificate.
       # The re-issued certificates will not be automatically reloaded by the service.
@@ -97,6 +106,11 @@ tls:
       # Can be 2048, 4096 or 8192 for RSA
       # Or 256, 384 or 521 for ECDSA
       keySize: 2048
+      # Enable this option to include a commonName in the Certificate.
+      # Certain custom Certificate Authorities (CAs), such as AWS PCA, require the commonName 
+      # field to be present in the certificate for successful issuance.
+      # If set to true, the commonName of certs will automatically be set to the service name.
+      commonNameRequired: false
 
   ## When certManager.enabled=false, rootCA.cert and rootCA.key are used to generate TLS certs.
   ## When certManager.enabled=true and boostrapSelfsigned=true, rootCA is ignored.
