@@ -395,7 +395,33 @@ Set consistent issuer name.
   {{- if .Values.tls.certManager.bootstrapSelfsigned -}}
     {{ .Values.oldNamingStyle | ternary "yugabyte-selfsigned" (printf "%s-selfsigned" (include "yugabyte.fullname" .)) }}
   {{- else -}}
-    {{ .Values.tls.certManager.useClusterIssuer | ternary .Values.tls.certManager.clusterIssuer .Values.tls.certManager.issuer}}
+    {{- if .Values.tls.certManager.useCustomIssuer -}}
+      {{ .Values.tls.certManager.customIssuer.name }}
+    {{- else -}}
+      {{ .Values.tls.certManager.useClusterIssuer | ternary .Values.tls.certManager.clusterIssuer .Values.tls.certManager.issuer }}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Set issuer kind.
+*/}}
+{{- define "yugabyte.tls_issuer_kind" -}}
+  {{- if .Values.tls.certManager.useCustomIssuer -}}
+    {{ .Values.tls.certManager.customIssuer.kind }}
+  {{- else -}}
+    {{ .Values.tls.certManager.useClusterIssuer | ternary "ClusterIssuer" "Issuer" }}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Set issuer group.
+*/}}
+{{- define "yugabyte.tls_issuer_group" -}}
+  {{- if .Values.tls.certManager.useCustomIssuer -}}
+    {{ .Values.tls.certManager.customIssuer.group | default "cert-manager.io"  }}
+  {{- else -}}
+    {{ "cert-manager.io" }}
   {{- end -}}
 {{- end -}}
 
