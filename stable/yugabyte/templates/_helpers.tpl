@@ -421,7 +421,7 @@ Set issuer group.
   {{- if .Values.tls.certManager.useCustomIssuer -}}
     {{ .Values.tls.certManager.customIssuer.group | default "cert-manager.io"  }}
   {{- else -}}
-    {{ "cert-manager.io" }}
+    {{ "" }}
   {{- end -}}
 {{- end -}}
 
