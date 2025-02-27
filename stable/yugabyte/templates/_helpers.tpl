@@ -91,10 +91,10 @@ app.kubernetes.io/name: "{{ .label }}"
 {{- $partof := (get (.root.Values.commonLabels | default dict) "app.kubernetes.io/part-of" | default "")}}
 {{- if $partof }}
 app.kubernetes.io/part-of: "{{ $partof }}"
-{{- end }} 
+{{- end }}
 {{- end }}
 
-{{/*                                                                                                 
+{{/*
 Checks if a service is required to be installed/upgraded
 */}}
 {{- define "yugabyte.should_render_service" -}}
@@ -347,11 +347,7 @@ Generate server web interface.
 Generate server CQL proxy bind address.
 */}}
 {{- define "yugabyte.cql_proxy_bind_address" -}}
-  {{- if or .Values.istioCompatibility.enabled .Values.multicluster.createServiceExports .Values.multicluster.createServicePerPod -}}
-    0.0.0.0:{{ index .Service.ports "tcp-yql-port" -}}
-  {{- else -}}
-    {{- include "yugabyte.server_fqdn" . -}}
-  {{- end -}}
+  {{- eq .Values.ip_version_support "v6_only" | ternary "[::]" "0.0.0.0" -}}:{{ index .Service.ports "tcp-yql-port" -}}
 {{- end -}}
 
 {{/*
