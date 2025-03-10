@@ -721,10 +721,14 @@ authCredentials:
     user: ""
     password: ""
     database: ""
+    # Must contain the key ysqlPassword
+    passwordSecretName: ""
   ycql:
     user: ""
     password: ""
     keyspace: ""
+    # Must contain the key ycqlPassword
+    passwordSecretName: ""
 
 oldNamingStyle: true
 
