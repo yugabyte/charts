@@ -1,0 +1,24 @@
+name: "Run Unit tests"
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  yugabyte-unittests:
+    runs-on: ubuntu-latest
+    steps:
+    - name: "Install Helm"
+      run: |
+        curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+        chmod 700 get_helm.sh
+        ./get_helm.sh
+    - name: "Install Helm Unittest"
+      run: helm plugin install https://github.com/helm-unittest/helm-unittest.git
+    - name: "Checkout"
+      uses: actions/checkout@v2
+    - name: "Run tests"
+      run: cd stable/yugabyte && pwd && helm unittest -f "tests/test_*.yaml" .
+    

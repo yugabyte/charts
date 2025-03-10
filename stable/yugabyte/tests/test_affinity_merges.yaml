@@ -1,9 +1,8 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/quintush/helm-unittest/master/schema/helm-testsuite.json
 suite: nodeAffinity and podAntiAffinity Merge
-templates:
-- service.yaml
 tests:
 - it: Test with AZ
+  template: templates/service.yaml
   values:
   - ./values_affinity_merge.yaml
   set:
@@ -60,7 +59,7 @@ tests:
             operator: In
             values:
             - custom_value_2
-    documentIndex: 2
+    documentIndex: 1
   - isSubset:
       path: spec.template.spec.affinity.podAntiAffinity
       content:
@@ -82,7 +81,7 @@ tests:
                 operator: In
                 values:
                 - paa_value
-    documentIndex: 2
+    documentIndex: 1
   - isSubset:
       path: spec.template.spec.affinity.nodeAffinity
       content:
@@ -100,7 +99,7 @@ tests:
               - test_az
         preferredDuringSchedulingIgnoredDuringExecution:
           random_key: random_value
-    documentIndex: 6
+    documentIndex: 4
   - isSubset:
       path: spec.template.spec.affinity.podAntiAffinity
       content:
@@ -116,8 +115,9 @@ tests:
             topologyKey: kubernetes.io/hostname                
         requiredDuringSchedulingIgnoredDuringExecution:
           random_key2: random_value2
-    documentIndex: 6
+    documentIndex: 4
 - it: Test without AZ
+  template: templates/service.yaml
   values:
   - ./values_affinity_merge.yaml
   set:
@@ -143,7 +143,7 @@ tests:
             operator: In
             values:
             - custom_value_2        
-    documentIndex: 2
+    documentIndex: 1
   - isSubset:
       path: spec.template.spec.affinity.podAntiAffinity
       content:
@@ -165,13 +165,13 @@ tests:
                 operator: In
                 values:
                 - paa_value
-    documentIndex: 2
+    documentIndex: 1
   - isSubset:
       path: spec.template.spec.affinity.nodeAffinity
       content:
         preferredDuringSchedulingIgnoredDuringExecution:
           random_key: random_value
-    documentIndex: 6
+    documentIndex: 4
   - isSubset:
       path: spec.template.spec.affinity.podAntiAffinity
       content:
@@ -187,5 +187,5 @@ tests:
             topologyKey: kubernetes.io/hostname                
         requiredDuringSchedulingIgnoredDuringExecution:
           random_key2: random_value2
-    documentIndex: 6  
+    documentIndex: 4  
 

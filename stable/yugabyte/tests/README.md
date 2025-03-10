@@ -15,5 +15,5 @@ $ helm plugin install https://github.com/helm-unittest/helm-unittest.git
 ## Run tests
 ```
 $ cd stable/yugabyte
-$ helm unittest -f tests/test_*.yaml .
+$ helm unittest -f "tests/test_*.yaml" .
 ```
