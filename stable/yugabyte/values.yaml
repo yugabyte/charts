@@ -8,7 +8,7 @@ nameOverride: ""
 
 Image:
   repository: "yugabytedb/yugabyte"
-  tag: 2024.2.2.0-b70
+  tag: 2024.2.2.1-b6
   pullPolicy: IfNotPresent
   pullSecretName: ""
 
