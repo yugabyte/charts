@@ -437,6 +437,7 @@ spec:
               k8s_parent=""
             fi && \
           {{- if and $root.Values.tls.enabled $root.Values.tls.certManager.enabled }}
+            {{- $serverFqdn := include "yugabyte.server_fqdn" $serviceValues -}}
             echo "Creating ephemeral /opt/certs/yugabyte/ as symlink to persisted /mnt/disk0/certs/" && \
             mkdir -p /mnt/disk0/certs  && \
             mkdir -p /opt/certs  && \
@@ -448,8 +449,8 @@ spec:
             cmp -s /home/yugabyte/cert-manager/ca.crt /opt/certs/yugabyte/ca.crt;sameRootCA=$? && \
             if [[ $sameRootCA -eq 0 ]]; then
               echo "Refreshing tls certs at /opt/certs/yugabyte/";
-              cp /home/yugabyte/cert-manager/tls.crt /opt/certs/yugabyte/node.{{$rpcAddr}}.crt;
-              cp /home/yugabyte/cert-manager/tls.key /opt/certs/yugabyte/node.{{$rpcAddr}}.key;
+              cp /home/yugabyte/cert-manager/tls.crt /opt/certs/yugabyte/node.{{$serverFqdn}}.crt;
+              cp /home/yugabyte/cert-manager/tls.key /opt/certs/yugabyte/node.{{$serverFqdn}}.key;
               chmod 600 /opt/certs/yugabyte/*
             else
               echo "WARNING: Not refreshing certificates as the root ca.crt has changed"

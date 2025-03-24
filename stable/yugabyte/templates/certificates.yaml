@@ -101,6 +101,16 @@ spec:
   {{- range $index := until ( int ( $replicas ) ) }}
   {{- $nodeOldStyle := printf "%s-%d.%s.%s.svc.%s" $service.label $index $service.name $root.Release.Namespace $root.Values.domainName }}
   {{- $nodeNewStyle := printf "%s-%s-%d.%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
+  
+  {{- if $root.Values.multicluster.createServiceExports -}}
+    {{- $nodeOldStyle = printf "%s-%d.%s.%s.%s.svc.clusterset.local" $service.label $index $root.Values.multicluster.kubernetesClusterId $service.name $root.Release.Namespace }}
+    {{- $nodeNewStyle = printf "%s-%s-%d.%s.%s-%s.%s.svc.clusterset.local" (include "yugabyte.fullname" $root) $service.label $index $root.Values.multicluster.kubernetesClusterId (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
+  {{- end -}}
+
+  {{- if $root.Values.multicluster.createServicePerPod -}}
+    {{- $nodeOldStyle = printf "%s-%d.%s.svc.%s" $service.label $index $root.Release.Namespace $root.Values.domainName }}
+    {{- $nodeNewStyle = printf "%s-%s-%d.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index $root.Release.Namespace $root.Values.domainName }}
+  {{- end -}}
   {{- $node := $root.Values.oldNamingStyle | ternary $nodeOldStyle $nodeNewStyle }}
   - {{$node}}
   {{- end }}
