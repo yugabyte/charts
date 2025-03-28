@@ -567,7 +567,7 @@ exec:
   - -c
   - |
     {{- if not .Values.disableYsql }}
-    {{- if (or .Values.authCredentials.ysql.password (eq .Values.gflags.tserver.ysql_enable_auth "true")) }}
+    {{- if (or .Values.authCredentials.ysql.password (eq .Values.gflags.tserver.ysql_enable_auth "true") .Values.authCredentials.ysql.passwordSecretName) }}
     unix_socket=$(find /tmp -name ".yb.*");
     ysqlsh_output=$(ysqlsh -U yugabyte -h "${unix_socket}" -d system_platform -c "\\conninfo");
     exit_code="$?";
