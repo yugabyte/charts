@@ -629,6 +629,9 @@ spec:
             trap - TERM INT;
             done \
             {{- end }}
+        {{- if $root.Values.yugabytedUi.resources }}
+        resources: {{ toYaml $root.Values.yugabytedUi.resources | nindent 10 }}
+        {{- end }}
       {{- end }}
 
       {{- if and (eq .name "yb-tservers") ($root.Values.ybc.enabled) }}
