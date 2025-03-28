@@ -37,6 +37,9 @@ spec:
           rebound_needed_threshold_mib: 100
           rebound_trigger_threshold_mib: 10
         directory: /mnt/disk0/otel-collector/queue
+      health_check:
+        endpoint: {{ (printf "%s:13133" (include "yugabyte.webserver_interface" $root)) | quote }}
+        path: "/health"
     processors:
       {{- range $name := (keys .Values.otelCollector.exporters) }}
       attributes/{{ $name }}:
@@ -74,6 +77,7 @@ spec:
     service:
       extensions:
       - file_storage/queue
+      - health_check
       pipelines:
         {{- range $name := (keys .Values.otelCollector.exporters) }}
         logs/{{ $name }}:
