@@ -1,6 +1,6 @@
 apiVersion: v2
-appVersion: 2024.1.5.0-b26
-version: 2024.1.5
+appVersion: 2024.1.6.0-b53
+version: 2024.1.6
 kubeVersion: ">=1.17.0-0"
 home: https://www.yugabyte.com
 description: YugabyteDB Anywhere provides deployment, orchestration, and monitoring for managing YugabyteDB clusters. YugabyteDB Anywhere can create a YugabyteDB cluster with multiple pods provided by Kubernetes or OpenShift and logically grouped together to form one logical distributed database.
