@@ -1,6 +1,6 @@
 {{- $root := . -}}
 ---
-{{- if and (eq $root.Values.tls.enabled true) (eq $root.Values.tls.certManager.enabled false) }}
+{{- if and (eq $root.Values.tls.enabled true) (eq $root.Values.tls.certManager.enabled false) (eq $root.Values.tls.provided false) }}
 ---
 apiVersion: v1
 kind: Secret
@@ -32,7 +32,7 @@ data:
 {{- $replicas := (eq .name "yb-masters") | ternary $root.Values.replicas.master $root.Values.replicas.tserver -}}
 
 {{- if gt (int ($replicas)) 0 }}
-{{- if and (eq $root.Values.tls.enabled true) (eq $root.Values.tls.certManager.enabled false) }}
+{{- if and (eq $root.Values.tls.enabled true) (eq $root.Values.tls.certManager.enabled false) (eq $root.Values.tls.provided false) }}
 ---
 apiVersion: v1
 kind: Secret
