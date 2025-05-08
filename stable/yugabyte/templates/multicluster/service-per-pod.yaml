@@ -15,7 +15,7 @@ metadata:
 spec:
   ports:
     {{- range $label, $port := $server.ports }}
-    {{- if (eq $label "tcp-ybc-port") }}
+    {{- if (eq $label "grpc-ybc-port") }}
     {{- if $.Values.ybc.enabled }}
     - name: {{ $label | quote }}
       port: {{ $port }}
