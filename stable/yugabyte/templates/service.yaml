@@ -96,9 +96,9 @@ spec:
   {{- end }}
   ports:
     {{- range $label, $port := .ports }}
-    {{- if (eq $label "grpc-ybc-port") }}
+    {{- if or (eq $label "grpc-ybc-port") (eq $label "tcp-ybc-port")}}
     {{- if $root.Values.ybc.enabled }}
-    - name: {{ $label | quote }}
+    - name: "tcp-ybc-port"
       port: {{ $port }}
     {{- end }}
     {{- else if (eq $label "yugabyted-ui") }}
@@ -486,7 +486,7 @@ spec:
           - containerPort: {{ $port }}
             name: {{ $label | quote }}
           {{- end }}
-          {{- else if not (eq $label "grpc-ybc-port") }}
+          {{- else if not (or (eq $label "grpc-ybc-port") (eq $label "tcp-ybc-port"))}}
           - containerPort: {{ $port }}
             name: {{ $label | quote }}
           {{- end }}
@@ -666,10 +666,12 @@ spec:
               sleep 60;
               /home/yugabyte/tools/k8s_ybc_parent.py status || /home/yugabyte/tools/k8s_ybc_parent.py start;
             done
-        {{- with index $service.ports "grpc-ybc-port" }}
+        {{- range $label, $port := .ports }}
+        {{- if or (eq $label "grpc-ybc-port") (eq $label "tcp-ybc-port")}}
         ports:
-          - containerPort: {{ . }}
-            name: "grpc-ybc-port"
+          - containerPort: {{ $port }}
+            name: "tcp-ybc-port"
+        {{- end }}
         {{- end }}
         volumeMounts:
           - name: tserver-tmp

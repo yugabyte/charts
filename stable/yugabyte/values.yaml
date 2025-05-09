@@ -288,7 +288,7 @@ Services:
       http-ycql-met: "12000"
       http-yedis-met: "11000"
       http-ysql-met: "13000"
-      grpc-ybc-port: "18018"
+      tcp-ybc-port: "18018"
       yugabyted-ui: "15433"
 
 
