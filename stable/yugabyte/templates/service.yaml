@@ -440,7 +440,6 @@ spec:
             {{- $serverFqdn := include "yugabyte.server_fqdn" $serviceValues -}}
             echo "Creating ephemeral /opt/certs/yugabyte/ as symlink to persisted /mnt/disk0/certs/" && \
             mkdir -p /mnt/disk0/certs  && \
-            mkdir -p /opt/certs  && \
             ln -s /mnt/disk0/certs /opt/certs/yugabyte  && \
             if [[ ! -f /opt/certs/yugabyte/ca.crt ]]; then
               echo "Fresh install of /opt/certs/yugabyte/ca.crt"
@@ -513,6 +512,10 @@ spec:
           - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
             mountPath: {{ $root.Values.tls.certManager.enabled | ternary "/home/yugabyte/cert-manager" "/opt/certs/yugabyte" }}
             readOnly: true
+          {{- if $root.Values.tls.certManager.enabled }}
+          - name: certs-dir
+            mountPath: /opt/certs
+          {{- end }}
           - name: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
             mountPath: /root/.yugabytedb/
             readOnly: true
@@ -652,7 +655,6 @@ spec:
                   ln -sf /mnt/disk0/yw-data/controller/bin /tmp/yugabyte/controller;
                   rm -f /tmp/yugabyte/controller/yb-controller.pid;
                   {{- if and $root.Values.tls.enabled $root.Values.tls.certManager.enabled }}
-                  mkdir -p /opt/certs;
                   ln -sf /mnt/disk0/certs /opt/certs/yugabyte;
                   {{- end }}
         command:
@@ -686,6 +688,10 @@ spec:
           - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
             mountPath: {{ $root.Values.tls.certManager.enabled | ternary "/home/yugabyte/cert-manager" "/opt/certs/yugabyte" }}
             readOnly: true
+          {{- if $root.Values.tls.certManager.enabled }}
+          - name: certs-dir
+            mountPath: /opt/certs
+          {{- end }}
           {{- end }}
           {{- if ($root.Values.tserver.extraVolumeMounts) -}}
           {{- include "yugabyte.isExtraVolumesMappingExists" $root.Values.tserver -}}
@@ -730,6 +736,8 @@ spec:
             {{- end }}
             - secret:
                 name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
+        - name: certs-dir
+          emptyDir: {}
         {{- else }}
         {{/* certManager disabled */}}
         - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
