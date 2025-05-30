@@ -2,6 +2,164 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  name: restorejobs.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: restorejobs
+    singular: restorejob
+    kind: RestoreJob
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: Custom resource definition for YugabyteDB restore job
+          properties:
+            status:
+              type: object
+              description: Restore job status for the restore job custom resource.
+              properties:
+                message:
+                  description: String log message from restore job controller
+                  type: string
+                taskUUID:
+                  description: >
+                    Internal UUID of the task associated with
+                    the restore job resource.
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the restore operation.
+                  type: string
+            spec:
+              type: object
+              properties:
+                actionType:
+                  description: Type of action to be taken. Allowed values - RESTORE
+                  type: string
+                  enum:
+                    - RESTORE
+                universe:
+                  description: >
+                    Name of the universe for which restore is to be taken,
+                    refers to a ybuniverse CR name.
+                  type: string
+                backup:
+                  description: >
+                    Name of the backup to be restored,
+                    refers to a backup CR name.
+                  type: string
+                keyspace:
+                  description: Name of the keyspace to be restored.
+                  type: string
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: support-bundles.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: support-bundles
+    singular: support-bundle
+    kind: SupportBundle
+    shortNames:
+    - sb
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: >
+            Custom resource definition for YugabyteDB support bundle to capture logs,
+            events in case of failures.
+          type: object
+          properties:
+            status:
+              description: Support bundle status for the support bundle custom resource.
+              type: object
+              properties:
+                status:
+                  description: >
+                    Status of the support bundle.
+                    Allowed values - generating, ready, failed
+                  type: string
+                  enum:
+                  - generating
+                  - ready
+                  - failed
+                access:
+                  description: Access details for the generated support bundle to download.
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the support bundle resource.
+                  type: string
+            spec:
+              type: object
+              properties:
+                universeName:
+                  description: >
+                    Name of the universe for which support bundle is to be generated,
+                    refers to a ybuniverse CR name.
+                  type: string
+                collectionTimerange:
+                  description: Time range for which logs and events are to be collected.
+                  type: object
+                  properties:
+                    startDate:
+                      description: Start date for the logs and events collection.
+                      type: string
+                      example: 2022-12-12T13:07:18Z,
+                      format: date-time
+                    endDate:
+                      description: End date for the logs and events collection.
+                      type: string
+                      example: 2022-12-12T13:07:18Z,
+                      format: date-time
+                  required:
+                  - startDate
+                components:
+                  description: >
+                    Components for which logs and events are to be collected. If not provided, all
+                    components will be collected.
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                    - UniverseLogs
+                    - ApplicationLogs
+                    - OutputFiles
+                    - ErrorFiles
+                    - CoreFiles
+                    - GFlags
+                    - Instance
+                    - ConsensusMeta
+                    - TabletMeta
+                    - YbcLogs
+                    - K8sInfo
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
   name: backups.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
@@ -73,6 +231,11 @@ spec:
                   description: Time before backup is deleted from storage in milliseconds.
                   type: integer
                   minimum: 0
+                incrementalBackupBase:
+                  description: >
+                    Base backup Custom Resource name. Operator will add an incremental backup
+                    to the existing chain of backups at the last.
+                  type: string
               required:
               - keyspace
               - backupType
@@ -162,8 +325,20 @@ spec:
                               description: S3 access key
                               type: string
                             secretAccessKey:
-                              description: S3 secret key
+                              description: S3 secret key. Deprecated, use secretAccessKeySecret
                               type: string
+                            secretAccessKeySecret:
+                              description: S3 secret key secret. Overrides secretAccessKey
+                              type: object
+                              properties:
+                                name:
+                                  description: Name of the secret
+                                  type: string
+                                namespace:
+                                  description: Namespace of the secret
+                                  type: string
+                              required:
+                              - name
                             paths:
                               description: S3 paths to download the release from
                               type: object
@@ -200,7 +375,19 @@ spec:
                                   description: Optional checksum for Helm chart package
                             credentialsJson:
                               type: string
-                              description: GCS service key JSON
+                              description: |
+                                GCS service key JSON. Deprecated, use credentialsJsonSecret instead.
+                            credentialsJsonSecret:
+                              type: object
+                              properties:
+                                name:
+                                  description: Name of the secret
+                                  type: string
+                                namespace:
+                                  description: Namespace of the secret
+                                  type: string
+                              required:
+                              - name
                         http:
                           type: object
                           properties:
@@ -225,14 +412,14 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: restorejobs.operator.yugabyte.io
+  name: backupschedules.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
   scope: Namespaced
   names:
-    plural: restorejobs
-    singular: restorejob
-    kind: RestoreJob
+    plural: backupschedules
+    singular: backupschedule
+    kind: BackupSchedule
     categories:
       - all
       - yugabyte
@@ -244,45 +431,107 @@ spec:
       storage: true
       schema:
         openAPIV3Schema:
+          description: Custom resource definition for YugabyteDB backup schedules.
           type: object
-          description: Custom resource definition for YugabyteDB restore job
           properties:
             status:
               type: object
-              description: Restore job status for the restore job custom resource.
+              description: Schedule status for the backup schedule custom resource.
               properties:
-                message:
-                  description: String log message from restore job controller
+                nextBackupTime:
+                  description: Timestamp of the next backup in UTC.
                   type: string
-                taskUUID:
-                  description: >
-                    Internal UUID of the task associated with
-                    the restore job resource.
+                previousBackupTime:
+                  description: Time of the previous backup in UTC.
                   type: string
-                resourceUUID:
-                  description: Internal UUID of the restore operation.
+                scheduleUUID:
+                  description: Internal UUID of the backup schedule resource.
                   type: string
+                state:
+                  description: State of schedule
+                  type: string
+
             spec:
               type: object
+              x-kubernetes-validations:
+                - rule: self.schedulingFrequency != 0 || self.cronExpression != ''
+                  message: >
+                    "Either 'schedulingFrequency' must be non-zero or
+                    'cronExpression' must be a non-empty string."
               properties:
-                actionType:
-                  description: Type of action to be taken. Allowed values - RESTORE
+                backupType:
+                  description: >
+                    Type of backup to be taken.
+                    Allowed values are -
+                    YQL_TABLE_TYPE PGSQL_TABLE_TYPE
                   type: string
                   enum:
-                    - RESTORE
+                    - YQL_TABLE_TYPE
+                    - PGSQL_TABLE_TYPE
+                  x-kubernetes-validations:
+                  - message: backupType cannot be changed
+                    rule: self == oldSelf
+                storageConfig:
+                  description: >
+                    Storage configuration for the backup,
+                    refers to a storageconfig CR name. Should be in the same namespace
+                    as the backupschedule.
+                  type: string
+                  x-kubernetes-validations:
+                  - message: storageConfig cannot be changed
+                    rule: self == oldSelf
                 universe:
                   description: >
-                    Name of the universe for which restore is to be taken,
-                    refers to a ybuniverse CR name.
+                    Name of the universe for which backup is to be taken,
+                    refers to a ybuniverse CR name. Should be in the same namespace
+                    as the backupschedule.
                   type: string
-                backup:
-                  description: >
-                    Name of the backup to be restored,
-                    refers to a backup CR name.
-                  type: string
+                  x-kubernetes-validations:
+                  - message: universe cannot be changed
+                    rule: self == oldSelf
+                tableByTableBackup:
+                  description: Boolean indicating if backup is to be taken table by table.
+                  type: boolean
+                  x-kubernetes-validations:
+                  - message: tableByTableBackup cannot be changed
+                    rule: self == oldSelf
                 keyspace:
-                  description: Name of the keyspace to be restored.
+                  description: Name of keyspace to be backed up.
                   type: string
+                  x-kubernetes-validations:
+                  - message: keyspace cannot be changed
+                    rule: self == oldSelf
+                timeBeforeDelete:
+                  description: Time before backup is deleted from storage in milliseconds.
+                  type: integer
+                  minimum: 0
+                  x-kubernetes-validations:
+                  - message: timeBeforeDelete cannot be changed
+                    rule: self == oldSelf
+                schedulingFrequency:
+                  description: Frequency of full backups in milliseconds.
+                  type: integer
+                  minimum: 3600000
+                cronExpression:
+                  description: Frequency of full backups in cron expression.
+                  type: string
+                  default: ''
+                incrementalBackupFrequency:
+                  description: Frequency of incremental backups in milliseconds
+                  type: integer
+                  minimum: 0
+                enablePointInTimeRestore:
+                  description: Enable Point in time restore for backups created with the schedule
+                  type: boolean
+                  default: false
+                  x-kubernetes-validations:
+                  - message: enablePointInTimeRestore cannot be changed
+                    rule: self == oldSelf
+              required:
+              - keyspace
+              - backupType
+              - storageConfig
+              - universe
 
 
 ---
@@ -332,12 +581,16 @@ spec:
                 config_type:
                   description:
                     Type of storage configuration to be created.
-                    Allowed values - STORAGE_S3, STORAGE_NFS, STORAGE_GCS
+                    Allowed values - STORAGE_S3, STORAGE_NFS, STORAGE_GCS, STORAGE_AZ
                   type: string
                   enum:
                     - STORAGE_S3
                     - STORAGE_NFS
                     - STORAGE_GCS
+                    - STORAGE_AZ
+                  x-kubernetes-validations:
+                  - message: Config type cannot be changed
+                    rule: self == oldSelf
                 data:
                   type: object
                   description: Data object to create storage configuration.
@@ -346,106 +599,82 @@ spec:
                       description: AWS access key id for the S3 storage configuration.
                       type: string
                     AWS_SECRET_ACCESS_KEY:
-                      description: AWS secret access key for the S3 storage configuration.
+                      description: |
+                        AWS secret access key for the S3 storage configuration. Deprecated, use
+                        aws_secret_access_key_secret instead
                       type: string
+                    USE_IAM:
+                      description: Use IAM for storage account access. Valid for S3/GCS.
+                      type: boolean
                     BACKUP_LOCATION:
-                      description: Backup location for the NFS storage configuration.
+                      description: Backup location for the storage configuration.
                       type: string
+                      x-kubernetes-validations:
+                      - message: BACKUP_LOCATION cannot be changed
+                        rule: self == oldSelf
                     GCS_CREDENTIALS_JSON:
-                      description: GCS credentials JSON for the GCS storage configuration.
+                      description: |
+                        GCS credentials JSON for the GCS storage configuration. Deprecated, use
+                        gcs_credentials_json_secret instead
                       type: string
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: support-bundles.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: support-bundles
-    singular: support-bundle
-    kind: SupportBundle
-    shortNames:
-    - sb
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: >
-            Custom resource definition for YugabyteDB support bundle to capture logs,
-            events in case of failures.
-          type: object
-          properties:
-            status:
-              description: Support bundle status for the support bundle custom resource.
-              type: object
-              properties:
-                status:
-                  description: >
-                    Status of the support bundle.
-                    Allowed values - generating, ready, failed
-                  type: string
-                  enum:
-                  - generating
-                  - ready
-                  - failed
-                access:
-                  description: Access details for the generated support bundle to download.
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the support bundle resource.
-                  type: string
-            spec:
-              type: object
-              properties:
-                universeName:
-                  description: >
-                    Name of the universe for which support bundle is to be generated,
-                    refers to a ybuniverse CR name.
-                  type: string
-                collectionTimerange:
-                  description: Time range for which logs and events are to be collected.
-                  type: object
-                  properties:
-                    startDate:
-                      description: Start date for the logs and events collection.
+                    AZURE_STORAGE_SAS_TOKEN:
+                      description: |
+                        Azure SAS token for the Azure storage configuration. Deprecated, use
+                        azure_storage_sas_token_secret instead
                       type: string
-                      example: 2022-12-12T13:07:18Z,
-                      format: date-time
-                    endDate:
-                      description: End date for the logs and events collection.
+                    AWS_HOST_BASE:
+                      description: |
+                        Host of S3 bucket configuration. Valid for S3 compatible storages.
                       type: string
-                      example: 2022-12-12T13:07:18Z,
-                      format: date-time
+                    PATH_STYLE_ACCESS:
+                      description: |
+                        Use path style access for S3 bucket configuration. Valid for S3 compatible
+                        storages.
+                      type: boolean
                   required:
-                  - startDate
-                components:
-                  description: Components for which logs and events are to be collected.
-                  type: array
-                  items:
-                    type: string
-                    enum:
-                    - UniverseLogs
-                    - ApplicationLogs
-                    - OutputFiles
-                    - ErrorFiles
-                    - CoreFiles
-                    - GFlags
-                    - Instance
-                    - ConsensusMeta
-                    - TabletMeta
-                    - YbcLogs
-                    - K8sInfo
+                  - BACKUP_LOCATION
+                awsSecretAccessKeySecret:
+                  type: object
+                  description: |
+                    Name of the secret containing AWS_SECRET_ACCESS_KEY for the S3 storage
+                    configuration. The secret will take precedence over data.AWS_SECRET_ACCESS_KEY
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the secret
+                    namespace:
+                      type: string
+                      description: Namespace of the secret
+                  required:
+                  - name
+                gcsCredentialsJsonSecret:
+                  type: object
+                  description: |
+                    Name of the secret containing GCS_CREDENTIALS_JSON for the GCS storage
+                    configuration. The secret will take precedence over data.GCS_CREDENTIALS_JSON
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the secret
+                    namespace:
+                      type: string
+                      description: Namespace of the secret
+                  required:
+                  - name
+                azureStorageSasTokenSecret:
+                  type: object
+                  description: |
+                    Name of the secret containing AZURE_STORAGE_SAS_TOKEN for the Azure storage
+                    configuration. The secret will take precedence over data.AZURE_STORAGE_SAS_TOKEN
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the secret
+                    namespace:
+                      type: string
+                      description: Namespace of the secret
+                  required:
+                  - name
 
 
 ---
@@ -630,7 +859,7 @@ spec:
                   rule: self == oldSelf
               deviceInfo:
                 description: >
-                  Device information for the universe to
+                  Device information for the tservers in universe to
                   refer to storage information for volume,
                   storage classes etc.
                 properties:
@@ -649,6 +878,54 @@ spec:
                       - message:   StorageClass cannot be changed once set.
                         rule: self == oldSelf
                 type: object
+              masterDeviceInfo:
+                description: >
+                  Device information for the masters in universe to
+                  refer to storage information for volume,
+                  storage classes etc.
+                properties:
+                  volumeSize:
+                    type: integer
+                    default: 50
+                  numVolumes:
+                    type: integer
+                    default: 1
+                    x-kubernetes-validations:
+                      - message:   numVolumes cannot be changed once set.
+                        rule: self == oldSelf
+                  storageClass:
+                    type: string
+                    x-kubernetes-validations:
+                      - message:   StorageClass cannot be changed once set.
+                        rule: self == oldSelf
+                type: object
+              paused:
+                description: >
+                  If the universe is paused. A paused universe will have its statefulsets scaled
+                  to 0 pods. When unpaused, the statefulsets will be scaled back to their previous
+                  values.
+                  While Paused, all other actions on the universe will be ignored until the universe
+                  is resumed.
+                type: boolean
+                default: false
+              ybcThrottleParameters:
+                description: >
+                  YBC throttle parameters for the universe. These throttle parameters can be used to
+                  control speed and resource usage of taking and restoring backups.
+                type: object
+                properties:
+                  maxConcurrentUploads:
+                    description: Number of parallel uploads per node. Used during backup.
+                    type: integer
+                  perUploadNumObjects:
+                    description: Number of buffers per upload per node. Used during backup.
+                    type: integer
+                  maxConcurrentDownloads:
+                    description: Number of parallel downloads per node. Used during restore.
+                    type: integer
+                  perDownloadNumObjects:
+                    description: Number of buffers per download per node. Used during restore.
+                    type: integer
               kubernetesOverrides:
                 description: >
                   Kubernetes overrides for the universe.
