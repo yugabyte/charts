@@ -130,6 +130,10 @@ yugaware:
   # Crash YBA if operator thread is not initialised correctly
   kubernetesOperatorCrashOnFailure: true
 
+  fips:
+    # Enable FIPS mode for YugabyteDB Anywhere.
+    enabled: false
+
   # Create an initial user for YugabyteDB Anywhere. A user is required for YBA workflows.
   defaultUser:
     enabled: false

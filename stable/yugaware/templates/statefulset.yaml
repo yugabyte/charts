@@ -537,7 +537,13 @@ spec:
           resources:
 {{ toYaml .Values.yugaware.resources | indent 12 }}
           {{- end }}
-          args: ["bin/yugaware","-Dconfig.file=/data/application.docker.conf"]
+          args: [
+            "bin/yugaware",
+            {{- if .Values.yugaware.fips.enabled }}
+            "-Dorg.bouncycastle.fips.approved_only=true",
+            {{- end }}
+            "-Dconfig.file=/data/application.docker.conf"
+            ]
           env:
           # Conditionally set these env variables, if runAsUser is not 0(root)
           # or 10001(yugabyte).
