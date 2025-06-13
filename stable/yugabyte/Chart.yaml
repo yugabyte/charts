@@ -1,7 +1,7 @@
 apiVersion: v2
 name: yugabyte
 version: 2024.2.3
-appVersion: 2024.2.3.0-b116
+appVersion: 2024.2.3.1-b3
 kubeVersion: ">=1.17.0-0"
 home: https://www.yugabyte.com
 description: YugabyteDB is the high-performance distributed SQL database for building global, internet-scale apps.
