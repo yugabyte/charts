@@ -221,6 +221,15 @@ rules:
   - "clusterissuers"
   verbs:
   - "get"
+- apiGroups:
+  - "opentelemetry.io"
+  resources:
+  - "opentelemetrycollectors"
+  verbs:
+  - "get"
+  - "create"
+  - "patch"
+  - "delete"
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
