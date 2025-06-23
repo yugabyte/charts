@@ -627,3 +627,14 @@ tcpSocket:
   port: {{ index (include "yugabyte.yb_tservers.ports" .| fromYaml) "tcp-rpc-port" }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+  Get Security Context.
+*/}}
+{{- define "getSecurityContext" }}
+securityContext:
+  runAsUser: {{ required "runAsUser cannot be empty" .Values.podSecurityContext.runAsUser }}
+  runAsGroup: {{ .Values.podSecurityContext.runAsGroup | default 0 }}
+  fsGroup: {{ .Values.podSecurityContext.fsGroup }}
+  runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
+{{- end -}}
