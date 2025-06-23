@@ -119,7 +119,8 @@ spec:
       name: {{ $root.Values.oldNamingStyle | ternary "datadir0" (printf "%s0" (include "yugabyte.volume_name" $root)) }}
   initContainers:
   - name: init-otel-collector
-    image: busybox
+    image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
+    imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
     command: 
       - "sh"
       - "-c"
@@ -143,7 +144,11 @@ spec:
           key: {{ .envName }}
     {{- end }}
     {{- end }}
+  {{- if .Values.podSecurityContext.enabled }}
+  {{- include "getSecurityContext" . | nindent 2 }}
+  {{- else if not .Values.ocpCompatibility.enabled }}
   securityContext:
     runAsUser: 0
+  {{- end }}
 ---
 {{- end }}

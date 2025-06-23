@@ -760,6 +760,10 @@ legacyVolumeClaimAnnotations: false
 
 useOldPodDisruptionBudget: true
 
+## Set to true to enable OCP compatibility mode.
+ocpCompatibility:
+  enabled: false
+
 ## Set to true to run OTEL collector as a sidecar in tserver pods
 otelCollector:
   enabled: false
