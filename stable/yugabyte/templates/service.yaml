@@ -182,7 +182,7 @@ spec:
       {{- with $root.Values.networkAnnotation }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- with $root.Values.master.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- if $root.Values.tls.enabled }}
-        checksum/rootCA: {{ cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum }}
+        checksum/rootCA: {{ (not $root.Values.tls.rootCAChecksum) | ternary (cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum) $root.Values.tls.rootCAChecksum }}
       {{- end }}
       {{- end }}
       {{- else }}
@@ -191,7 +191,7 @@ spec:
       {{- with $root.Values.networkAnnotation }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- with $root.Values.tserver.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- if $root.Values.tls.enabled }}
-        checksum/rootCA: {{ cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum }}
+        checksum/rootCA: {{ (not $root.Values.tls.rootCAChecksum) | ternary (cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum) $root.Values.tls.rootCAChecksum }}
       {{- end }}
       {{- end }}
       {{- if and (eq .name "yb-tservers") ($root.Values.otelCollector.enabled) }}
