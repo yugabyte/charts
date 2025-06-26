@@ -405,7 +405,7 @@ spec:
           - "/bin/bash"
           - "-c"
           - |
-          {{- $preCommands := (ternary $root.Values.master.advanced.preCommands $root.Values.tserver.advanced.preCommands (eq .name "yb-masters")) }} {{- with $preCommands }} {{ . | nindent 12 }} {{- end }}
+          {{- $preCommands := ( (eq .name "yb-masters") | ternary $root.Values.master.advanced.preCommands $root.Values.tserver.advanced.preCommands ) }} {{- with $preCommands }} {{ . | nindent 12 }} {{- end }}
           {{- if and (not $root.Values.preflight.skipUlimit) (not $root.Values.preflight.skipAll) }}
             if [ -f /home/yugabyte/tools/k8s_preflight.py ]; then
               /home/yugabyte/tools/k8s_preflight.py all
