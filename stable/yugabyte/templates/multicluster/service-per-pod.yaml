@@ -28,6 +28,7 @@ spec:
   selector:
     statefulset.kubernetes.io/pod-name: {{ $podName | quote }}
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
+  {{- include "yugabyte.ipFamilyConfig" . | indent 2 }}
 ---
 {{- end }}
 {{- end }}

@@ -638,3 +638,18 @@ securityContext:
   fsGroup: {{ .Values.podSecurityContext.fsGroup }}
   runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
 {{- end -}}
+
+{{/*
+Get ipFamily and ipFamilyPolicy settings.
+*/}}
+{{- define "yugabyte.ipFamilyConfig" }}
+{{- if .Values.ipFamilies }}
+ipFamilies:
+  {{- range .Values.ipFamilies }}
+  - {{ . }}
+  {{- end }}
+{{- end }}
+{{- if .Values.ipFamilyPolicy }}
+ipFamilyPolicy: {{ .Values.ipFamilyPolicy }}
+{{- end }}
+{{- end -}}

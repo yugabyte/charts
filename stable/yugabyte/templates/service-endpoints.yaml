@@ -70,12 +70,18 @@ spec:
     {{- else }}
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
     {{- end }}
+  {{- if ne $endpoint.type "ClusterIP" }}
   externalTrafficPolicy: {{ $endpoint.externalTrafficPolicy | default "Cluster" }}
+  {{- end }}
   {{- if $endpoint.loadBalancerIP }}
   loadBalancerIP: {{ $endpoint.loadBalancerIP }}
   {{- end }}
   {{- if eq $endpoint.name "yugabyted-ui-service"}}
   sessionAffinity: {{ $endpoint.sessionAffinity }}
+  {{- end }}
+  {{- include "yugabyte.ipFamilyConfig" ($root) | indent 2 }}
+  {{- range $key, $value := $endpoint.extraArgs }}
+  {{ $key }}: {{ $value | quote }}
   {{- end }}
 ---
 {{- end }}
