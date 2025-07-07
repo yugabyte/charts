@@ -219,6 +219,25 @@ domainName: "cluster.local"
 #     ports:
 #       http-ui: "7000"
 
+## If you would like to define which IP family to use for single stack or define
+## the order of IP families for dual-stack, you can choose the address families by
+## setting the ipFamilies. It can be any of these values:
+## ["IPv4"]
+## ["IPv6"]
+## ["IPv4","IPv6"] (dual stack)
+## ["IPv6","IPv4"] (dual stack)
+## Docs: https://kubernetes.io/docs/concepts/services-networking/dual-stack/#dual-stack-service-configuration-scenarios
+ipFamilies: []
+
+## ipFamilyPolicy can be set to the following values:
+## SingleStack
+## PreferDualStack
+## RequireDualStack
+## Selects the .spec.clusterIP from the list of .spec.clusterIPs based on the address
+## family of the first element in the .spec.ipFamilies array.
+## Docs: https://kubernetes.io/docs/concepts/services-networking/dual-stack/#dual-stack-service-configuration-scenarios
+ipFamilyPolicy: ""
+
 ## Default service scope to use if not defined in service endpoint definition. 
 ## Can be "Namespaced"/"AZ"
 defaultServiceScope: "AZ"
@@ -236,6 +255,7 @@ serviceEndpoints:
     loadBalancerIP: ""
     ports:
       http-ui: "7000"
+    extraArgs: {}
 
   - name: "yb-tserver-service"
     type: LoadBalancer
@@ -251,6 +271,7 @@ serviceEndpoints:
       tcp-yql-port: "9042"
       tcp-yedis-port: "6379"
       tcp-ysql-port: "5433"
+    extraArgs: {}
 
   - name: "yugabyted-ui-service"
     type: LoadBalancer
@@ -265,6 +286,7 @@ serviceEndpoints:
     sessionAffinity: ClientIP
     ports:
       yugabyted-ui: "15433"
+    extraArgs: {}
 
 Services:
   - name: "yb-masters"

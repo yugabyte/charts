@@ -113,6 +113,7 @@ spec:
     {{- end}}
   selector:
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
+  {{- include "yugabyte.ipFamilyConfig" ($root) | indent 2 }}
 
 ---
 apiVersion: apps/v1
