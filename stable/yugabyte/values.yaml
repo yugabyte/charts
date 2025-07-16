@@ -111,6 +111,8 @@ tls:
       # field to be present in the certificate for successful issuance.
       # If set to true, the commonName of certs will automatically be set to the service name.
       commonNameRequired: false
+      # If commonNameSuffix is specified, it will be used as the suffix for the commonName for the certificate.
+      commonNameSuffix: ""
 
   ## When certManager.enabled=false, rootCA.cert and rootCA.key are used to generate TLS certs.
   ## When certManager.enabled=true and boostrapSelfsigned=true, rootCA is ignored.

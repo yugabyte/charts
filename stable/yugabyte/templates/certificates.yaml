@@ -118,7 +118,7 @@ spec:
   uris: []
   ipAddresses: []
   {{- if $root.Values.tls.certManager.certificates.commonNameRequired }}
-  commonName: {{ $root.Values.oldNamingStyle | ternary $service.name (printf "%s-%s" (include "yugabyte.fullname" $root) $service.name) | quote }}
+  commonName: {{ include "yugabyte.commonNameWithSuffix" (dict "commonName" ($root.Values.oldNamingStyle | ternary $service.name (printf "%s-%s" (include "yugabyte.fullname" $root) $service.name)) "root" $root) | quote }}
   {{- end }}
 ---
 {{- end }}
@@ -141,7 +141,7 @@ spec:
   secretName:  {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
   duration: {{ $root.Values.tls.certManager.certificates.duration | quote }}
   renewBefore: {{ $root.Values.tls.certManager.certificates.renewBefore | quote }}
-  commonName: yugabyte
+  commonName: {{ include "yugabyte.commonNameWithSuffix" (dict "commonName" "yugabyte" "root" $root) | quote }}
   isCA: false
   privateKey:
     algorithm: {{ $root.Values.tls.certManager.certificates.algorithm | quote }}
