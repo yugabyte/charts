@@ -631,3 +631,22 @@ tcpSocket:
   port: {{ index (include "yugabyte.yb_tservers.ports" .| fromYaml) "tcp-rpc-port" }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+  Append commonNameSuffix to commonName while ensuring total length doesn't exceed 63 characters.
+*/}}
+{{- define "yugabyte.commonNameWithSuffix" -}}
+  {{- $commonName := .commonName -}}
+  {{- $suffix := .root.Values.tls.certManager.certificates.commonNameSuffix | default "" -}}
+  {{- if $suffix -}}
+    {{- $combined := printf "%s-%s" $commonName $suffix -}}
+    {{- if gt (len $combined) 63 -}}
+      {{- $maxCommonNameLength := sub 63 (add 1 (len $suffix)) -}}
+      {{- printf "%s-%s" ($commonName | trunc $maxCommonNameLength | trimSuffix "-") $suffix -}}
+    {{- else -}}
+      {{- $combined -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $commonName -}}
+  {{- end -}}
+{{- end -}}
