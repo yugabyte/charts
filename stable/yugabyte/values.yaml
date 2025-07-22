@@ -590,6 +590,12 @@ master:
   ## for gflags changes.
   gflagsChecksum: ""
 
+  advanced:
+    ## Bash commands to run before the start of the master service
+    ## WARNING: This is an advanced feature. Incorrect use may cause startup failures,
+    ## security issues, or unexpected behavior. Use with caution and at your own risk.
+    preCommands: ""
+
 
 tserver:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
@@ -738,6 +744,12 @@ tserver:
   ## If previous value is provided again, there will be no Pod restart
   ## for gflags changes.
   gflagsChecksum: ""
+
+  advanced:
+    ## Bash commands to run before the start of the tserver service
+    ## WARNING: This is an advanced feature. Incorrect use may cause startup failures,
+    ## security issues, or unexpected behavior. Use with caution and at your own risk.
+    preCommands: ""
 
 helm2Legacy: false
 
