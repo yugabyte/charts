@@ -627,3 +627,48 @@ tcpSocket:
   port: {{ index (include "yugabyte.yb_tservers.ports" .| fromYaml) "tcp-rpc-port" }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+  Get Security Context.
+*/}}
+{{- define "getSecurityContext" }}
+securityContext:
+  runAsUser: {{ required "runAsUser cannot be empty" .Values.podSecurityContext.runAsUser }}
+  runAsGroup: {{ .Values.podSecurityContext.runAsGroup | default 0 }}
+  fsGroup: {{ .Values.podSecurityContext.fsGroup }}
+  runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
+{{- end -}}
+
+{{/*
+Get ipFamily and ipFamilyPolicy settings.
+*/}}
+{{- define "yugabyte.ipFamilyConfig" }}
+{{- if .Values.ipFamilies }}
+ipFamilies:
+  {{- range .Values.ipFamilies }}
+  - {{ . }}
+  {{- end }}
+{{- end }}
+{{- if .Values.ipFamilyPolicy }}
+ipFamilyPolicy: {{ .Values.ipFamilyPolicy }}
+{{- end }}
+{{- end -}}
+
+{{/*
+  Append commonNameSuffix to commonName while ensuring total length doesn't exceed 63 characters.
+*/}}
+{{- define "yugabyte.commonNameWithSuffix" -}}
+  {{- $commonName := .commonName -}}
+  {{- $suffix := .root.Values.tls.certManager.certificates.commonNameSuffix | default "" -}}
+  {{- if $suffix -}}
+    {{- $combined := printf "%s-%s" $commonName $suffix -}}
+    {{- if gt (len $combined) 63 -}}
+      {{- $maxCommonNameLength := sub 63 (add 1 (len $suffix)) -}}
+      {{- printf "%s-%s" ($commonName | trunc $maxCommonNameLength | trimSuffix "-") $suffix -}}
+    {{- else -}}
+      {{- $combined -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $commonName -}}
+  {{- end -}}
+{{- end -}}

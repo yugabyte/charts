@@ -96,9 +96,9 @@ spec:
   {{- end }}
   ports:
     {{- range $label, $port := .ports }}
-    {{- if (eq $label "grpc-ybc-port") }}
+    {{- if or (eq $label "grpc-ybc-port") (eq $label "tcp-ybc-port")}}
     {{- if $root.Values.ybc.enabled }}
-    - name: {{ $label | quote }}
+    - name: "tcp-ybc-port"
       port: {{ $port }}
     {{- end }}
     {{- else if (eq $label "yugabyted-ui") }}
@@ -113,6 +113,7 @@ spec:
     {{- end}}
   selector:
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
+  {{- include "yugabyte.ipFamilyConfig" ($root) | indent 2 }}
 
 ---
 apiVersion: apps/v1
@@ -182,7 +183,7 @@ spec:
       {{- with $root.Values.networkAnnotation }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- with $root.Values.master.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- if $root.Values.tls.enabled }}
-        checksum/rootCA: {{ cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum }}
+        checksum/rootCA: {{ (not $root.Values.tls.rootCAChecksum) | ternary (cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum) $root.Values.tls.rootCAChecksum }}
       {{- end }}
       {{- end }}
       {{- else }}
@@ -191,7 +192,7 @@ spec:
       {{- with $root.Values.networkAnnotation }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- with $root.Values.tserver.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- if $root.Values.tls.enabled }}
-        checksum/rootCA: {{ cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum }}
+        checksum/rootCA: {{ (not $root.Values.tls.rootCAChecksum) | ternary (cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum) $root.Values.tls.rootCAChecksum }}
       {{- end }}
       {{- end }}
       {{- if and (eq .name "yb-tservers") ($root.Values.otelCollector.enabled) }}
@@ -405,6 +406,7 @@ spec:
           - "/bin/bash"
           - "-c"
           - |
+          {{- $preCommands := ( (eq .name "yb-masters") | ternary $root.Values.master.advanced.preCommands $root.Values.tserver.advanced.preCommands ) }} {{- with $preCommands }} {{ . | nindent 12 }} {{- end }}
           {{- if and (not $root.Values.preflight.skipUlimit) (not $root.Values.preflight.skipAll) }}
             if [ -f /home/yugabyte/tools/k8s_preflight.py ]; then
               /home/yugabyte/tools/k8s_preflight.py all
@@ -440,7 +442,6 @@ spec:
             {{- $serverFqdn := include "yugabyte.server_fqdn" $serviceValues -}}
             echo "Creating ephemeral /opt/certs/yugabyte/ as symlink to persisted /mnt/disk0/certs/" && \
             mkdir -p /mnt/disk0/certs  && \
-            mkdir -p /opt/certs  && \
             ln -s /mnt/disk0/certs /opt/certs/yugabyte  && \
             if [[ ! -f /opt/certs/yugabyte/ca.crt ]]; then
               echo "Fresh install of /opt/certs/yugabyte/ca.crt"
@@ -486,7 +487,7 @@ spec:
           - containerPort: {{ $port }}
             name: {{ $label | quote }}
           {{- end }}
-          {{- else if not (eq $label "grpc-ybc-port") }}
+          {{- else if not (or (eq $label "grpc-ybc-port") (eq $label "tcp-ybc-port"))}}
           - containerPort: {{ $port }}
             name: {{ $label | quote }}
           {{- end }}
@@ -513,6 +514,10 @@ spec:
           - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
             mountPath: {{ $root.Values.tls.certManager.enabled | ternary "/home/yugabyte/cert-manager" "/opt/certs/yugabyte" }}
             readOnly: true
+          {{- if $root.Values.tls.certManager.enabled }}
+          - name: certs-dir
+            mountPath: /opt/certs
+          {{- end }}
           - name: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
             mountPath: /root/.yugabytedb/
             readOnly: true
@@ -572,6 +577,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: YUGABYTED_UI_K8S
+          value: "true"
         command:
           - "/sbin/tini"
           - "--"
@@ -650,7 +657,6 @@ spec:
                   ln -sf /mnt/disk0/yw-data/controller/bin /tmp/yugabyte/controller;
                   rm -f /tmp/yugabyte/controller/yb-controller.pid;
                   {{- if and $root.Values.tls.enabled $root.Values.tls.certManager.enabled }}
-                  mkdir -p /opt/certs;
                   ln -sf /mnt/disk0/certs /opt/certs/yugabyte;
                   {{- end }}
         command:
@@ -664,10 +670,12 @@ spec:
               sleep 60;
               /home/yugabyte/tools/k8s_ybc_parent.py status || /home/yugabyte/tools/k8s_ybc_parent.py start;
             done
-        {{- with index $service.ports "grpc-ybc-port" }}
+        {{- range $label, $port := .ports }}
+        {{- if or (eq $label "grpc-ybc-port") (eq $label "tcp-ybc-port")}}
         ports:
-          - containerPort: {{ . }}
-            name: "grpc-ybc-port"
+          - containerPort: {{ $port }}
+            name: "tcp-ybc-port"
+        {{- end }}
         {{- end }}
         volumeMounts:
           - name: tserver-tmp
@@ -682,6 +690,10 @@ spec:
           - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
             mountPath: {{ $root.Values.tls.certManager.enabled | ternary "/home/yugabyte/cert-manager" "/opt/certs/yugabyte" }}
             readOnly: true
+          {{- if $root.Values.tls.certManager.enabled }}
+          - name: certs-dir
+            mountPath: /opt/certs
+          {{- end }}
           {{- end }}
           {{- if ($root.Values.tserver.extraVolumeMounts) -}}
           {{- include "yugabyte.isExtraVolumesMappingExists" $root.Values.tserver -}}
@@ -726,6 +738,8 @@ spec:
             {{- end }}
             - secret:
                 name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
+        - name: certs-dir
+          emptyDir: {}
         {{- else }}
         {{/* certManager disabled */}}
         - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}

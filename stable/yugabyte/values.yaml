@@ -8,7 +8,7 @@ nameOverride: ""
 
 Image:
   repository: "yugabytedb/yugabyte"
-  tag: 2024.2.2.2-b2
+  tag: 2025.1.0.0-b168
   pullPolicy: IfNotPresent
   pullSecretName: ""
 
@@ -111,6 +111,8 @@ tls:
       # field to be present in the certificate for successful issuance.
       # If set to true, the commonName of certs will automatically be set to the service name.
       commonNameRequired: false
+      # If commonNameSuffix is specified, it will be used as the suffix for the commonName for the certificate.
+      commonNameSuffix: ""
 
   ## When certManager.enabled=false, rootCA.cert and rootCA.key are used to generate TLS certs.
   ## When certManager.enabled=true and boostrapSelfsigned=true, rootCA is ignored.
@@ -130,6 +132,12 @@ tls:
   clientCert:
     cert: ""
     key: ""
+  ## Checksum for CA certificate. If set to empty, statefulset
+  ## will calculate new checksum value and decide whether to restart pods
+  ## based on the result of comparing previous checksum value and new value.
+  ## If previous value is provided again, there will be no Pod restart
+  ## for CA certificate changes.
+  rootCAChecksum: ""
 
 gflags:
   master:
@@ -165,24 +173,24 @@ ybc:
   enabled: false
   ## https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
   ## Use the above link to learn more about Kubernetes resources configuration.
-  # resources:
-  #   requests:
-  #     cpu: "1"
-  #     memory: 1Gi
-  #   limits:
-  #     cpu: "1"
-  #     memory: 1Gi
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      cpu: "1"
+      memory: 1Gi
 
-ybCleanup: {}
+ybCleanup:
   ## https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
   ## Use the above link to learn more about Kubernetes resources configuration.
-  # resources:
-  #   requests:
-  #     cpu: "1"
-  #     memory: 1Gi
-  #   limits:
-  #     cpu: "1"
-  #     memory: 1Gi
+  resources:
+    requests:
+      cpu: "0.25"
+      memory: 250Mi
+    limits:
+      cpu: "0.25"
+      memory: 250Mi
 
 domainName: "cluster.local"
 
@@ -219,6 +227,25 @@ domainName: "cluster.local"
 #     ports:
 #       http-ui: "7000"
 
+## If you would like to define which IP family to use for single stack or define
+## the order of IP families for dual-stack, you can choose the address families by
+## setting the ipFamilies. It can be any of these values:
+## ["IPv4"]
+## ["IPv6"]
+## ["IPv4","IPv6"] (dual stack)
+## ["IPv6","IPv4"] (dual stack)
+## Docs: https://kubernetes.io/docs/concepts/services-networking/dual-stack/#dual-stack-service-configuration-scenarios
+ipFamilies: []
+
+## ipFamilyPolicy can be set to the following values:
+## SingleStack
+## PreferDualStack
+## RequireDualStack
+## Selects the .spec.clusterIP from the list of .spec.clusterIPs based on the address
+## family of the first element in the .spec.ipFamilies array.
+## Docs: https://kubernetes.io/docs/concepts/services-networking/dual-stack/#dual-stack-service-configuration-scenarios
+ipFamilyPolicy: ""
+
 ## Default service scope to use if not defined in service endpoint definition. 
 ## Can be "Namespaced"/"AZ"
 defaultServiceScope: "AZ"
@@ -236,6 +263,7 @@ serviceEndpoints:
     loadBalancerIP: ""
     ports:
       http-ui: "7000"
+    extraArgs: {}
 
   - name: "yb-tserver-service"
     type: LoadBalancer
@@ -251,6 +279,7 @@ serviceEndpoints:
       tcp-yql-port: "9042"
       tcp-yedis-port: "6379"
       tcp-ysql-port: "5433"
+    extraArgs: {}
 
   - name: "yugabyted-ui-service"
     type: LoadBalancer
@@ -265,6 +294,7 @@ serviceEndpoints:
     sessionAffinity: ClientIP
     ports:
       yugabyted-ui: "15433"
+    extraArgs: {}
 
 Services:
   - name: "yb-masters"
@@ -288,7 +318,7 @@ Services:
       http-ycql-met: "12000"
       http-yedis-met: "11000"
       http-ysql-met: "13000"
-      grpc-ybc-port: "18018"
+      tcp-ybc-port: "18018"
       yugabyted-ui: "15433"
 
 
@@ -571,6 +601,12 @@ master:
   ## for gflags changes.
   gflagsChecksum: ""
 
+  advanced:
+    ## Bash commands to run before the start of the master service
+    ## WARNING: This is an advanced feature. Incorrect use may cause startup failures,
+    ## security issues, or unexpected behavior. Use with caution and at your own risk.
+    preCommands: ""
+
 
 tserver:
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#affinity-v1-core
@@ -724,6 +760,12 @@ tserver:
   ## for gflags changes.
   gflagsChecksum: ""
 
+  advanced:
+    ## Bash commands to run before the start of the tserver service
+    ## WARNING: This is an advanced feature. Incorrect use may cause startup failures,
+    ## security issues, or unexpected behavior. Use with caution and at your own risk.
+    preCommands: ""
+
 helm2Legacy: false
 
 ip_version_support: "v4_only" # v4_only, v6_only are the only supported values at the moment
@@ -772,6 +814,10 @@ podSecurityContext:
 legacyVolumeClaimAnnotations: false
 
 useOldPodDisruptionBudget: true
+
+## Set to true to enable OCP compatibility mode.
+ocpCompatibility:
+  enabled: false
 
 ## Set to true to run OTEL collector as a sidecar in tserver pods
 otelCollector:

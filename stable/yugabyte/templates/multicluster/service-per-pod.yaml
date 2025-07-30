@@ -15,9 +15,9 @@ metadata:
 spec:
   ports:
     {{- range $label, $port := $server.ports }}
-    {{- if (eq $label "grpc-ybc-port") }}
+    {{- if or (eq $label "grpc-ybc-port") (eq $label "tcp-ybc-port")}}
     {{- if $.Values.ybc.enabled }}
-    - name: {{ $label | quote }}
+    - name: "tcp-ybc-port"
       port: {{ $port }}
     {{- end }}
     {{- else }}
@@ -28,6 +28,7 @@ spec:
   selector:
     statefulset.kubernetes.io/pod-name: {{ $podName | quote }}
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
+  {{- include "yugabyte.ipFamilyConfig" . | indent 2 }}
 ---
 {{- end }}
 {{- end }}

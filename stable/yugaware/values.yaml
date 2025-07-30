@@ -5,10 +5,6 @@
 fullnameOverride: ""
 nameOverride: ""
 
-# Cloud team will retain nginx for sometime
-# until they start creating a separate pool
-useNginxProxy: false
-
 # Use YugabyteDB as the backend DB for YB Anywhere (Yugaware)
 # instead of PostgreSQL.
 useYugabyteDB: false
@@ -19,7 +15,7 @@ image:
   # including the yugaware image
 
   repository: quay.io/yugabyte/yugaware
-  tag: 2024.2.2.2-b2
+  tag: 2025.1.0.0-b168
   pullPolicy: IfNotPresent
   pullSecret: yugabyte-k8s-pull-secret
   ## Docker config JSON File name
@@ -48,12 +44,7 @@ image:
     registry: ""
     tag: v3.2.1
     name: prom/prometheus
-
-  nginx:
-    registry: ""
-    tag: 1.25.1
-    name: nginxinc/nginx-unprivileged
-
+  
   ybdb:
     registry: ""
     tag: 2.18.1.0-b84
@@ -129,6 +120,10 @@ yugaware:
   kubernetesOperatorNamespace: ""
   # Crash YBA if operator thread is not initialised correctly
   kubernetesOperatorCrashOnFailure: true
+
+  fips:
+    # Enable FIPS mode for YugabyteDB Anywhere.
+    enabled: false
 
   # Create an initial user for YugabyteDB Anywhere. A user is required for YBA workflows.
   defaultUser:
@@ -287,7 +282,7 @@ tls:
   certificate: ""
   key: ""
   ca_certificate: ""
-  sslProtocols: "" # if set, override default Nginx SSL protocols setting
+  sslProtocols: ""
   ## cert-manager values
   ## If cert-manager is enabled:
   ## If genSelfsigned: true:
@@ -334,20 +329,6 @@ domainName: "cluster.local"
 helm2Legacy: false
 
 ip_version_support: "v4_only" # v4_only, v6_only are the only supported values at the moment
-
-nginx:
-  workerConnections: 1024
-  db_node_proxy_enabled: false
-
-  # max size of file upload allowed by YB platform
-  upload_size: 10G
-
-  resources:
-    requests:
-      cpu: "0.25"
-      memory: 300Mi
-
-  proxyReadTimeoutSec: 600
 
 rbac:
   ## Set this to false if you don't have enough permissions to create
