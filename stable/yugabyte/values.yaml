@@ -76,8 +76,10 @@ tls:
   clientToServer: true
   # Set to false to disallow any service with unencrypted communication from joining this cluster
   insecure: false
-  # Set to true to disable any secrets handling. You shall set the secrets with expected name and values (check secrets at the beginning of templates/service.yaml)
-  # If enabled, rootCA, nodeCert and clientCert are ignored
+  # Set to true to disable automatic secrets management.
+  # You must manually create the Kubernetes secrets with the expected names and values
+  # (see the beginning of templates/service.yaml for details).
+  # When enabled, the 'rootCA', 'nodeCert', and 'clientCert' settings are ignored.
   provided: false
 
   # Set enabled to true to use cert-manager instead of providing your own rootCA
