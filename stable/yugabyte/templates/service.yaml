@@ -648,6 +648,40 @@ spec:
       - name: yb-controller
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
         imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
+        {{- if $root.Values.ybc.useYBDBImage }}
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: YBDEVOPS_CORECOPY_DIR
+          value: "/mnt/disk0/cores"
+        workingDir: "/mnt/disk0/cores"
+        command:
+          - "/sbin/tini"
+          - "--"
+        args:
+          - "/bin/bash"
+          - "-c"
+          - |
+            if [[ -f /home/yugabyte/tools/k8s_parent.py ]]; then
+              k8s_parent="/home/yugabyte/tools/k8s_parent.py"
+            else
+              k8s_parent=""
+            fi && \
+            mkdir -p /tmp/yugabyte/controller/conf && \
+            envsubst < /opt/controller/conf/server.conf.template > /tmp/yugabyte/controller/conf/server.conf && \
+            exec ${k8s_parent} /home/yugabyte/controller/bin/yb-controller-server \
+              --flagfile /tmp/yugabyte/controller/conf/server.conf
+        {{- else }}
         lifecycle:
           postStart:
             exec:
@@ -676,6 +710,7 @@ spec:
               sleep 60;
               /home/yugabyte/tools/k8s_ybc_parent.py status || /home/yugabyte/tools/k8s_ybc_parent.py start;
             done
+        {{- end }}
         {{- range $label, $port := .ports }}
         {{- if or (eq $label "grpc-ybc-port") (eq $label "tcp-ybc-port")}}
         ports:
@@ -686,6 +721,10 @@ spec:
         volumeMounts:
           - name: tserver-tmp
             mountPath: /tmp
+          {{- if $root.Values.ybc.useYBDBImage }}
+          - name: controller-gflags
+            mountPath: /opt/controller/conf
+          {{- end }}
           {{- if not $root.Values.storage.ephemeral }}
           {{- range $index := until (int ($storageInfo.count)) }}
           - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
@@ -729,6 +768,12 @@ spec:
           secret:
             secretName: {{ include "yugabyte.fullname" $root }}-tserver-gflags
             defaultMode: 0755
+        {{- if $root.Values.ybc.useYBDBImage }}
+        - name: controller-gflags
+          secret:
+            secretName: {{ include "yugabyte.fullname" $root }}-controller-gflags
+            defaultMode: 0755
+        {{- end }}
         - name: tserver-tmp
           emptyDir: {}
         {{- end }}

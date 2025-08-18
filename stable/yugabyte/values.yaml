@@ -144,6 +144,7 @@ gflags:
     default_memory_limit_to_ram_ratio: 0.85
   tserver: {}
 #   use_cassandra_authentication: false
+  ybc: {}
 
 yugabytedUi:
   enabled: true
@@ -171,6 +172,8 @@ enableLoadBalancer: true
 
 ybc:
   enabled: false
+  # Use inbuilt YB-Controller executable
+  useYBDBImage: false
   ## https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
   ## Use the above link to learn more about Kubernetes resources configuration.
   resources:
