@@ -107,7 +107,7 @@ tls:
       # Or 256, 384 or 521 for ECDSA
       keySize: 2048
       # Enable this option to include a commonName in the Certificate.
-      # Certain custom Certificate Authorities (CAs), such as AWS PCA, require the commonName 
+      # Certain custom Certificate Authorities (CAs), such as AWS PCA, require the commonName
       # field to be present in the certificate for successful issuance.
       # If set to true, the commonName of certs will automatically be set to the service name.
       commonNameRequired: false
@@ -785,6 +785,26 @@ preflight:
   ## SkipAll has higher priority
   skipUlimit: false
 
+## Liveness Probe configuration for both master and tserver pods
+livenessProbe:
+  enabled: true
+  failureThreshold: 3
+  periodSeconds: 10
+  successThreshold: 1
+  timeoutSeconds: 1
+
+## Custom livenessProbe that overrides the default one
+## Example:
+# customLivenessProbe:
+#   failureThreshold: 3
+#   periodSeconds: 10
+#   timeoutSeconds: 1
+#   successThreshold: 1
+#   exec:
+#     command:
+#       - /custom/health/check
+customLivenessProbe: {}
+
 ## Pod securityContext
 ## Ref: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#security-context
 ## The following configuration runs YB-Master and YB-TServer as a non-root user
@@ -840,7 +860,7 @@ otelCollector:
   #     memory: "512Mi"
 
   # Add secret environment variables here if using AWS CloudWatch or GCP Log Explorer.
-  secretEnv: [] 
+  secretEnv: []
   # secretEnv:
   # - envName: AWS_ACCESS_KEY_ID
   #   envValue:  <key-id>
@@ -849,10 +869,9 @@ otelCollector:
   # - envName: GOOGLE_APPLICATION_CREDENTIALS_CONTENT
   #   envValue:  <GCP_CREDENTIALS_JSON_KEY_CONTENT>
 
-  # Alternatively, set `tserver.serviceAccount` to a service account with the necessary permissions 
+  # Alternatively, set `tserver.serviceAccount` to a service account with the necessary permissions
   # to utilize IAM roles for access instead of embedding credentials directly.
   # Additionally, ensure that the appropriate nodeSelector is added to enable the metadata server
-  # for example: for IAM authentication in GKE. 
+  # for example: for IAM authentication in GKE.
   # nodeSelector:
   #   iam.gke.io/gke-metadata-server-enabled: "true"
-  

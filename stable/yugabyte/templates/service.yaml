@@ -334,6 +334,10 @@ spec:
                     fi;
                   fi
         {{- if (and (not $root.Values.storage.ephemeral) (not $service.skipHealthChecks)) }}
+        {{- if $root.Values.livenessProbe.enabled }}
+        {{- if $root.Values.customLivenessProbe }}
+        livenessProbe: {{- toYaml $root.Values.customLivenessProbe | nindent 10 }}
+        {{- else }}
         livenessProbe:
           exec:
             command:
@@ -345,10 +349,12 @@ spec:
               exit_code="$?";
               echo "disk check exited with: ${exit_code}";
               exit "${exit_code}"
-          failureThreshold: 3
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 1
+          failureThreshold: {{ $root.Values.livenessProbe.failureThreshold }}
+          periodSeconds: {{ $root.Values.livenessProbe.periodSeconds }}
+          successThreshold: {{ $root.Values.livenessProbe.successThreshold }}
+          timeoutSeconds: {{ $root.Values.livenessProbe.timeoutSeconds }}
+        {{- end }}
+        {{- end }}
         {{- if (and (eq .name "yb-masters") (include "yugabyte.master.startupProbe" $root)) }}
         startupProbe: {{- include "yugabyte.master.startupProbe" $root | nindent 10 }}
         {{- else if (and (eq .name "yb-tservers") (include "yugabyte.tserver.startupProbe" $root)) }}
