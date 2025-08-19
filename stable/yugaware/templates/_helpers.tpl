@@ -289,3 +289,38 @@ Common labels to be applied to all objects
 {{- toYaml $commonLabels -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Compare a version string to stable and preview versions. Versions must not include build numbers
+Usage: {{ include "yb_version_compare" (list $version $stable $preview) }}
+Returns: 1 if version > target, 0 if equal, -1 if version < target. Target is stable if version matches stable pattern, else preview.
+*/}}
+{{- define "yb_version_compare" -}}
+  {{- $args := . -}}
+  {{- $ver := index $args 0 -}}
+  {{- $stable := index $args 1 -}}
+  {{- $preview := index $args 2 -}}
+  {{- $stablePattern := "^[0-9]{4}\\.[0-9]+\\.[0-9]+\\.[0-9]+$" -}}
+  {{- $target := "" -}}
+  {{- if regexMatch $stablePattern $ver -}}
+    {{- $target = $stable -}}
+  {{- else -}}
+    {{- $target = $preview -}}
+  {{- end -}}
+  {{- $verParts := splitList "." $ver -}}
+  {{- $targetParts := splitList "." $target -}}
+  {{- $maxParts := (int (max (len $verParts) (len $targetParts))) -}}
+  {{- $result := 0 -}}
+  {{- range $i, $v := until $maxParts -}}
+    {{- $verNum := (int (default "0" (index $verParts (int $i)))) -}}
+    {{- $targetNum := (int (default "0" (index $targetParts (int $i)))) -}}
+    {{- if gt $verNum $targetNum -}}
+      {{- $result = 1 -}}
+      {{- break -}}
+    {{- else if lt $verNum $targetNum -}}
+      {{- $result = -1 -}}
+      {{- break -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if eq $result 1 -}}1{{- else if eq $result 0 -}}0{{- else -}}-1{{- end -}}
+{{- end -}}

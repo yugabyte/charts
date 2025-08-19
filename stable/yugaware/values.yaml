@@ -491,3 +491,5 @@ initContainers:
         cpu: "0.25"
         memory: 500Mi
 
+preupgradeChecks:
+  enabled: true
