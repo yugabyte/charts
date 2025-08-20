@@ -5,6 +5,10 @@
 fullnameOverride: ""
 nameOverride: ""
 
+# Common labels to apply to all objects deployed by this chart
+# This provides an escape hatch for adding custom labels globally
+commonLabels: {}
+
 # Use YugabyteDB as the backend DB for YB Anywhere (Yugaware)
 # instead of PostgreSQL.
 useYugabyteDB: false
@@ -44,7 +48,7 @@ image:
     registry: ""
     tag: v3.2.1
     name: prom/prometheus
-  
+
   ybdb:
     registry: ""
     tag: 2.18.1.0-b84

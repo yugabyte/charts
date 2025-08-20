@@ -10,6 +10,9 @@ metadata:
     k8s-app: yugaware
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 {{- if .Values.yugaware.serviceAccountAnnotations }}
   annotations:
 {{ toYaml .Values.yugaware.serviceAccountAnnotations | indent 4 }}
@@ -24,6 +27,9 @@ metadata:
   name: {{ .Release.Name }}-cluster-monitoring-view
   labels:
     app: yugaware
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
@@ -40,6 +46,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ .Release.Name }}
+  labels:
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 rules:
 # Set of permissions required for operator
 - apiGroups:
@@ -239,6 +249,9 @@ metadata:
     k8s-app: yugaware
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
