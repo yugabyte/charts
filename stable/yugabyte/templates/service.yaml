@@ -91,9 +91,7 @@ metadata:
     service-type: "headless"
 spec:
   clusterIP: None
-  {{- if (or (include "yugabyte.master.readinessProbe" $root) (include "yugabyte.tserver.readinessProbe" $root)) }}
   publishNotReadyAddresses: true
-  {{- end }}
   ports:
     {{- range $label, $port := .ports }}
     {{- if or (eq $label "grpc-ybc-port") (eq $label "tcp-ybc-port")}}
