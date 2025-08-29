@@ -110,7 +110,7 @@ spec:
     - name: {{ $label | quote }}
       port: {{ $port }}
     {{- end }}
-    {{- end}}
+    {{- end }}
   selector:
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
   {{- include "yugabyte.ipFamilyConfig" ($root) | indent 2 }}
@@ -315,6 +315,58 @@ spec:
       {{- with $root.Values.dnsPolicy }}
       dnsPolicy: {{ . | quote }}
       {{- end }}
+      {{- if and $root.Values.tls.enabled $root.Values.tls.certManager.enabled }}
+      initContainers:
+        - name: certmanager-init
+          image: {{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}
+          imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
+          command:
+            - "/bin/bash"
+            - "-c"
+            - |
+              {{ $serverFqdn := include "yugabyte.server_fqdn" $serviceValues }}
+              mkdir -p /mnt/disk0/certs;
+              chmod u+x /mnt/disk0/certs;
+              if [ -L /mnt/disk0/certs/certs ]; then
+                echo "Cleaning up old recursive symlink at /mnt/disk0/certs/certs if it exists";
+                chmod --reference="$(dirname /mnt/disk0/certs)" /mnt/disk0/certs
+                rm -f /mnt/disk0/certs/certs;
+              fi
+              echo "Creating ephemeral /opt/certs/yugabyte/ as symlink to persisted /mnt/disk0/certs/"
+              ln -sF /mnt/disk0/certs /opt/certs/yugabyte
+              if [[ ! -f /mnt/disk0/certs/ca.crt ]]; then
+                echo "Fresh install of /mnt/disk0/certs/ca.crt"
+                cp /home/yugabyte/cert-manager/ca.crt /mnt/disk0/certs/ca.crt;
+              fi
+              cmp -s /home/yugabyte/cert-manager/ca.crt /mnt/disk0/certs/ca.crt; sameRootCA=$?;
+              if [[ $sameRootCA -eq 0 ]]; then
+                echo "Refreshing TLS certs at /mnt/disk0/certs/";
+                cp /home/yugabyte/cert-manager/tls.crt /mnt/disk0/certs/node.{{$serverFqdn}}.crt;
+                cp /home/yugabyte/cert-manager/tls.key /mnt/disk0/certs/node.{{$serverFqdn}}.key;
+                chmod 600 /mnt/disk0/certs/*;
+              else
+                echo "WARNING: Not refreshing certificates as the root ca.crt has changed";
+              fi
+          volumeMounts:
+            {{- if not $root.Values.storage.ephemeral }}
+            - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir0") (printf "%s0" (include "yugabyte.volume_name" $root)) }}
+              mountPath: /mnt/disk0
+            {{- end }}
+            - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
+              mountPath: /home/yugabyte/cert-manager
+              readOnly: true
+            - name: certs-dir
+              mountPath: /opt/certs
+          env:
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+      {{- end }}
       containers:
       - name: "{{ .label }}"
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
@@ -437,25 +489,6 @@ spec:
             else
               k8s_parent=""
             fi && \
-          {{- if and $root.Values.tls.enabled $root.Values.tls.certManager.enabled }}
-            {{- $serverFqdn := include "yugabyte.server_fqdn" $serviceValues -}}
-            echo "Creating ephemeral /opt/certs/yugabyte/ as symlink to persisted /mnt/disk0/certs/" && \
-            mkdir -p /mnt/disk0/certs  && \
-            ln -s /mnt/disk0/certs /opt/certs/yugabyte  && \
-            if [[ ! -f /opt/certs/yugabyte/ca.crt ]]; then
-              echo "Fresh install of /opt/certs/yugabyte/ca.crt"
-              cp /home/yugabyte/cert-manager/ca.crt /opt/certs/yugabyte/ca.crt;
-            fi && \
-            cmp -s /home/yugabyte/cert-manager/ca.crt /opt/certs/yugabyte/ca.crt;sameRootCA=$? && \
-            if [[ $sameRootCA -eq 0 ]]; then
-              echo "Refreshing tls certs at /opt/certs/yugabyte/";
-              cp /home/yugabyte/cert-manager/tls.crt /opt/certs/yugabyte/node.{{$serverFqdn}}.crt;
-              cp /home/yugabyte/cert-manager/tls.key /opt/certs/yugabyte/node.{{$serverFqdn}}.key;
-              chmod 600 /opt/certs/yugabyte/*
-            else
-              echo "WARNING: Not refreshing certificates as the root ca.crt has changed"
-            fi && \
-          {{- end }}
           {{- if eq .name "yb-masters" }}
             mkdir -p /tmp/yugabyte/master/conf && \
             envsubst < /opt/master/conf/server.conf.template > /tmp/yugabyte/master/conf/server.conf && \
@@ -655,9 +688,6 @@ spec:
                   ln -sf /mnt/disk0/ybc-data/controller/logs /tmp/yugabyte/controller;
                   ln -sf /mnt/disk0/yw-data/controller/bin /tmp/yugabyte/controller;
                   rm -f /tmp/yugabyte/controller/yb-controller.pid;
-                  {{- if and $root.Values.tls.enabled $root.Values.tls.certManager.enabled }}
-                  ln -sf /mnt/disk0/certs /opt/certs/yugabyte;
-                  {{- end }}
         command:
           - "/sbin/tini"
           - "--"
