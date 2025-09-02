@@ -186,6 +186,9 @@ spec:
       {{- end }}
       {{- else }}
         checksum/gflags: {{ (not $root.Values.tserver.gflagsChecksum) | ternary (include (print $root.Template.BasePath "/tserver-gflags-secret.yaml") $root | sha256sum) $root.Values.tserver.gflagsChecksum }}
+      {{- if $root.Values.ybc.useYBDBImage }}
+        checksum/ybcGflags: {{ (not $root.Values.ybc.gflagsChecksum) | ternary (include (print $root.Template.BasePath "/controller-gflags-secret.yaml") $root | sha256sum) $root.Values.ybc.gflagsChecksum }}
+      {{- end }}
       {{- if (or $root.Values.networkAnnotation $root.Values.tserver.podAnnotations $root.Values.tls.enabled) }}
       {{- with $root.Values.networkAnnotation }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- with $root.Values.tserver.podAnnotations }}{{ toYaml . | nindent 8 }}{{ end }}

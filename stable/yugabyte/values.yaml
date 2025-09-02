@@ -183,6 +183,12 @@ ybc:
     limits:
       cpu: "1"
       memory: 1Gi
+  ## Checksum for controller gflags secret. If set to empty, statefulset
+  ## will calculate new checksum value and decide whether to restart pods
+  ## based on the result of comparing previous checksum value and new value.
+  ## If previous value is provided again, there will be no Pod restart
+  ## for gflags changes.
+  gflagsChecksum: ""
 
 ybCleanup:
   ## https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
