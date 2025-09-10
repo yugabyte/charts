@@ -1,5 +1,7 @@
 {{- if .Release.IsUpgrade }}
 {{- $newTag := .Values.image.tag }}
+{{- /* stsName is also the same format used for the app selector label to map sts to pods */}}
+{{- $stsName := printf "%s-%s" .Release.Name "yugaware" }}
 {{- $stable := "2025.2.0.0" }}
 {{- $preview := "2.27.0.0" }}
 {{- $newTagMain := regexReplaceAll "(.*)-b.*" $newTag "${1}" }}
