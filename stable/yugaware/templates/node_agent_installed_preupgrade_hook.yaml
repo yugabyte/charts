@@ -18,7 +18,9 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "yugaware.fullname" . }}-nodeagent-precheck
+  {{- /* Truncate name length to be less than 63 chars, including extra identifiers that *}}
+  {{- /* are added when a job pod are created */}}
+  name: {{ trunc 35 (include "yugaware.fullname" . )}}-nodeagent-precheck
   namespace: "{{ .Release.Namespace }}"
   annotations:
     "helm.sh/hook": pre-upgrade
