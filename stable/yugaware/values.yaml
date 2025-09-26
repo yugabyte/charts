@@ -33,7 +33,7 @@ image:
   postgres:
     # For non default postgres image, set postgres.sampleConfig values accordingly.
     registry: ""
-    tag: '14.17'
+    tag: '14.19'
     name: postgres
     # Postgres postgresql.conf.sample location on container. This will be used to mount
     # configmap with custom settings.
