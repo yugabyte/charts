@@ -100,6 +100,7 @@ spec:
                     - key: universe_boot_script
                       path: universe-boot-script.sh
             {{- end }}
+        {{- if .Values.prometheus.enabled }}
         - name: prometheus-config
           configMap:
             name: {{ .Release.Name }}-yugaware-prometheus-config
@@ -108,6 +109,7 @@ spec:
                 path: prometheus.yml
               - key: no_scrape.yml
                 path: no_scrape.yml
+        {{- end }}
         {{- if .Values.securityContext.enabled }}
         - name: init-container-script
           configMap:
@@ -195,6 +197,7 @@ spec:
       dnsPolicy: {{ . | quote }}
       {{- end }}
       initContainers:
+        {{- if .Values.prometheus.enabled }}
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.initContainers.prometheusConfiguration.resources }}
@@ -235,6 +238,7 @@ spec:
           - name: init-container-script
             mountPath: /init-container
           {{- end }}
+        {{- end }}
         {{- if not .Values.useYugabyteDB }}
         {{- if not (and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io")) }}
         - image: {{ include "full_image" (dict "containerName" "postgres-upgrade" "root" .) }}
@@ -451,6 +455,7 @@ spec:
                 command: ["/bin/bash", "/ybdb-create-yugware-db/ybdb-create-yugaware-db.sh"]
           {{- end }}
 
+        {{- if .Values.prometheus.enabled }}
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -506,6 +511,7 @@ spec:
             - --query.timeout={{ .Values.prometheus.queryTimeout }}
           ports:
             - containerPort: 9090
+        {{- end }}
         - name: yugaware
           image: {{ include "full_yugaware_image" . }}
           {{- if .Values.securityContext.enabled }}
@@ -611,6 +617,7 @@ spec:
           - name: yugaware-storage
             mountPath: /opt/releases/
             subPath: releases
+          {{- if .Values.prometheus.enabled }}
           - name: yugaware-storage
             mountPath: /opt/yugabyte/prometheus/targets
             subPath: swamper_targets
@@ -625,6 +632,7 @@ spec:
           - name: yugaware-storage
             mountPath: /prometheus_data
             subPath: prometheus_data
+          {{- end }}
         {{- if (.Values.tls.enabled) }}
           {{- if .Values.tls.certManager.enabled }}
           - name: {{  .Release.Name }}-yugaware-tls-cert

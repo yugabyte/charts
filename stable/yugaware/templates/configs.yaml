@@ -86,14 +86,16 @@ data:
       cloud.enabled = {{ .Values.yugaware.cloud.enabled }}
       cloud.requestIdHeader = "{{ .Values.yugaware.cloud.requestIdHeader }}"
       devops.home = /opt/yugabyte/devops
+{{- if .Values.prometheus.enabled }}
       metrics.host = "{{ eq .Values.ip_version_support "v6_only" | ternary "[::1]" "127.0.0.1" }}"
       metrics.url = "http://"${yb.metrics.host}":9090/api/v1"
       metrics.management.url = "http://"${yb.metrics.host}":9090/-"
+      swamper.targetPath = /opt/yugabyte/prometheus/targets
+      swamper.rulesPath = /opt/yugabyte/prometheus/rules
+{{- end }}
       storage.path = /opt/yugabyte/yugaware/data
       docker.network = bridge
       seedData = false
-      swamper.targetPath = /opt/yugabyte/prometheus/targets
-      swamper.rulesPath = /opt/yugabyte/prometheus/rules
       security.enable_auth_for_proxy_metrics = {{ .Values.yugaware.enableProxyMetricsAuth }}
       proxy_endpoint_timeout = {{ .Values.yugaware.proxyEndpointTimeoutMs }}
       multiTenant = {{ .Values.yugaware.multiTenant }}
@@ -280,7 +282,7 @@ data:
 
 {{- end }}
 
-{{- if .Values.prometheus.remoteWrite.tls.enabled }}
+{{- if and .Values.prometheus.enabled .Values.prometheus.remoteWrite.tls.enabled }}
 ---
 apiVersion: v1
 kind: Secret
@@ -308,6 +310,7 @@ data:
 {{- end }}
 {{- end}}
 
+{{- if .Values.prometheus.enabled }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -664,3 +667,4 @@ data:
 {{ toYaml .Values.prometheus.remoteWrite.config | indent 6}}
     {{- end }}
     scrape_configs: []
+{{- end }}
