@@ -9,7 +9,7 @@
 {{- $shouldRun := ge $newCompare 0 }}
 {{- if and $shouldRun .Values.preupgradeChecks.enabled }}
 {{- /* need to get the ip address of the YBA pod, so we can connect to its pg */}}
-{{- $postgresIp := "localhost" }} 
+{{- $postgresIp := "localhost" }}
 {{- range $i, $p := (lookup "v1" "Pod" .Release.Namespace "" ).items }}
   {{- if and (and (hasKey $p.metadata "labels") (hasKey $p.metadata.labels "app")) (eq $p.metadata.labels.app $stsName) }}
     {{- $postgresIp = $p.status.podIP }}
@@ -24,7 +24,7 @@ metadata:
   namespace: "{{ .Release.Namespace }}"
   annotations:
     "helm.sh/hook": pre-upgrade
-    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-weight": "1"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
   labels:
     app: "nodeagent-precheck"
@@ -34,7 +34,6 @@ metadata:
 spec:
   template:
     spec:
-      backoffLimit: 0
       terminationGracePeriodSeconds: {{ .Values.yugaware.pod.terminationGracePeriodSeconds }}
       serviceAccountName: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
       imagePullSecrets:
@@ -105,8 +104,6 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: app_secret
-            - name: YBA_UPGRADE_PRECHECK
-              value: "true"
           volumeMounts:
           - name: yugaware-config
             mountPath: /data
@@ -115,7 +112,7 @@ spec:
           projected:
             sources:
               - configMap:
-                  name: {{ .Release.Name }}-preupgrade-config
+                  name: {{ trunc 36 .Release.Name }}-preupgrade-config
                   items:
                     - key: application.docker.conf
                       path: application.docker.conf
@@ -124,7 +121,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Release.Name }}-preupgrade-config
+  name: {{ trunc 36 .Release.Name }}-preupgrade-config
   labels:
     app: {{ template "yugaware.name" . }}
     chart: {{ template "yugaware.chart" . }}
