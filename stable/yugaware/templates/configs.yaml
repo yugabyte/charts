@@ -351,6 +351,7 @@ data:
           'match[]':
             # kubelet metrics that match our pods
             - '{pod=~"(.*)yb-(.*)"}'
+            - '{__name__=~"kubelet_volume_stats_.*", persistentvolumeclaim=~"(.*)-yb-(.*)"}'
         static_configs:
           - targets:
             - "prometheus-k8s.openshift-monitoring.svc:9091"
