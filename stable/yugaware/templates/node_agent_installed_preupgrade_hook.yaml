@@ -92,7 +92,11 @@ spec:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_db
             - name: POSTGRES_HOST
+              {{- if .Values.postgres.external.host }}
+              value: {{ .Values.postgres.external.host | quote }}
+              {{- else }}
               value: {{ $postgresIp }}
+              {{- end }}
             - name: POSTGRES_PORT
               {{- if .Values.postgres.external.host }}
               value: {{ .Values.postgres.external.port | quote }}
