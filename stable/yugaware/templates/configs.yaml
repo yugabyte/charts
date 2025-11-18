@@ -373,6 +373,10 @@ data:
             regex: "(.*)"
             target_label: "container_name"
             replacement: "$1"
+          - source_labels: ["topology_kubernetes_io_zone"]
+            regex: "(.*)"
+            target_label: "az_name"
+            replacement: "$1"
           # rename new name of the CPU metric to the old name and label
           # ref: https://github.com/kubernetes/kube-state-metrics/blob/master/CHANGELOG.md#v200-alpha--2020-09-16
           - source_labels: ["__name__", "unit"]
@@ -423,6 +427,10 @@ data:
             regex: "(.*)"
             target_label: "container_name"
             replacement: "$1"
+          - source_labels: ["topology_kubernetes_io_zone"]
+            regex: "(.*)"
+            target_label: "az_name"
+            replacement: "$1"
 
       - job_name: 'kube-state-metrics'
         static_configs:
@@ -444,6 +452,10 @@ data:
           - source_labels: ["container"]
             regex: "(.*)"
             target_label: "container_name"
+            replacement: "$1"
+          - source_labels: ["topology_kubernetes_io_zone"]
+            regex: "(.*)"
+            target_label: "az_name"
             replacement: "$1"
           # Keep metrics from YugabyteDB pods, discard everything else
           - source_labels: ["pod_name"]
@@ -493,6 +505,10 @@ data:
           - source_labels: ["container"]
             regex: "(.*)"
             target_label: "container_name"
+            replacement: "$1"
+          - source_labels: ["topology_kubernetes_io_zone"]
+            regex: "(.*)"
+            target_label: "az_name"
             replacement: "$1"
           # Keep metrics from YugabyteDB pods, discard everything else
           - source_labels: ["pod_name"]
