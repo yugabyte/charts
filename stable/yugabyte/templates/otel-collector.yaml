@@ -3,11 +3,15 @@
 {{- if .Values.otelCollector.enabled }}
 ---
 {{- if .Values.otelCollector.secretEnv }}
+{{- $appLabelArgs := dict "label" "yb-tserver" "root" $root -}}
 apiVersion: v1
 kind: Secret
 metadata:
   name:  {{ include "yugabyte.fullname" $root }}-otel-secrets
   namespace: "{{ $root.Release.Namespace }}"
+  labels:
+    {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
+    {{- include "yugabyte.labels" $root | indent 4 }}
 type: Opaque
 data:
 {{- range .Values.otelCollector.secretEnv }}
@@ -15,16 +19,20 @@ data:
 {{- end }}
 {{- end }}
 ---
+{{- $appLabelArgs := dict "label" "yb-tserver" "root" $root -}}
 apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: {{ $root.Values.oldNamingStyle | ternary "otel-yb-tserver" (printf "otel-%s-yb-tserver" (include "yugabyte.fullname" $root)) | quote }}
   namespace: "{{ $root.Release.Namespace }}"
+  labels:
+    {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
+    {{- include "yugabyte.labels" $root | indent 4 }}
 spec:
   config:
     exporters:
       {{- range $name, $exporter := .Values.otelCollector.exporters}}
-      {{ $name }}: 
+      {{ $name }}:
 {{ toYaml $exporter | indent 8 }}
       {{- end }}
     extensions:
@@ -121,7 +129,7 @@ spec:
   - name: init-otel-collector
     image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
     imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
-    command: 
+    command:
       - "sh"
       - "-c"
       - >
