@@ -1,7 +1,19 @@
-{{- if and (not .Values.rbac.create) (.Values.yugaware.kubernetesOperatorEnabled) }}
-{{- fail "Must use rbac if Kubernetes operator is enabled" }}
+{{ if and .Values.yugaware.kubernetesOperatorEnabled
+     (and (not .Values.rbac.create)
+          (not .Values.yugaware.serviceAccount)) }}
+{{ fail "Must use rbac or provide a service account with the correct permissions if Kubernetes operator is enable " }}
+{{- end }}
+{{- if and .Values.yugaware.kubernetesOperatorNamespace
+      (and (not .Values.yugaware.serviceAccount)
+           (ne .Release.Namespace .Values.yugaware.kubernetesOperatorNamespace)
+           (.Values.rbac.namespaced)) }}
+{{ fail "When using operator in a specific namespace, you must either 1) provide a service account with the correct permissions or 2) deploy the operator in the same namespace with rbac.namespaced set to true, or 3) use global rbac.create without rbac.namespaced"}}
+{{- end }}
+{{- if and (not .Values.yugaware.kubernetesOperatorNamespace) .Values.rbac.namespaced }}
+{{ fail "Cannot use the operator globally with namespaced RBAC"}}
 {{- end }}
 {{ if not .Values.yugaware.serviceAccount }}
+{{/* Create a default service account if one is not provided */}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -43,7 +55,11 @@ roleRef:
 {{- if or (not .Values.ocpCompatibility.enabled) .Values.yugaware.kubernetesOperatorEnabled }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
+{{- if .Values.rbac.namespaced }}
+kind: Role
+{{- else }}
 kind: ClusterRole
+{{- end }}
 metadata:
   name: {{ .Release.Name }}
   labels:
@@ -123,6 +139,7 @@ rules:
   - "patch"
   - "delete"
 # Set of permissions required by YBA to manage YB DB universes
+{{- if not .Values.rbac.namespaced }}
 - apiGroups:
   - ""
   resources:
@@ -133,6 +150,7 @@ rules:
   - "patch"
   - "get"
   - "list"
+{{- end }}
 - apiGroups:
   - ""
   resources:
@@ -179,6 +197,8 @@ rules:
 # required to scrape resource metrics like CPU, memory, etc.
 # required to validate zones during provider creation
 # required to auto-fill the zone labels for provider creation
+{{- if not .Values.rbac.namespaced }}
+{{/* nodes and nodes/proxy are global resources */}}
 - apiGroups:
   - ""
   resources:
@@ -194,6 +214,7 @@ rules:
   - "nodes/proxy"
   verbs:
   - "get"
+{{- end }}
 # Ref: https://github.com/yugabyte/charts/commit/4a5319972385666487a7bc2cd0c35052f2cfa4c5
 - apiGroups:
   - ""
@@ -217,18 +238,22 @@ rules:
   - "update"
 # required to validate storage class during provider creation and
 # volume expansion
+{{- if not .Values.rbac.namespaced }}
 - apiGroups:
   - "storage.k8s.io"
   resources:
   - "storageclasses"
   verbs:
   - "get"
+{{- end }}
 # required to validate existance of issuer during provider creation.
 - apiGroups:
   - "cert-manager.io"
   resources:
   - "issuers"
+{{- if not .Values.rbac.namespaced }}
   - "clusterissuers"
+{{- end }}
   verbs:
   - "get"
 - apiGroups:
@@ -241,7 +266,11 @@ rules:
   - "patch"
   - "delete"
 ---
+{{- if .Values.rbac.namespaced }}
+kind: RoleBinding
+{{- else }}
 kind: ClusterRoleBinding
+{{- end }}
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Name }}
@@ -257,7 +286,11 @@ subjects:
   name: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
   namespace: {{ .Release.Namespace }}
 roleRef:
+  {{- if .Values.rbac.namespaced }}
+  kind: Role
+  {{- else }}
   kind: ClusterRole
+  {{- end }}
   name: {{ .Release.Name }}
   apiGroup: rbac.authorization.k8s.io
 {{- end }}
