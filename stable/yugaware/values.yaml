@@ -336,6 +336,8 @@ rbac:
   ## set to false, some of the graphs from Container section of the
   ## Metrics UI don't work.
   create: true
+  # Set to true to enable namespaced RBAC instead of global
+  namespaced: false
 
 ## In order to deploy on OpenShift Container Platform, set this to
 ## true.
