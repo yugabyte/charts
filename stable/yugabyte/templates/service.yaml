@@ -202,8 +202,8 @@ spec:
       {{- end}}
       {{- end }}
       labels:
-        {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
         {{- include "yugabyte.labels" $root | indent 8 }}
+        {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
         {{- if $root.Values.istioCompatibility.enabled }}
         sidecar.istio.io/inject: "true"
         {{- end }}
@@ -864,6 +864,9 @@ apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
   name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-pdb" .label) (printf "%s-%s-pdb" (include "yugabyte.fullname" $root) .name) }}
+  labels:
+    {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
+    {{- include "yugabyte.labels" $root | indent 4 }}
 spec:
   maxUnavailable: {{ template "yugabyte.max_unavailable_for_quorum" $root }}
   selector:

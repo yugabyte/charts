@@ -1,17 +1,12 @@
 {{- if and .Values.serviceMonitor.enabled .Values.serviceMonitor.master.enabled }}
+{{- $appLabelArgs := dict "label" "yb-master" "root" . -}}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ include "yugabyte.fullname" . }}-yb-master
   labels:
-    {{- if .Values.oldNamingStyle }}
-    app: "yb-master"
-    {{- else }}
-    app.kubernetes.io/name: "yb-master"
-    {{- end }}
-    release: {{ .Release.Name | quote }}
-    chart: "{{ .Chart.Name }}"
-    component: "{{ .Values.Component }}"
+    {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
+    {{- include "yugabyte.labels" . | indent 4 }}
     {{- with .Values.serviceMonitor.extraLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
