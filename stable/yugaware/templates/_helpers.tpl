@@ -261,7 +261,7 @@ securityContext:
   {{- end -}}
   {{- end -}}
   {{- printf $flagsList -}}
-  
+
 {{- end -}}
 
 {{/*
@@ -278,4 +278,14 @@ Make list of custom http headers
   {{- end -}}
 {{- end -}}
 ]
+{{- end -}}
+
+{{/*
+Common labels to be applied to all objects
+*/}}
+{{- define "yugaware.commonLabels" -}}
+{{- $commonLabels := .Values.commonLabels | default dict -}}
+{{- if $commonLabels -}}
+{{- toYaml $commonLabels -}}
+{{- end -}}
 {{- end -}}

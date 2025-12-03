@@ -1,7 +1,7 @@
 {{- if .Values.yugaware.defaultUser.enabled -}}
 apiVersion: batch/v1
 kind: Job
-metadata: 
+metadata:
   name: {{ include "yugaware.fullname" . }}-customer-create-job
   namespace: "{{ .Release.Namespace }}"
   labels:
@@ -9,6 +9,9 @@ metadata:
     release: {{ .Release.Name | quote }}
     chart: "{{ .Chart.Name }}"
     component: "{{ .Values.Component }}"
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
   annotations:
     "helm.sh/hook": post-install
     "helm.sh/hook-weight": "0"
@@ -22,6 +25,9 @@ spec:
         release: {{ .Release.Name | quote }}
         chart: "{{ .Chart.Name }}"
         component: "{{ .Values.Component }}"
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 8 }}
+{{- end }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.yugaware.pod.terminationGracePeriodSeconds }}
       serviceAccountName: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
@@ -57,7 +63,7 @@ spec:
 {{ toYaml .Values.zoneAffinity | indent 18 }}
       {{- end }}
       restartPolicy: Never
-      containers: 
+      containers:
       - name: post-install-job
         image: {{ include "full_yugaware_image" . }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -70,7 +76,7 @@ spec:
         - "--header"
         - "Content-Type: application/json"
         - "--data"
-        - '{"email": "{{ .Values.yugaware.defaultUser.email}}", 
+        - '{"email": "{{ .Values.yugaware.defaultUser.email}}",
 {{- if eq .Values.yugaware.defaultUser.password ""}}
 {{- fail ".Values.yugaware.defaultUser.password cannot be empty string"}}
 {{- end }}

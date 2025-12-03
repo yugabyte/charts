@@ -21,6 +21,9 @@ metadata:
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 data:
   application.docker.conf: |
     include classpath("application.common.conf")
@@ -173,6 +176,9 @@ metadata:
     chart: "{{ template "yugaware.chart" . }}"
     release: {{ .Release.Name | quote }}
     heritage: {{ .Release.Service | quote }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 type: Opaque
 data:
 {{- include "getOrCreateServerPem" (dict "Namespace" .Release.Namespace "Root" . "Name" (printf "%s%s" .Release.Name "-yugaware-tls-pem")) | nindent 2 }}
@@ -189,6 +195,9 @@ metadata:
     chart: "{{ template "yugaware.chart" . }}"
     release: {{ .Release.Name | quote }}
     heritage: {{ .Release.Service | quote }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 data:
   cert-manager.pemcfg: |
     alias=yba-https
@@ -208,6 +217,9 @@ metadata:
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 data:
   pg-upgrade-11-to-14.sh: |
     #!/bin/bash
@@ -236,6 +248,9 @@ metadata:
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 data:
   pg-prerun.sh: |
     #!/bin/bash
@@ -254,6 +269,9 @@ metadata:
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 data:
   postgresql.conf.sample: |
     {{- range $conf_key, $conf_value := .Values.postgres.sampleConfig }}
@@ -273,6 +291,9 @@ metadata:
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name | quote }}
     heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 type: Opaque
 data:
 # For user-provided remote write ca cert, cert and key. Expect to be base-64 encoded.
@@ -297,6 +318,9 @@ metadata:
     chart: {{ template "yugaware.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 data:
   prometheus.yml: |
     global:
