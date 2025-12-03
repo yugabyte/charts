@@ -22,6 +22,8 @@ The longest name that gets created of 20 characters, so truncation should be 63-
 
 {{/*
 Generate common labels.
+Excludes chart-managed labels from commonLabels to prevent overriding them.
+Chart-managed labels include: heritage, release (used in selectors), chart, component, app, app.kubernetes.io/name
 */}}
 {{- define "yugabyte.labels" }}
 heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
@@ -29,7 +31,13 @@ release: {{ .Release.Name | quote }}
 chart: {{ .Chart.Name | quote }}
 component: {{ .Values.Component | quote }}
 {{- if .Values.commonLabels}}
-{{ toYaml .Values.commonLabels }}
+{{- $filteredLabels := .Values.commonLabels }}
+{{- if .Values.oldNamingStyle }}
+{{- $filteredLabels = omit $filteredLabels "heritage" "release" "chart" "component" "app" }}
+{{- else }}
+{{- $filteredLabels = omit $filteredLabels "heritage" "release" "chart" "component" "app" "app.kubernetes.io/name" }}
+{{- end }}
+{{ toYaml $filteredLabels }}
 {{- end }}
 {{- end }}
 
@@ -52,8 +60,8 @@ Generate app selector.
 app: "{{ .label }}"
 {{- else }}
 app.kubernetes.io/name: "{{ .label }}"
-release: {{ .root.Release.Name | quote }}
 {{- end }}
+release: {{ .root.Release.Name | quote }}
 {{- end }}
 
 {{/*
