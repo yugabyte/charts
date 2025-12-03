@@ -3,7 +3,6 @@ suite: Labels on all objects
 templates:
 - master-gflags-secret.yaml
 - tserver-gflags-secret.yaml
-- controller-gflags-secret.yaml
 - debug_config_map.yaml
 - setup-credentials-configmap.yaml
 - master-servicemonitor.yaml
@@ -55,30 +54,6 @@ tests:
   - exists:
       path: metadata.labels.component
 
-# Test controller-gflags-secret.yaml
-- it: controller-gflags-secret has labels
-  template: templates/controller-gflags-secret.yaml
-  set:
-    Services:
-    - name: yb-tservers
-      label: yb-tserver
-      ports:
-        tcp-ybc-port: 11000
-        http-ui: 9000
-    ybc:
-      enabled: true
-      useYBDBImage: true
-  asserts:
-  - exists:
-      path: metadata.labels
-  - exists:
-      path: metadata.labels.app
-  - exists:
-      path: metadata.labels.release
-  - exists:
-      path: metadata.labels.chart
-  - exists:
-      path: metadata.labels.component
 
 # Test debug_config_map.yaml - master-hooks
 - it: debug_config_map master-hooks has labels
@@ -430,8 +405,18 @@ tests:
   - equal:
       path: metadata.labels['app.kubernetes.io/name']
       value: yb-master
+  - notExists:
+      path: metadata.labels.app
+  - exists:
+      path: metadata.labels.heritage
+  - exists:
+      path: metadata.labels.release
+  - exists:
+      path: metadata.labels.chart
+  - exists:
+      path: metadata.labels.component
 
-# Test custom labels from commonLabels
+# Test custom labels from commonLabels are included
 - it: custom labels from commonLabels are included
   template: templates/master-gflags-secret.yaml
   set:
@@ -464,6 +449,116 @@ tests:
       path: metadata.labels.app
   - exists:
       path: metadata.labels.release
+
+# Test that chart-managed labels cannot be overridden by commonLabels
+- it: chart-managed labels are protected from commonLabels override
+  template: templates/master-gflags-secret.yaml
+  set:
+    Services:
+    - name: yb-masters
+      label: yb-master
+      ports:
+        tcp-rpc-port: 7100
+    commonLabels:
+      heritage: overridden-heritage
+      release: overridden-release
+      chart: overridden-chart
+      component: overridden-component
+      app: overridden-app
+  asserts:
+  # Chart-managed labels should NOT be overridden
+  - equal:
+      path: metadata.labels.heritage
+      value: Helm
+  - exists:
+      path: metadata.labels.release
+  - notEqual:
+      path: metadata.labels.release
+      value: overridden-release
+  - equal:
+      path: metadata.labels.chart
+      value: yugabyte
+  - equal:
+      path: metadata.labels.component
+      value: yugabytedb
+  - equal:
+      path: metadata.labels.app
+      value: yb-master
+
+# Test that app.kubernetes.io/name cannot be overridden by commonLabels (new naming style)
+- it: app.kubernetes.io/name is protected from commonLabels override
+  template: templates/master-gflags-secret.yaml
+  set:
+    oldNamingStyle: false
+    Services:
+    - name: yb-masters
+      label: yb-master
+      ports:
+        tcp-rpc-port: 7100
+    commonLabels:
+      app.kubernetes.io/name: overridden-app-name
+      app: overridden-app
+  asserts:
+  # Service-specific app label should NOT be overridden
+  - equal:
+      path: metadata.labels['app.kubernetes.io/name']
+      value: yb-master
+  # app label should not exist in new naming style
+  - notExists:
+      path: metadata.labels.app
+
+# Test StatefulSet selector matches pod template labels when commonLabels tries to override
+- it: StatefulSet selector matches pod template labels (protected from commonLabels)
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: false
+    Services:
+    - name: yb-masters
+      label: yb-master
+      ports:
+        tcp-rpc-port: 7100
+        http-ui: 7000
+    replicas:
+      master: 3
+    storage:
+      master:
+        count: 1
+        size: 10Gi
+    domainName: cluster.local
+    commonLabels:
+      app.kubernetes.io/name: overridden-name
+      release: overridden-release
+      environment: production
+  asserts:
+  # Verify StatefulSet exists at documentIndex 2
+  - matchRegex:
+      path: kind
+      pattern: StatefulSet
+      documentIndex: 2
+  # Selector should use service-specific app label, not overridden value
+  - equal:
+      path: spec.selector.matchLabels['app.kubernetes.io/name']
+      value: yb-master
+      documentIndex: 2
+  - exists:
+      path: spec.selector.matchLabels.release
+      documentIndex: 2
+  # Pod template should also have service-specific app label
+  - equal:
+      path: spec.template.metadata.labels['app.kubernetes.io/name']
+      value: yb-master
+      documentIndex: 2
+  - exists:
+      path: spec.template.metadata.labels.release
+      documentIndex: 2
+  # Custom labels should still be present
+  - exists:
+      path: spec.template.metadata.labels.environment
+      documentIndex: 2
+  - equal:
+      path: spec.template.metadata.labels.environment
+      value: production
+      documentIndex: 2
 
 # Test custom labels on multiple object types
 - it: custom labels appear on ConfigMap

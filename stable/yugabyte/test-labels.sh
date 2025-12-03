@@ -40,9 +40,9 @@ echo ""
 echo "4. Checking for Yugabyte label patterns..."
 echo ""
 
-echo "Checking for 'yugabyte.labels' template output (release, chart, component):"
-if grep -q "release:" /tmp/rendered-templates.yaml && grep -q "chart:" /tmp/rendered-templates.yaml && grep -q "component:" /tmp/rendered-templates.yaml; then
-    echo "✓ Found release, chart, and component labels"
+echo "Checking for 'yugabyte.labels' template output (heritage, release, chart, component):"
+if grep -q "heritage:" /tmp/rendered-templates.yaml && grep -q "release:" /tmp/rendered-templates.yaml && grep -q "chart:" /tmp/rendered-templates.yaml && grep -q "component:" /tmp/rendered-templates.yaml; then
+    echo "✓ Found heritage, release, chart, and component labels"
 else
     echo "✗ Missing standard labels"
 fi
@@ -78,6 +78,41 @@ if [ "$TEST_CUSTOM_LABELS" = "true" ]; then
         echo "$custom_labels" | head -5 | sed 's/^/    - /'
     else
         echo "ℹ No custom labels detected in rendered output"
+    fi
+    echo ""
+    
+    # Test that chart-managed labels cannot be overridden
+    echo "Checking that chart-managed labels are protected from commonLabels override..."
+    if grep -q "heritage: Helm" /tmp/rendered-templates.yaml || grep -q "heritage: Tiller" /tmp/rendered-templates.yaml; then
+        echo "✓ heritage label is protected (not overridden by commonLabels)"
+    else
+        echo "✗ heritage label may have been overridden"
+    fi
+    
+    if grep -q "release: \"$RELEASE_NAME\"" /tmp/rendered-templates.yaml || grep -q "release: $RELEASE_NAME" /tmp/rendered-templates.yaml; then
+        echo "✓ release label is protected (not overridden by commonLabels)"
+    else
+        echo "✗ release label may have been overridden"
+    fi
+    
+    if grep -q "chart: \"yugabyte\"" /tmp/rendered-templates.yaml || grep -q "chart: yugabyte" /tmp/rendered-templates.yaml; then
+        echo "✓ chart label is protected (not overridden by commonLabels)"
+    else
+        echo "✗ chart label may have been overridden"
+    fi
+    
+    if grep -q "component: \"yugabytedb\"" /tmp/rendered-templates.yaml || grep -q "component: yugabytedb" /tmp/rendered-templates.yaml; then
+        echo "✓ component label is protected (not overridden by commonLabels)"
+    else
+        echo "✗ component label may have been overridden"
+    fi
+    
+    # Check app labels are protected (service-specific)
+    if grep -q "app: \"yb-master\"" /tmp/rendered-templates.yaml || grep -q "app: \"yb-tserver\"" /tmp/rendered-templates.yaml || \
+       grep -q "app.kubernetes.io/name: \"yb-master\"" /tmp/rendered-templates.yaml || grep -q "app.kubernetes.io/name: \"yb-tserver\"" /tmp/rendered-templates.yaml; then
+        echo "✓ app/app.kubernetes.io/name labels are protected (service-specific, not overridden)"
+    else
+        echo "✗ app labels may have been overridden"
     fi
     echo ""
 fi
@@ -187,5 +222,9 @@ echo "To test with custom labels:"
 echo "  TEST_CUSTOM_LABELS=true ./test-labels.sh"
 echo "  # or"
 echo "  helm template test-release . --set commonLabels.environment=prod --set commonLabels.team=platform"
+echo ""
+echo "To test that chart-managed labels are protected:"
+echo "  helm template test-release . --set commonLabels.heritage=overridden --set commonLabels.release=overridden --set commonLabels.chart=overridden --set commonLabels.component=overridden --set commonLabels.app=overridden"
+echo "  # Chart-managed labels (heritage, release, chart, component, app, app.kubernetes.io/name) should NOT be overridden"
 echo ""
 

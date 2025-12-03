@@ -201,8 +201,8 @@ spec:
       {{- end}}
       {{- end }}
       labels:
-        {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
         {{- include "yugabyte.labels" $root | indent 8 }}
+        {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
         {{- if $root.Values.istioCompatibility.enabled }}
         sidecar.istio.io/inject: "true"
         {{- end }}
