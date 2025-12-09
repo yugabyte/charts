@@ -33,6 +33,11 @@ data:
     play.logger.includeConfigProperties=true
     log.override.path = "/opt/yugabyte/yugaware/data/logs"
 
+    {{- if .Values.trustedProxies }}
+    # Trusted proxies for X-Forwarded-* header processing (OIDC HTTPS redirect URIs)
+    play.http.forwarded.trustedProxies = [{{- range $index, $proxy := .Values.trustedProxies }}{{if $index}}, {{end}}"{{ $proxy }}"{{end}}]
+    {{- end }}
+
     db {
       default.dbname=${POSTGRES_DB}
   {{ if and (not .Values.useYugabyteDB) .Values.postgres.external.host }}
