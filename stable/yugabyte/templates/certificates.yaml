@@ -3,7 +3,7 @@
 {{- if $root.Values.tls.certManager.enabled }}
 {{- if $root.Values.tls.certManager.bootstrapSelfsigned }}
 ---
-{{- $appLabelArgs := dict "label" "yugabyte" "root" $root -}}
+{{ $appLabelArgs := dict "label" "yugabyte" "root" $root }}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
