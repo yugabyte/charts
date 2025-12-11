@@ -1,5 +1,5 @@
 ---
-{{- $appLabelArgs := dict "label" "yb-master" "root" . -}}
+{{ $appLabelArgs := dict "label" "yb-master" "root" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,7 +14,7 @@ data:
   yb-master-{{.}}-post_debug_hook.sh: "echo 'hello-from-post' "
 {{- end }}
 ---
-{{- $appLabelArgs := dict "label" "yb-tserver" "root" . -}}
+{{ $appLabelArgs := dict "label" "yb-tserver" "root" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
