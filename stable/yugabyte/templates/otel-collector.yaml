@@ -19,7 +19,7 @@ data:
 {{- end }}
 {{- end }}
 ---
-{{- $appLabelArgs := dict "label" "yb-tserver" "root" $root -}}
+{{ $appLabelArgs := dict "label" "yb-tserver" "root" $root }}
 apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
