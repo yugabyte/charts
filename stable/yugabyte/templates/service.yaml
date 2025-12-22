@@ -340,19 +340,38 @@ spec:
               fi
               echo "Creating ephemeral /opt/certs/yugabyte/ as symlink to persisted /mnt/disk0/certs/"
               ln -sF /mnt/disk0/certs /opt/certs/yugabyte
-              if [[ ! -f /mnt/disk0/certs/ca.crt ]]; then
-                echo "Fresh install of /mnt/disk0/certs/ca.crt"
-                cp /home/yugabyte/cert-manager/ca.crt /mnt/disk0/certs/ca.crt;
-              fi
-              cmp -s /home/yugabyte/cert-manager/ca.crt /mnt/disk0/certs/ca.crt; sameRootCA=$?;
-              if [[ $sameRootCA -eq 0 ]]; then
-                echo "Refreshing TLS certs at /mnt/disk0/certs/";
+              # Copy the root CA certificate to the persistent volume
+              cp /home/yugabyte/cert-manager/ca.crt /mnt/disk0/certs/ca.crt;
+
+              {{- if not $root.Values.tls.certManager.useExistingServerCertificate }}
+              echo "Verifying TLS certificate..."
+              echo "Running: openssl verify -CAfile /mnt/disk0/certs/ca.crt -untrusted /home/yugabyte/cert-manager/tls.crt /home/yugabyte/cert-manager/tls.crt"
+              openssl verify -CAfile /mnt/disk0/certs/ca.crt -untrusted /home/yugabyte/cert-manager/tls.crt /home/yugabyte/cert-manager/tls.crt; verifyResult=$?;
+              if [[ $verifyResult -eq 0 ]]; then
+                echo "TLS certificate is signed by the CA. Copying to persistent volume.";
                 cp /home/yugabyte/cert-manager/tls.crt /mnt/disk0/certs/node.{{$serverFqdn}}.crt;
                 cp /home/yugabyte/cert-manager/tls.key /mnt/disk0/certs/node.{{$serverFqdn}}.key;
                 chmod 600 /mnt/disk0/certs/*;
               else
-                echo "WARNING: Not refreshing certificates as the root ca.crt has changed";
+                echo "TLS certificate is not signed by the CA. Checking for existing certificates.";
+                if [[ -f /mnt/disk0/certs/node.{{$serverFqdn}}.crt ]]; then
+                  echo "Validating existing certificates.";
+                  echo "Running: openssl verify -CAfile /mnt/disk0/certs/ca.crt -untrusted /mnt/disk0/certs/node.{{$serverFqdn}}.crt /mnt/disk0/certs/node.{{$serverFqdn}}.crt"
+                  openssl verify -CAfile /mnt/disk0/certs/ca.crt -untrusted /mnt/disk0/certs/node.{{$serverFqdn}}.crt /mnt/disk0/certs/node.{{$serverFqdn}}.crt; verifyResult=$?;
+                  if [[ $verifyResult -eq 0 ]]; then
+                    echo "Existing certificates are valid. Using them.";
+                  else
+                    echo "Existing certificates are not valid. Exiting.";
+                    exit 1;
+                  fi
+                else
+                  echo "No existing certificates found. Certificates provided by cert-manager are not valid. Exiting. Please ensure certificates are valid and try again.";
+                  exit 1;
+                fi
               fi
+              {{else}}
+              echo "Using existing server certificate."
+              {{end}}
           volumeMounts:
             {{- if not $root.Values.storage.ephemeral }}
             - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir0") (printf "%s0" (include "yugabyte.volume_name" $root)) }}
@@ -819,12 +838,38 @@ spec:
         - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
           projected:
             sources:
-            {{- if not $root.Values.tls.certManager.bootstrapSelfsigned }}
+            - secret:
+                name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
+            {{- if and (not $root.Values.tls.certManager.bootstrapSelfsigned) (not (empty $root.Values.tls.rootCA.cert)) }}
             - secret:
                 name: {{ printf "%s-root-ca" (include "yugabyte.fullname" $root) }}
             {{- end }}
+        - name: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
+          projected:
+            sources:
+            {{- /* get the ca.crt from values or cert-manager */}}
+            {{- if and (not $root.Values.tls.certManager.bootstrapSelfsigned) (not (empty $root.Values.tls.rootCA.cert)) }}
             - secret:
-                name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
+                name: {{ printf "%s-root-ca" (include "yugabyte.fullname" $root) }}
+                items:
+                  - key: ca.crt
+                    path: root.crt
+            {{- else }}
+            - secret:
+                name: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
+                items:
+                  - key: ca.crt
+                    path: root.crt
+            {{- end }}
+            {{- /* finally mount the tls client cert and key from cert-manager */}}
+            - secret:
+                name: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
+                items:
+                  - key: tls.crt
+                    path: yugabytedb.crt
+                  - key: tls.key
+                    path: yugabytedb.key
+            defaultMode: 256
         - name: certs-dir
           emptyDir: {}
         {{- else }}
@@ -833,20 +878,11 @@ spec:
           secret:
             secretName: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" .label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) .label) }}
             defaultMode: 256
-        {{- end }}
         - name: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
           secret:
             secretName: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
-            {{- if $root.Values.tls.certManager.enabled }}
-            items:
-              - key: ca.crt
-                path: root.crt
-              - key: tls.crt
-                path: yugabytedb.crt
-              - key: tls.key
-                path: yugabytedb.key
-            {{- end }}
             defaultMode: 256
+        {{- end }}
         {{- end }}
         {{- if and (eq .name "yb-masters") ($root.Values.master.extraVolumes) -}}
         {{- include "yugabyte.isExtraVolumesMappingExists" $root.Values.master -}}

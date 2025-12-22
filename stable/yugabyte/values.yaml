@@ -76,7 +76,7 @@ tls:
   clientToServer: true
   # Set to false to disallow any service with unencrypted communication from joining this cluster
   insecure: false
-  # Set enabled to true to use cert-manager instead of providing your own rootCA
+  # Set enabled to true to use cert-manager instead of providing your own node certs
   certManager:
     enabled: false
     # Will create own ca certificate and issuer when set to true
@@ -95,6 +95,10 @@ tls:
       kind: Issuer
       name: yugabyte-ca
       group: cert-manager.io
+    
+    # Set to true to use existing server certificate.
+    # Useful during online certificate rotation.
+    useExistingServerCertificate: false
 
     certificates:
       # The lifetime before cert-manager will issue a new certificate.
