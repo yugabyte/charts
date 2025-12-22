@@ -244,6 +244,9 @@ securityContext:
   runAsUser: {{ required "runAsUser cannot be empty" .Values.securityContext.runAsUser }}
   runAsGroup: {{ .Values.securityContext.runAsGroup | default 0 }}
   runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+  {{- if .Values.securityContext.additionalSettings }}
+{{ toYaml .Values.securityContext.additionalSettings | indent 2}}
+  {{- end }}
 {{- end -}}
 
 {{/*

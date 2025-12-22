@@ -209,36 +209,6 @@ data:
 
 {{- if not .Values.useYugabyteDB }}
 ---
-{{- if not (and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io")) }}
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ .Release.Name }}-yugaware-pg-upgrade
-  labels:
-    app: {{ template "yugaware.name" . }}
-    chart: {{ template "yugaware.chart" . }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
-{{- if .Values.commonLabels }}
-{{ include "yugaware.commonLabels" . | indent 4 }}
-{{- end }}
-data:
-  pg-upgrade-11-to-14.sh: |
-    #!/bin/bash
-    set -x -o errexit
-
-    cd /pg_upgrade_logs/
-    if [ ! "$(ls -A ${PGDATANEW})" ] && [ "$(ls -A ${PGDATAOLD})" ];
-    then
-      echo "Upgrading PG data from ${PGDATAOLD} to ${PGDATANEW}"
-      # if fsGroup is set, we need to remove the sticky bit, and group
-      # write permission from the directories
-      chmod -R g-w-s "${PGDATAOLD}"
-      chmod g-w-s "${PGDATAOLD}"
-      docker-upgrade pg_upgrade | tee -a /pg_upgrade_logs/pg_upgrade_11_to_14.log;
-      echo "host all all all scram-sha-256" >> "${PGDATANEW}/pg_hba.conf";
-    fi
-{{- end }}
 {{- if .Values.securityContext.enabled }}
 ---
 apiVersion: "v1"
@@ -258,7 +228,35 @@ data:
     #!/bin/bash
     set -x -o errexit
 
-    mkdir -p $PGDATA && chown -R $PG_UID:$PG_GID $PGDATA;
+    if [ -d "$PGDATA" ]; then
+        OWNER_ID=$(stat -c '%u' "$PGDATA")
+        
+        # If ownership is wrong, perform the "Copy-Replace" Fix
+        if [ "$OWNER_ID" != "$PG_UID" ]; then
+            echo "Starting copy-replace as PG data dir owner $OWNER_ID does not match run user $PG_UID"
+            
+            # Clean path string (remove trailing slash)
+            SAFE_PGDATA=${PGDATA%/}
+            BACKUP_DIR="${SAFE_PGDATA}_temp_fix"
+
+            # A. Move curent data dir
+            # (fsGroup gives us write access to the parent folder)
+            mv "$SAFE_PGDATA" "$BACKUP_DIR"
+
+            # B. Copy it back 
+            # (cp creates NEW files, so they are automatically owned by US)
+            cp -R "$BACKUP_DIR" "$SAFE_PGDATA"
+
+            # C. Cleanup
+            rm -rf "$BACKUP_DIR"
+            echo "Ownership fixed successfully."
+        fi
+    else
+        # If directory does not exist, simply create it.
+        # Since we are creating it, we will automatically own it.
+        echo "Creating new data directory..."
+        mkdir -p "$PGDATA"
+    fi
 {{- end }}
 
 ---

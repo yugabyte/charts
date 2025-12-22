@@ -144,14 +144,6 @@ spec:
             secretName: {{ .Release.Name }}-yugaware-prometheus-remote-write-tls
         {{- end }}
         {{- if not .Values.useYugabyteDB }}
-        {{- if not (and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io")) }}
-        - name: pg-upgrade-11-to-14
-          configMap:
-            name: {{ .Release.Name }}-yugaware-pg-upgrade
-            items:
-              - key: pg-upgrade-11-to-14.sh
-                path: pg-upgrade-11-to-14.sh
-        {{- end }}
         - name: pg-init
           configMap:
             name: {{ .Release.Name }}-yugaware-pg-prerun
@@ -239,45 +231,8 @@ spec:
             mountPath: /init-container
           {{- end }}
         {{- end }}
+        {{- if and .Values.securityContext.enabled }}
         {{- if not .Values.useYugabyteDB }}
-        {{- if not (and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io")) }}
-        - image: {{ include "full_image" (dict "containerName" "postgres-upgrade" "root" .) }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          name: postgres-upgrade
-          {{- if .Values.initContainers.postgresUpgrade.resources }}
-          resources: {{- toYaml .Values.initContainers.postgresUpgrade.resources | nindent 12 }}
-          {{ end -}}
-          command:
-          - 'bash'
-          - '-c'
-          - /bin/bash /pg_upgrade_11_to_14/pg-upgrade-11-to-14.sh;
-          env:
-          - name: PGDATANEW
-            value: /var/lib/postgresql/14/pgdata
-          - name: PGDATAOLD
-            value: /var/lib/postgresql/11/pgdata
-          # https://github.com/tianon/docker-postgres-upgrade/issues/10#issuecomment-523020113
-          - name: PGUSER
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Release.Name }}-yugaware-global-config
-                key: postgres_user
-          - name: POSTGRES_INITDB_ARGS
-            value: "-U $PGUSER"
-          volumeMounts:
-          - name: yugaware-storage
-            mountPath: /var/lib/postgresql/11/
-            subPath: postgres_data
-          - name: yugaware-storage
-            mountPath: /var/lib/postgresql/14/
-            subPath: postgres_data_14
-          - name: pg-upgrade-11-to-14
-            mountPath: /pg_upgrade_11_to_14
-          - name: yugaware-storage
-            mountPath: /pg_upgrade_logs
-            subPath: postgres_data_14
-        {{- end }}
-        {{- if .Values.securityContext.enabled }}
         - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           name: postgres-init
           {{- if .Values.initContainers.dbInit.resources }}
@@ -285,6 +240,7 @@ spec:
           {{ end -}}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/bin/bash", "/pg_prerun/pg-prerun.sh"]
+          {{- include "getSecurityContext" . | indent 10 }}
           env:
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata

@@ -39,11 +39,6 @@ image:
     # configmap with custom settings.
     sampleConfLocation: /usr/share/postgresql/postgresql.conf.sample
 
-  postgres-upgrade:
-    registry: ""
-    tag: "11-to-14"
-    name: tianon/postgres-upgrade
-
   prometheus:
     registry: ""
     tag: v3.5.0
@@ -323,6 +318,11 @@ securityContext:
   runAsUser: 10001
   runAsGroup: 10001
   runAsNonRoot: true
+  additionalSettings: {}
+  ## pg prerun is a root based init container which will modify the PG data dir's
+  ## owner to current user. Without this PG does not start. Required when modifying
+  ## the runAsUser setting or switch from root to non-root.
+  runPGPrerun: true
 
 helm:
   timeout: 900
