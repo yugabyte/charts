@@ -377,8 +377,11 @@ Get YugaByte master addresses
     {{- if eq .name "yb-masters" -}}
       {{- range $index := until $master_replicas -}}
         {{- if ne $index 0 }},{{ end -}}
-        {{- $clusterID := ternary (printf "%s." $.Values.multicluster.kubernetesClusterId) "" }}
-        {{- $prefix }}yb-master-{{ $index }}.{{ $clusterID }}{{ $prefix }}yb-masters.${NAMESPACE}.svc.{{ $domain_name }}:7100
+        {{- if eq $.Values.multicluster.kubernetesClusterId "" }}
+          {{- $prefix }}yb-master-{{ $index }}.{{ $prefix }}yb-masters.${NAMESPACE}.svc.{{ $domain_name }}:7100
+        {{- else }}
+          {{- $prefix }}yb-master-{{ $index }}.{{ $.Values.multicluster.kubernetesClusterId }}.{{ $prefix }}yb-masters.${NAMESPACE}.svc.{{ $domain_name }}:7100
+        {{- end }}
       {{- end -}}
     {{- end -}}
   {{- end -}}
