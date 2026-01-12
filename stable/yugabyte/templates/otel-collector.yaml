@@ -3,7 +3,7 @@
 {{- if .Values.otelCollector.enabled }}
 ---
 {{- if .Values.otelCollector.secretEnv }}
-{{- $appLabelArgs := dict "label" "yb-tserver" "root" $root -}}
+{{ $appLabelArgs := dict "label" "yb-tserver" "root" $root }}
 apiVersion: v1
 kind: Secret
 metadata:
