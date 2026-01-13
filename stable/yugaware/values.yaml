@@ -39,11 +39,6 @@ image:
     # configmap with custom settings.
     sampleConfLocation: /usr/share/postgresql/postgresql.conf.sample
 
-  postgres-upgrade:
-    registry: ""
-    tag: "11-to-14"
-    name: tianon/postgres-upgrade
-
   prometheus:
     registry: ""
     tag: v3.10.0
@@ -323,6 +318,7 @@ securityContext:
   runAsUser: 10001
   runAsGroup: 10001
   runAsNonRoot: true
+  additionalSettings: {}
 
 helm:
   timeout: 900
