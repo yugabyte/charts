@@ -231,7 +231,7 @@ spec:
             mountPath: /init-container
           {{- end }}
         {{- end }}
-        {{- if and .Values.securityContext.enabled }}
+        {{- if .Values.securityContext.enabled }}
         {{- if not .Values.useYugabyteDB }}
         - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           name: postgres-init
@@ -254,7 +254,6 @@ spec:
             subPath: postgres_data_14
           - name: pg-init
             mountPath: /pg_prerun
-        {{- end }}
         {{- else }}
         - image: {{ include "full_image" (dict "containerName" "ybdb" "root" .) }}
           name: ybdb-init
@@ -278,6 +277,7 @@ spec:
             subPath: ybdb_data
           - name: ybdb-init
             mountPath: /ybdb_prerun
+        {{- end }}
         {{- end }}
       containers:
         {{ if not ( or .Values.useYugabyteDB .Values.postgres.external.host) }}
