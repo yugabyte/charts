@@ -118,12 +118,14 @@ spec:
               - key: init-permissions.sh
                 path: init-permissions.sh
         {{- end }}
+        {{- if .Values.prometheus.enabled }}
         - name: prometheus-init-script
           configMap:
             name: {{ .Release.Name }}-prometheus-init
             items:
               - key: init-prometheus.sh
                 path: init-prometheus.sh
+        {{- end }}
         {{- if (.Values.tls.enabled) }}
         {{- if .Values.tls.certManager.enabled }}
         - name: {{ .Release.Name }}-yugaware-tls-cert
@@ -537,6 +539,7 @@ spec:
             - containerPort: 9000
               name: yugaware
           {{- if .Values.yugaware.pod.probes.enabled }}
+          {{- if .Values.yugaware.pod.probes.startupProbe.enabled}}
           startupProbe:
             failureThreshold: {{ div .Values.yugaware.pod.probes.startupTimeSec.max (div .Values.yugaware.pod.probes.startupTimeSec.min 2) }}
             initialDelaySeconds: {{ .Values.yugaware.pod.probes.startupTimeSec.min }}
@@ -545,6 +548,8 @@ spec:
             httpGet:
                 path: /api/app_version
                 port: yugaware
+          {{- end }}
+          {{- if .Values.yugaware.pod.probes.livenessProbe.enabled}}
           livenessProbe:
             failureThreshold: {{ .Values.yugaware.pod.probes.livenessProbe.failureThreshold }}
             periodSeconds: {{ .Values.yugaware.pod.probes.livenessProbe.periodSeconds }}
@@ -552,6 +557,18 @@ spec:
             httpGet:
                 path: /api/app_version
                 port: yugaware
+          {{- end }}
+          {{- if .Values.yugaware.pod.probes.readinessProbe.enabled}}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.yugaware.pod.probes.readinessProbe.httpGet.path }}
+              port: {{ .Values.yugaware.pod.probes.readinessProbe.httpGet.port }}
+            initialDelaySeconds: {{ .Values.yugaware.pod.probes.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.yugaware.pod.probes.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.yugaware.pod.probes.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.yugaware.pod.probes.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.yugaware.pod.probes.readinessProbe.failureThreshold }}
+          {{- end }}
           {{- end }}
           volumeMounts:
           - name: yugaware-config

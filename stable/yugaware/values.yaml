@@ -86,9 +86,22 @@ yugaware:
       startupTimeSec:
         min: 20 # minimum expected time for yugaware to start
         max: 600 # maximum expected time for yugaware to start, k8s will restart pod on timeout
+      startupProbe:
+        enabled: true 
       livenessProbe:
+        enabled: true 
         periodSeconds: 30 # query period
         failureThreshold: 10 # number of failed checks to restart pod
+      readinessProbe:
+        enabled: false 
+        httpGet:
+          path:  /api/app_version   
+          port: yugaware 
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        successThreshold: 1
+        failureThreshold: 3
   health:
     username: ""
     password: ""
