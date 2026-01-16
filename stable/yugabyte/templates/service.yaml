@@ -221,7 +221,12 @@ spec:
       - name: {{ $root.Values.Image.pullSecretName }}
       {{ end }}
       {{- if $root.Values.podSecurityContext.enabled }}
-      securityContext: {{- omit $root.Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
+      securityContext:
+        {{- $podSecurityContext := omit $root.Values.podSecurityContext "enabled" "additionalSettings" -}}
+        {{- if $root.Values.podSecurityContext.additionalSettings -}}
+        {{- $podSecurityContext = merge $podSecurityContext $root.Values.podSecurityContext.additionalSettings -}}
+        {{- end -}}
+        {{- toYaml $podSecurityContext | nindent 8 }}
       {{- end }}
       {{- if $root.Values.nodeSelector }}
       nodeSelector:
