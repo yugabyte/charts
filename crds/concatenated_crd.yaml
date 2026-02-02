@@ -2,14 +2,14 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: restorejobs.operator.yugabyte.io
+  name: backups.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
   scope: Namespaced
   names:
-    plural: restorejobs
-    singular: restorejob
-    kind: RestoreJob
+    plural: backups
+    singular: backup
+    kind: Backup
     categories:
       - all
       - yugabyte
@@ -21,61 +21,84 @@ spec:
       storage: true
       schema:
         openAPIV3Schema:
+          description: Custom resource definition for YugabyteDB backups.
           type: object
-          description: Custom resource definition for YugabyteDB restore job
           properties:
             status:
               type: object
-              description: Restore job status for the restore job custom resource.
+              description: Backup status for the backup custom resource.
               properties:
                 message:
-                  description: String log message from restore job controller
-                  type: string
-                taskUUID:
-                  description: >
-                    Internal UUID of the task associated with
-                    the restore job resource.
+                  description: String log message from backup controller
                   type: string
                 resourceUUID:
-                  description: Internal UUID of the restore operation.
+                  description: Internal UUID of the backup resource.
                   type: string
+                taskUUID:
+                  description: Internal UUID of the task associated with the backup resource.
+                  type: string
+
             spec:
               type: object
               properties:
-                actionType:
-                  description: Type of action to be taken. Allowed values - RESTORE
+                backupType:
+                  description: >
+                    Type of backup to be taken.
+                    Allowed values are -
+                    YQL_TABLE_TYPE REDIS_TABLE_TYPE PGSQL_TABLE_TYPE TRANSACTION_STATUS_TABLE_TYPE
                   type: string
                   enum:
-                    - RESTORE
+                    - YQL_TABLE_TYPE
+                    - PGSQL_TABLE_TYPE
+                sse:
+                  description: Server side encryption for the backup.
+                  type: boolean
+                storageConfig:
+                  description: >
+                    Storage configuration for the backup,
+                    should contain name of storage config object
+                  type: string
                 universe:
                   description: >
-                    Name of the universe for which restore is to be taken,
+                    Name of the universe for which backup is to be taken,
                     refers to a ybuniverse CR name.
                   type: string
-                backup:
-                  description: >
-                    Name of the backup to be restored,
-                    refers to a backup CR name.
-                  type: string
+                tableByTableBackup:
+                  description: Boolean indicating if backup is to be taken table by table.
+                  type: boolean
                 keyspace:
-                  description: Name of the keyspace to be restored.
+                  description: Name of keyspace to be backed up.
                   type: string
+                timeBeforeDelete:
+                  description: Time before backup is deleted from storage in milliseconds.
+                  type: integer
+                  minimum: 0
+                incrementalBackupBase:
+                  description: >
+                    Base backup Custom Resource name. Operator will add an incremental backup
+                    to the existing chain of backups at the last.
+                  type: string
+              required:
+              - keyspace
+              - backupType
+              - storageConfig
+              - universe
 
 
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: support-bundles.operator.yugabyte.io
+  name: ybproviders.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
   scope: Namespaced
   names:
-    plural: support-bundles
-    singular: support-bundle
-    kind: SupportBundle
+    plural: ybproviders
+    singular: ybprovider
     shortNames:
-    - sb
+      - yp
+    kind: YBProvider
     categories:
       - all
       - yugabyte
@@ -83,77 +106,167 @@ spec:
     - name: v1alpha1
       subresources:
         status: {}
+      additionalPrinterColumns:
+      - name: State
+        type: string
+        description: The state of the provider
+        jsonPath: .status.state
       served: true
       storage: true
       schema:
         openAPIV3Schema:
-          description: >
-            Custom resource definition for YugabyteDB support bundle to capture logs,
-            events in case of failures.
+          description: Custom resource definition for YugabyteDB Kubernetes provider configuration.
           type: object
           properties:
             status:
-              description: Support bundle status for the support bundle custom resource.
+              description: >
+                Provider configuration status for the provider configuration custom resource.
               type: object
               properties:
-                status:
+                state:
                   description: >
-                    Status of the support bundle.
-                    Allowed values - generating, ready, failed
-                  type: string
-                  enum:
-                  - generating
-                  - ready
-                  - failed
-                access:
-                  description: Access details for the generated support bundle to download.
+                    State of the provider configuration.
                   type: string
                 resourceUUID:
-                  description: Internal UUID of the support bundle resource.
+                  description: Internal UUID of the provider configuration resource.
+                  type: string
+                message:
+                  description: >
+                    Message for the provider configuration.
                   type: string
             spec:
               type: object
               properties:
-                universeName:
+                cloudInfo:
                   description: >
-                    Name of the universe for which support bundle is to be generated,
-                    refers to a ybuniverse CR name.
-                  type: string
-                collectionTimerange:
-                  description: Time range for which logs and events are to be collected.
+                    Cloud information for the provider configuration.
                   type: object
                   properties:
-                    startDate:
-                      description: Start date for the logs and events collection.
+                    kubernetesProvider:
+                      description:
+                        Type of provider configuration to be created.
+                        Allowed values - gke, eks, aks, openshift, custom
                       type: string
-                      example: 2022-12-12T13:07:18Z,
-                      format: date-time
-                    endDate:
-                      description: End date for the logs and events collection.
+                      enum:
+                        - gke
+                        - eks
+                        - aks
+                        - openshift
+                        - custom
+                      x-kubernetes-validations:
+                      - message: Config type cannot be changed
+                        rule: self == oldSelf
+                    kubernetesImageRegistry:
+                      description: >
+                        Kubernetes image registry to be used for the provider configuration.
+                        This is used to pull the YugabyteDB operator image.
                       type: string
-                      example: 2022-12-12T13:07:18Z,
-                      format: date-time
-                  required:
-                  - startDate
-                components:
+                    kubeConfigSecret:
+                      description: >
+                        Secret containing kubeconfig for the region.
+                        Will use in-cluster credentials if empty.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the kubeconfig secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the kubeconfig secret.
+                          type: string
+                regions:
                   description: >
-                    Components for which logs and events are to be collected. If not provided, all
-                    components will be collected.
+                    List of regions to be used for the provider configuration.
                   type: array
+                  minItems: 1
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - code
                   items:
-                    type: string
-                    enum:
-                    - UniverseLogs
-                    - ApplicationLogs
-                    - OutputFiles
-                    - ErrorFiles
-                    - CoreFiles
-                    - GFlags
-                    - Instance
-                    - ConsensusMeta
-                    - TabletMeta
-                    - YbcLogs
-                    - K8sInfo
+                    type: object
+                    required:
+                      - code
+                      - zones
+                    properties:
+                      code:
+                        description: >
+                          Code of the region to be used for the provider configuration.
+                          This is a short code like us-west1, us-east1, etc.
+                        type: string
+                      zones:
+                        description: >
+                          List of zones to be used for the provider configuration in the region.
+                        type: array
+                        minItems: 1
+                        x-kubernetes-list-type: map
+                        x-kubernetes-list-map-keys:
+                          - code
+                        items:
+                          type: object
+                          required:
+                            - code
+                          properties:
+                            code:
+                              description:  >
+                                Code of the zone to be used for the provider configuration.
+                                This is a short code like us-west1-a, us-east1-b, etc.
+                              type: string
+                            cloudInfo:
+                              description: >
+                                Cloud information for the zone.
+                              type: object
+                              x-kubernetes-validations:
+                              - rule: "!has(self.certManagerIssuerKind) || has(self.certManagerIssuerName)"
+                                message: >
+                                  If 'certManagerIssuerKind' is specified,
+                                  'certManagerIssuerName' must also be specified.
+                              properties:
+                                kubeNamespace:
+                                  description: >
+                                    Name of the Kubernetes namespace where universe nodes
+                                    are to be deployed.
+                                  type: string
+                                kubeDomain:
+                                  description: >
+                                    Domain Name for the Kubernetes cluster.
+                                  type: string
+                                kubePodAddressTemplate:
+                                  description: >
+                                    Template for forming the FQDN for a pod.
+                                    Useful to set in a multi-cluster k8s.
+                                  type: string
+                                kubernetesStorageClass:
+                                  description: >
+                                    Name of the StorageClass used for Volumes in this zone.
+                                  type: string
+                                kubeConfigSecret:
+                                  description: >
+                                    Secret containing kubeconfig for the region.
+                                    Will use in-cluster credentials if empty.
+                                  type: object
+                                  properties:
+                                    name:
+                                      description: Name of the kubeconfig secret.
+                                      type: string
+                                    namespace:
+                                      description: Namespace of the kubeconfig secret.
+                                      type: string
+                                overrides:
+                                  description: >
+                                    Kubernetes overrides for the provider.
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                certManagerIssuerKind:
+                                  description: >
+                                    Kind of the cert-manager issuer.
+                                  type: string
+                                certManagerIssuerName:
+                                  description: Name of the cert-manager issuer.
+                                  type: string
+                                certManagerIssuerGroup:
+                                  description: >
+                                    Group of the cert-manager issuer.
+                                    This is used to identify the issuer kind.
+                                  type: string
 
 
 ---
@@ -325,14 +438,14 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: backups.operator.yugabyte.io
+  name: restorejobs.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
   scope: Namespaced
   names:
-    plural: backups
-    singular: backup
-    kind: Backup
+    plural: restorejobs
+    singular: restorejob
+    kind: RestoreJob
     categories:
       - all
       - yugabyte
@@ -344,68 +457,45 @@ spec:
       storage: true
       schema:
         openAPIV3Schema:
-          description: Custom resource definition for YugabyteDB backups.
           type: object
+          description: Custom resource definition for YugabyteDB restore job
           properties:
             status:
               type: object
-              description: Backup status for the backup custom resource.
+              description: Restore job status for the restore job custom resource.
               properties:
                 message:
-                  description: String log message from backup controller
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the backup resource.
+                  description: String log message from restore job controller
                   type: string
                 taskUUID:
-                  description: Internal UUID of the task associated with the backup resource.
+                  description: >
+                    Internal UUID of the task associated with
+                    the restore job resource.
                   type: string
-
+                resourceUUID:
+                  description: Internal UUID of the restore operation.
+                  type: string
             spec:
               type: object
               properties:
-                backupType:
-                  description: >
-                    Type of backup to be taken.
-                    Allowed values are -
-                    YQL_TABLE_TYPE REDIS_TABLE_TYPE PGSQL_TABLE_TYPE TRANSACTION_STATUS_TABLE_TYPE
+                actionType:
+                  description: Type of action to be taken. Allowed values - RESTORE
                   type: string
                   enum:
-                    - YQL_TABLE_TYPE
-                    - PGSQL_TABLE_TYPE
-                sse:
-                  description: Server side encryption for the backup.
-                  type: boolean
-                storageConfig:
-                  description: >
-                    Storage configuration for the backup,
-                    should contain name of storage config object
-                  type: string
+                    - RESTORE
                 universe:
                   description: >
-                    Name of the universe for which backup is to be taken,
+                    Name of the universe for which restore is to be taken,
                     refers to a ybuniverse CR name.
                   type: string
-                tableByTableBackup:
-                  description: Boolean indicating if backup is to be taken table by table.
-                  type: boolean
-                keyspace:
-                  description: Name of keyspace to be backed up.
-                  type: string
-                timeBeforeDelete:
-                  description: Time before backup is deleted from storage in milliseconds.
-                  type: integer
-                  minimum: 0
-                incrementalBackupBase:
+                backup:
                   description: >
-                    Base backup Custom Resource name. Operator will add an incremental backup
-                    to the existing chain of backups at the last.
+                    Name of the backup to be restored,
+                    refers to a backup CR name.
                   type: string
-              required:
-              - keyspace
-              - backupType
-              - storageConfig
-              - universe
+                keyspace:
+                  description: Name of the keyspace to be restored.
+                  type: string
 
 
 ---
@@ -604,7 +694,7 @@ spec:
                         aws_secret_access_key_secret instead
                       type: string
                     USE_IAM:
-                      description: Use IAM for storage account access. Valid for S3/GCS.
+                      description: Use IAM for storage account access. Valid for S3/GCS/AZ.
                       type: boolean
                     BACKUP_LOCATION:
                       description: Backup location for the storage configuration.
@@ -681,16 +771,16 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: ybproviders.operator.yugabyte.io
+  name: support-bundles.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
   scope: Namespaced
   names:
-    plural: ybproviders
-    singular: ybprovider
+    plural: support-bundles
+    singular: support-bundle
+    kind: SupportBundle
     shortNames:
-      - yp
-    kind: YBProvider
+    - sb
     categories:
       - all
       - yugabyte
@@ -698,167 +788,77 @@ spec:
     - name: v1alpha1
       subresources:
         status: {}
-      additionalPrinterColumns:
-      - name: State
-        type: string
-        description: The state of the provider
-        jsonPath: .status.state
       served: true
       storage: true
       schema:
         openAPIV3Schema:
-          description: Custom resource definition for YugabyteDB Kubernetes provider configuration.
+          description: >
+            Custom resource definition for YugabyteDB support bundle to capture logs,
+            events in case of failures.
           type: object
           properties:
             status:
-              description: >
-                Provider configuration status for the provider configuration custom resource.
+              description: Support bundle status for the support bundle custom resource.
               type: object
               properties:
-                state:
+                status:
                   description: >
-                    State of the provider configuration.
+                    Status of the support bundle.
+                    Allowed values - generating, ready, failed
+                  type: string
+                  enum:
+                  - generating
+                  - ready
+                  - failed
+                access:
+                  description: Access details for the generated support bundle to download.
                   type: string
                 resourceUUID:
-                  description: Internal UUID of the provider configuration resource.
-                  type: string
-                message:
-                  description: >
-                    Message for the provider configuration.
+                  description: Internal UUID of the support bundle resource.
                   type: string
             spec:
               type: object
               properties:
-                cloudInfo:
+                universeName:
                   description: >
-                    Cloud information for the provider configuration.
+                    Name of the universe for which support bundle is to be generated,
+                    refers to a ybuniverse CR name.
+                  type: string
+                collectionTimerange:
+                  description: Time range for which logs and events are to be collected.
                   type: object
                   properties:
-                    kubernetesProvider:
-                      description:
-                        Type of provider configuration to be created.
-                        Allowed values - gke, eks, aks, openshift, custom
+                    startDate:
+                      description: Start date for the logs and events collection.
                       type: string
-                      enum:
-                        - gke
-                        - eks
-                        - aks
-                        - openshift
-                        - custom
-                      x-kubernetes-validations:
-                      - message: Config type cannot be changed
-                        rule: self == oldSelf
-                    kubernetesImageRegistry:
-                      description: >
-                        Kubernetes image registry to be used for the provider configuration.
-                        This is used to pull the YugabyteDB operator image.
+                      example: 2022-12-12T13:07:18Z,
+                      format: date-time
+                    endDate:
+                      description: End date for the logs and events collection.
                       type: string
-                    kubeConfigSecret:
-                      description: >
-                        Secret containing kubeconfig for the region.
-                        Will use in-cluster credentials if empty.
-                      type: object
-                      properties:
-                        name:
-                          description: Name of the kubeconfig secret.
-                          type: string
-                        namespace:
-                          description: Namespace of the kubeconfig secret.
-                          type: string
-                regions:
+                      example: 2022-12-12T13:07:18Z,
+                      format: date-time
+                  required:
+                  - startDate
+                components:
                   description: >
-                    List of regions to be used for the provider configuration.
+                    Components for which logs and events are to be collected. If not provided, all
+                    components will be collected.
                   type: array
-                  minItems: 1
-                  x-kubernetes-list-type: map
-                  x-kubernetes-list-map-keys:
-                    - code
                   items:
-                    type: object
-                    required:
-                      - code
-                      - zones
-                    properties:
-                      code:
-                        description: >
-                          Code of the region to be used for the provider configuration.
-                          This is a short code like us-west1, us-east1, etc.
-                        type: string
-                      zones:
-                        description: >
-                          List of zones to be used for the provider configuration in the region.
-                        type: array
-                        minItems: 1
-                        x-kubernetes-list-type: map
-                        x-kubernetes-list-map-keys:
-                          - code
-                        items:
-                          type: object
-                          required:
-                            - code
-                          properties:
-                            code:
-                              description:  >
-                                Code of the zone to be used for the provider configuration.
-                                This is a short code like us-west1-a, us-east1-b, etc.
-                              type: string
-                            cloudInfo:
-                              description: >
-                                Cloud information for the zone.
-                              type: object
-                              x-kubernetes-validations:
-                              - rule: "!has(self.certManagerIssuerKind) || has(self.certManagerIssuerName)"
-                                message: >
-                                  If 'certManagerIssuerKind' is specified,
-                                  'certManagerIssuerName' must also be specified.
-                              properties:
-                                kubeNamespace:
-                                  description: >
-                                    Name of the Kubernetes namespace where universe nodes
-                                    are to be deployed.
-                                  type: string
-                                kubeDomain:
-                                  description: >
-                                    Domain Name for the Kubernetes cluster.
-                                  type: string
-                                kubePodAddressTemplate:
-                                  description: >
-                                    Template for forming the FQDN for a pod.
-                                    Useful to set in a multi-cluster k8s.
-                                  type: string
-                                kubernetesStorageClass:
-                                  description: >
-                                    Name of the StorageClass used for Volumes in this zone.
-                                  type: string
-                                kubeConfigSecret:
-                                  description: >
-                                    Secret containing kubeconfig for the region.
-                                    Will use in-cluster credentials if empty.
-                                  type: object
-                                  properties:
-                                    name:
-                                      description: Name of the kubeconfig secret.
-                                      type: string
-                                    namespace:
-                                      description: Namespace of the kubeconfig secret.
-                                      type: string
-                                overrides:
-                                  description: >
-                                    Kubernetes overrides for the provider.
-                                  type: object
-                                  x-kubernetes-preserve-unknown-fields: true
-                                certManagerIssuerKind:
-                                  description: >
-                                    Kind of the cert-manager issuer.
-                                  type: string
-                                certManagerIssuerName:
-                                  description: Name of the cert-manager issuer.
-                                  type: string
-                                certManagerIssuerGroup:
-                                  description: >
-                                    Group of the cert-manager issuer.
-                                    This is used to identify the issuer kind.
-                                  type: string
+                    type: string
+                    enum:
+                    - UniverseLogs
+                    - ApplicationLogs
+                    - OutputFiles
+                    - ErrorFiles
+                    - CoreFiles
+                    - GFlags
+                    - Instance
+                    - ConsensusMeta
+                    - TabletMeta
+                    - YbcLogs
+                    - K8sInfo
 
 
 ---
