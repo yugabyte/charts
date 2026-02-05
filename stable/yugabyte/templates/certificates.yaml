@@ -68,6 +68,11 @@ metadata:
 type: Opaque
 data:
   ca.crt: {{ $root.Values.tls.rootCA.cert }}
+  {{/* if useExistingServerCertificate is true, then tls.crt and tls.key will not be set */}}
+  {{if $root.Values.tls.certManager.useExistingServerCertificate -}}
+  tls.crt: ""
+  tls.key: ""
+  {{- end }}
 ---
 {{- end }}
 
