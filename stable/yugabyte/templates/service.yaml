@@ -492,6 +492,9 @@ spec:
           {{- $webserverDict := dict "Addr" $webserverAddr "Port" $webserverPort -}}
           {{- $webserverPreflight := include "yugabyte.preflight_check" (set $serviceValues "Preflight" $webserverDict) -}}
           {{- if $webserverPreflight -}}{{ $webserverPreflight | nindent 12 }}{{ end }}
+            if [[ -f /home/yugabyte/bin/post_install.sh ]]; then
+              /home/yugabyte/bin/post_install.sh
+            fi && \
             if [[ -f /home/yugabyte/tools/k8s_parent.py ]]; then
               k8s_parent="/home/yugabyte/tools/k8s_parent.py"
             else
