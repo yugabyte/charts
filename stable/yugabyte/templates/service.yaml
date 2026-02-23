@@ -240,6 +240,9 @@ spec:
       tolerations:
       {{- with $root.Values.master.tolerations }}{{ toYaml . | nindent 8 }}{{ end }}
       {{- end }}
+      {{- if $root.Values.master.priorityClassName }}
+      priorityClassName: {{ $root.Values.master.priorityClassName }}
+      {{- end }}
       {{- else }} # yb-tservers
       {{- with $root.Values.tserver.serviceAccount }}
       serviceAccountName: {{ . }}
@@ -247,6 +250,9 @@ spec:
       {{- if $root.Values.tserver.tolerations }}
       tolerations:
       {{- with $root.Values.tserver.tolerations }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- end }}
+      {{- if $root.Values.tserver.priorityClassName }}
+      priorityClassName: {{ $root.Values.tserver.priorityClassName }}
       {{- end }}
       {{- end }}
       terminationGracePeriodSeconds: 300

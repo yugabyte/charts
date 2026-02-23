@@ -526,6 +526,12 @@ master:
   #   effect: NoSchedule
   tolerations: []
 
+  ## PriorityClass to be used by the Master pods.
+  ## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
+  ## Example:
+  # priorityClassName: high-priority
+  priorityClassName: ""
+
   ## Extra volumes
   ## extraVolumesMounts are mandatory for each extraVolumes.
   ## Ref: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#volume-v1-core
@@ -676,6 +682,12 @@ tserver:
   #   value: experimental
   #   effect: NoSchedule
   tolerations: []
+
+  ## PriorityClass to be used by the TServer pods.
+  ## Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
+  ## Example:
+  # priorityClassName: high-priority
+  priorityClassName: ""
 
   ## Sets the --server_broadcast_addresses flag on the TServer, no
   ## preflight checks are done for this address. You might need to add
