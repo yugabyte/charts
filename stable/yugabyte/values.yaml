@@ -169,6 +169,15 @@ yugabytedUi:
       - disk_usage
       - cpu_usage
       - node_up
+  ## https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
+  ## Use the above link to learn more about Kubernetes resources configuration.
+  # resources:
+  #   requests:
+  #     cpu: "1"
+  #     memory: 1Gi
+  #   limits:
+  #     cpu: "1"
+  #     memory: 1Gi
 
 PodManagementPolicy: Parallel
 
