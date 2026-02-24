@@ -505,6 +505,15 @@ master:
   #       fieldPath: status.hostIP
   extraEnv: []
 
+  ## Sets the --server_broadcast_addresses flag on the Master pods, no
+  ## preflight checks are done for this address. You might need to add
+  ## `use_private_ip: cloud` to the gflags.master and gflags.tserver.
+  serverBroadcastAddress: ""
+
+  ## Sets the --rpc_bind_addresses flag on the Master pods, no
+  ## preflight checks are done for this address.
+  rpcBindAddress: ""
+
   # secretEnv variables are used to expose secrets data as env variables in the master pod.
   # TODO Add namespace also to support copying secrets from other namespace.
   # secretEnv:
@@ -694,6 +703,10 @@ tserver:
   ## preflight checks are done for this address. You might need to add
   ## `use_private_ip: cloud` to the gflags.master and gflags.tserver.
   serverBroadcastAddress: ""
+
+  ## Sets the --rpc_bind_addresses flag on the TServer, no
+  ## preflight checks are done for this address.
+  rpcBindAddress: ""
 
   ## Extra volumes
   ## extraVolumesMounts are mandatory for each extraVolumes.
