@@ -219,6 +219,15 @@ spec:
       imagePullSecrets:
       - name: {{ $root.Values.Image.pullSecretName }}
       {{ end }}
+      {{- $priorityClassName := "" }}
+      {{- if eq $service.name "yb-masters" }}
+      {{- $priorityClassName = $root.Values.master.priorityClassName | default $root.Values.priorityClassName }}
+      {{- else }}
+      {{- $priorityClassName = $root.Values.tserver.priorityClassName | default $root.Values.priorityClassName }}
+      {{- end }}
+      {{- if $priorityClassName }}
+      priorityClassName: {{ $priorityClassName | quote }}
+      {{- end }}
       {{- if $root.Values.podSecurityContext.enabled }}
       securityContext: {{- omit $root.Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
       {{- end }}

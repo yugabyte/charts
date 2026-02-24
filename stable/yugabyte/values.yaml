@@ -421,6 +421,11 @@ resources: {}
 
 nodeSelector: {}
 
+## PriorityClassName for the StatefulSet pod template (sts.spec.template.spec.priorityClassName).
+## Default for both master and tserver; override per component with master.priorityClassName / tserver.priorityClassName.
+## See https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
+priorityClassName: ""
+
 affinity: {}
 
 statefulSetAnnotations: {}
@@ -528,6 +533,10 @@ master:
   ## Set service account for master DB pods. The service account
   ## should exist in the namespace where the master DB pods are brought up.
   serviceAccount: ""
+
+  ## PriorityClassName for master pods (sts.spec.template.spec.priorityClassName).
+  ## Falls back to top-level priorityClassName if unset.
+  priorityClassName: ""
 
   ## Memory limit hard % (between 1-100) of the memory limit.
   memoryLimitHardPercentage: 85
@@ -651,6 +660,10 @@ tserver:
   #   value: experimental
   #   effect: NoSchedule
   tolerations: []
+
+  ## PriorityClassName for tserver pods (sts.spec.template.spec.priorityClassName).
+  ## Falls back to top-level priorityClassName if unset.
+  priorityClassName: ""
 
   ## Sets the --server_broadcast_addresses flag on the TServer, no
   ## preflight checks are done for this address. You might need to add
