@@ -393,6 +393,9 @@ zoneAffinity: {}
 ## See https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
 tolerations: []
 
+## PriorityClassName for the StatefulSet pod template (sts.spec.template.spec.priorityClassName).
+## See https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
+priorityClassName: ""
 
 ## @param dnsPolicy DNS Policy for pod
 ## ref: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
