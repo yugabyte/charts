@@ -57,6 +57,60 @@ partition:
   master: 0
   tserver: 0
 
+# Used to decide if a move operation is in progress.
+# This defines the range of StatefulSet indices that are part of a move operation.
+# 
+# Rules:
+# - start == end: No move operation in progress. All StatefulSets use standard values.
+# - start != end: Move operation in progress. The StatefulSet with index 'end' uses values from moveOp.
+# - end can only be 1 more than start (end = start + 1). This ensures only one StatefulSet
+#   is being migrated at a time.
+# - Wraparound case: When start is at the 9, end will be 0
+#   instead of start+1. This is the only exception to the "end = start + 1" rule.
+#
+# Example progression for 2 replicas (indices 0, 1):
+#   - Initial: start=0, end=0 (no migration)
+#   - Step 1: start=0, end=1 (migrating index 1, end = start + 1)
+#   - Complete: start=1, end=1 (migration complete)
+stsIndex:
+  tserver:
+    start: 0
+    end: 0
+  master:
+    start: 0
+    end: 0
+
+# Used during move operation to define temporary configuration values.
+# 
+# When a move operation is in progress (stsIndex.start != stsIndex.end), the StatefulSet
+# with index equal to stsIndex.end will use the values defined here instead of the standard
+# values (storage, replicas, partition, etc.) from the main configuration.
+#
+# This allows you to migrate a StatefulSet to new storage class, storage counts, or other settings
+# without affecting the rest of the cluster. Once the migration is complete and stsIndex.start
+# equals stsIndex.end, all StatefulSets will revert to using the standard values.
+#
+# Only used when stsIndex.start != stsIndex.end for the corresponding server type (master/tserver).
+moveOp:
+  storage:
+    ephemeral: false  # will not allocate PVs when true
+    master:
+      count: 2
+      size: 10Gi
+      storageClass: ""
+    tserver:
+      count: 2
+      size: 10Gi
+      storageClass: ""
+
+  replicas:
+    master: 3
+    tserver: 3
+
+  partition:
+    master: 0
+    tserver: 0
+
 updateStrategy:
   type: RollingUpdate
 

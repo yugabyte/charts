@@ -85,14 +85,19 @@ These secrets are mounted into master/tserver pods.
 {{- $service := . -}}
 {{- $appLabelArgs := dict "label" .label "root" $root -}}
 {{- $serviceValues := (dict "Service" $service "Values" $root.Values "Chart" $root.Chart "Release" $root.Release) -}}
-{{- $replicas := (eq .name "yb-masters") | ternary $root.Values.replicas.master $root.Values.replicas.tserver -}}
-
-{{- if (gt (int $replicas)  0) }}
+{{- $vars := include "yugabyte.stsIndexVars" (dict "serviceName" .name "root" $root) | fromYaml -}}
+{{- range $stsIdx := until (int $vars.stsCount) }}
+{{- $loopVars := include "yugabyte.stsIndexLoopVars" (dict "stsIdx" $stsIdx "stsStart" $vars.stsStart "stsEnd" $vars.stsEnd "replicas" $vars.replicas "moveOpReplicas" $vars.moveOpReplicas) | fromYaml -}}
+{{- $currentStsIndex := $loopVars.currentStsIndex -}}
+{{- $useMoveOp := $loopVars.useMoveOp -}}
+{{- $stsIndexSuffix := $loopVars.stsIndexSuffix -}}
+{{- $currentReplicas := $loopVars.currentReplicas }}
+{{- if gt (int $currentReplicas) 0 }}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" $service.label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) $service.label) }}
+  name: {{ $root.Values.oldNamingStyle | ternary (printf "%s%s-yugabyte-tls-cert" $service.label $stsIndexSuffix) (printf "%s-%s%s-tls-cert" (include "yugabyte.fullname" $root) $service.label $stsIndexSuffix) }}
   namespace: "{{ $root.Release.Namespace }}"
   labels:
     {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
@@ -106,7 +111,7 @@ spec:
     name: {{ include "yugabyte.tls_cm_issuer" $root | quote }}
     kind: {{ include "yugabyte.tls_issuer_kind" $root }}
     group: {{ include "yugabyte.tls_issuer_group" $root }}
-  secretName: {{ $root.Values.oldNamingStyle | ternary (printf "%s-yugabyte-tls-cert" $service.label) (printf "%s-%s-tls-cert" (include "yugabyte.fullname" $root) $service.label) }}
+  secretName: {{ $root.Values.oldNamingStyle | ternary (printf "%s%s-yugabyte-tls-cert" $service.label $stsIndexSuffix) (printf "%s-%s%s-tls-cert" (include "yugabyte.fullname" $root) $service.label $stsIndexSuffix) }}
   duration: {{ $root.Values.tls.certManager.certificates.duration | quote }}
   renewBefore: {{ $root.Values.tls.certManager.certificates.renewBefore | quote }}
   isCA: false
@@ -120,29 +125,30 @@ spec:
     - client auth
   # At least one of a DNS Name, URI, or IP address is required.
   dnsNames:
-  {{- range $index := until ( int ( $replicas ) ) }}
-  {{- $nodeOldStyle := printf "%s-%d.%s.%s.svc.%s" $service.label $index $service.name $root.Release.Namespace $root.Values.domainName }}
-  {{- $nodeNewStyle := printf "%s-%s-%d.%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
+  {{- range $index := until ( int ( $currentReplicas ) ) }}
+  {{- $nodeOldStyle := printf "%s%s-%d.%s.%s.svc.%s" $service.label $stsIndexSuffix $index $service.name $root.Release.Namespace $root.Values.domainName }}
+  {{- $nodeNewStyle := printf "%s-%s%s-%d.%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $stsIndexSuffix $index (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
 
   {{- if $root.Values.multicluster.createServiceExports -}}
-    {{- $nodeOldStyle = printf "%s-%d.%s.%s.%s.svc.clusterset.local" $service.label $index $root.Values.multicluster.kubernetesClusterId $service.name $root.Release.Namespace }}
-    {{- $nodeNewStyle = printf "%s-%s-%d.%s.%s-%s.%s.svc.clusterset.local" (include "yugabyte.fullname" $root) $service.label $index $root.Values.multicluster.kubernetesClusterId (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
+    {{- $nodeOldStyle = printf "%s%s-%d.%s.%s.%s.svc.clusterset.local" $service.label $stsIndexSuffix $index $root.Values.multicluster.kubernetesClusterId $service.name $root.Release.Namespace }}
+    {{- $nodeNewStyle = printf "%s-%s%s-%d.%s.%s-%s.%s.svc.clusterset.local" (include "yugabyte.fullname" $root) $service.label $stsIndexSuffix $index $root.Values.multicluster.kubernetesClusterId (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace }}
   {{- end -}}
 
   {{- if $root.Values.multicluster.createServicePerPod -}}
-    {{- $nodeOldStyle = printf "%s-%d.%s.svc.%s" $service.label $index $root.Release.Namespace $root.Values.domainName }}
-    {{- $nodeNewStyle = printf "%s-%s-%d.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $index $root.Release.Namespace $root.Values.domainName }}
+    {{- $nodeOldStyle = printf "%s%s-%d.%s.svc.%s" $service.label $stsIndexSuffix $index $root.Release.Namespace $root.Values.domainName }}
+    {{- $nodeNewStyle = printf "%s-%s%s-%d.%s.svc.%s" (include "yugabyte.fullname" $root) $service.label $stsIndexSuffix $index $root.Release.Namespace $root.Values.domainName }}
   {{- end -}}
   {{- $node := $root.Values.oldNamingStyle | ternary $nodeOldStyle $nodeNewStyle }}
   - {{$node}}
   {{- end }}
-  - {{ printf "%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
+  - {{ printf "%s-%s%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.name $stsIndexSuffix $root.Release.Namespace $root.Values.domainName }}
   uris: []
   ipAddresses: []
   {{- if $root.Values.tls.certManager.certificates.commonNameRequired }}
   commonName: {{ include "yugabyte.commonNameWithSuffix" (dict "commonName" ($root.Values.oldNamingStyle | ternary $service.name (printf "%s-%s" (include "yugabyte.fullname" $root) $service.name)) "root" $root) | quote }}
   {{- end }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}
 

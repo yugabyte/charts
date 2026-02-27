@@ -684,3 +684,104 @@ ipFamilyPolicy: {{ .Values.ipFamilyPolicy }}
     {{- $commonName -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+  Validate stsIndex start and end values for master and tserver.
+  Rules:
+  1. end must be >= start (except for the wrap-around case: start=9, end=0)
+  2. If start != end (move operation in progress), end - start must be exactly 1, except for the wrap-around case
+  3. start == end is valid (no move operation)
+  
+  Usage:
+    {{- include "yugabyte.validateStsIndex" (dict "start" ($root.Values.stsIndex.master.start | int) "end" ($root.Values.stsIndex.master.end | int) "component" "master") -}}
+    {{- include "yugabyte.validateStsIndex" (dict "start" ($root.Values.stsIndex.tserver.start | int) "end" ($root.Values.stsIndex.tserver.end | int) "component" "tserver") -}}
+*/}}
+{{- define "yugabyte.validateStsIndex" -}}
+  {{- $start := .start | int -}}
+  {{- $end := .end | int -}}
+  {{- $component := .component -}}
+  
+  {{- $isWrapAround := and (eq $start 9) (eq $end 0) -}}
+  {{- $diff := sub $end $start -}}
+  {{- $isMoveOp := ne $start $end -}}
+  
+  {{- /* Check: end >= start (except wrap-around case) */ -}}
+  {{- if and (not $isWrapAround) (lt $end $start) -}}
+    {{- fail (printf "stsIndex.%s: end (%d) must be >= start (%d), except for the wrap-around case (start=9, end=0)" $component $end $start) -}}
+  {{- end -}}
+  
+  {{- /* Check: if move operation (start != end), end - start must be exactly 1 (except wrap-around case) */ -}}
+  {{- if and $isMoveOp (not $isWrapAround) (ne $diff 1) -}}
+    {{- fail (printf "stsIndex.%s: end (%d) and start (%d) must differ by exactly one when start != end, except for the wrap-around case (start=9, end=0)" $component $end $start) -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Get storage info based on service type and move operation state.
+Returns the storage dict object as YAML.
+Usage:
+  {{- $storageInfo := include "yugabyte.storageInfo" (dict "serviceName" $service.name "useMoveOp" $useMoveOp "root" $root) | fromYaml -}}
+*/}}
+{{- define "yugabyte.storageInfo" -}}
+  {{- $serviceName := .serviceName -}}
+  {{- $useMoveOp := .useMoveOp -}}
+  {{- $root := .root -}}
+  {{- if eq $serviceName "yb-masters" -}}
+    {{- if $useMoveOp -}}
+      {{- $root.Values.moveOp.storage.master | toYaml -}}
+    {{- else -}}
+      {{- $root.Values.storage.master | toYaml -}}
+    {{- end -}}
+  {{- else -}}
+    {{- if $useMoveOp -}}
+      {{- $root.Values.moveOp.storage.tserver | toYaml -}}
+    {{- else -}}
+      {{- $root.Values.storage.tserver | toYaml -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Get stsIndex variables for a service (master or tserver).
+Returns a YAML dict with: stsStart, stsEnd, stsCount, replicas, moveOpReplicas, hasMoveOp
+Usage: {{- $vars := include "yugabyte.stsIndexVars" (dict "serviceName" "yb-masters" "root" $root) | fromYaml -}}
+*/}}
+{{- define "yugabyte.stsIndexVars" -}}
+  {{- $serviceName := .serviceName -}}
+  {{- $root := .root -}}
+  {{- $isMaster := eq $serviceName "yb-masters" -}}
+  {{- $stsStart := ($isMaster | ternary $root.Values.stsIndex.master.start $root.Values.stsIndex.tserver.start) | int -}}
+  {{- $stsEnd := ($isMaster | ternary $root.Values.stsIndex.master.end $root.Values.stsIndex.tserver.end) | int -}}
+  {{- $stsCount := (add (mod (add (sub $stsEnd $stsStart) 10) 10) 1 | int) -}}
+  {{- $replicas := ($isMaster | ternary $root.Values.replicas.master $root.Values.replicas.tserver) | int -}}
+  {{- $moveOpReplicas := ($isMaster | ternary $root.Values.moveOp.replicas.master $root.Values.moveOp.replicas.tserver) | int -}}
+  {{- $hasMoveOp := ne $stsStart $stsEnd -}}
+stsStart: {{ $stsStart }}
+stsEnd: {{ $stsEnd }}
+stsCount: {{ $stsCount }}
+replicas: {{ $replicas }}
+moveOpReplicas: {{ $moveOpReplicas }}
+hasMoveOp: {{ $hasMoveOp }}
+{{- end -}}
+
+{{/*
+Get stsIndex loop variables for a specific iteration.
+Returns a YAML dict with: currentStsIndex, useMoveOp, stsIndexSuffix, currentReplicas
+Usage: {{- $loopVars := include "yugabyte.stsIndexLoopVars" (dict "stsIdx" $stsIdx "stsStart" $vars.stsStart "stsEnd" $vars.stsEnd "replicas" $vars.replicas "moveOpReplicas" $vars.moveOpReplicas) | fromYaml -}}
+Note: The helper function casts all input values to int internally, so no casting is needed when passing values.
+*/}}
+{{- define "yugabyte.stsIndexLoopVars" -}}
+  {{- $stsIdx := .stsIdx | int -}}
+  {{- $stsStart := .stsStart | int -}}
+  {{- $stsEnd := .stsEnd | int -}}
+  {{- $replicas := .replicas | int -}}
+  {{- $moveOpReplicas := .moveOpReplicas | int -}}
+  {{- $currentStsIndex := mod (add $stsStart $stsIdx) 10 | int -}}
+  {{- $useMoveOp := and (ne $stsStart $stsEnd) (eq $currentStsIndex $stsEnd) -}}
+  {{- $stsIndexSuffix := eq $currentStsIndex 0 | ternary "" (printf "-%d" $currentStsIndex) -}}
+  {{- $currentReplicas := $useMoveOp | ternary $moveOpReplicas $replicas | int -}}
+currentStsIndex: {{ $currentStsIndex }}
+useMoveOp: {{ $useMoveOp }}
+stsIndexSuffix: {{ $stsIndexSuffix | quote }}
+currentReplicas: {{ $currentReplicas }}
+{{- end -}}
