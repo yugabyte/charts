@@ -33,7 +33,8 @@ spec:
     exporters:
       {{- range $name, $exporter := .Values.otelCollector.exporters}}
       {{ $name }}:
-{{ toYaml $exporter | indent 8 }}
+        {{- $exporterConfig := omit $exporter "receivers" "attributes" "batch" "memoryLimiter" }}
+        {{- toYaml $exporterConfig | nindent 8 }}
       {{- end }}
     extensions:
       file_storage/queue:
@@ -49,57 +50,98 @@ spec:
         endpoint: {{ (printf "%s:13133" (include "yugabyte.webserver_interface" $root)) | quote }}
         path: "/health"
     processors:
-      {{- range $name := (keys .Values.otelCollector.exporters) }}
+      {{- if $root.Values.otelCollector.transform }}
+      transform/replace:
+        {{- toYaml $root.Values.otelCollector.transform | nindent 8 }}
+      {{- end }}
+      {{- range $name, $exporter := .Values.otelCollector.exporters }}
       attributes/{{ $name }}:
         actions:
-        - action: upsert
-          key: ddsource
-          value: yugabyte
-        - action: upsert
-          key: service
-          value: yb-otel-collector
+        {{- if $exporter.attributes }}
+        {{- toYaml $exporter.attributes | nindent 8 }}
+        {{- end }}
         - action: upsert
           key: host
           value: ${POD_NAME}
+      {{- if $exporter.batch }}
+      batch/{{ $name }}:
+        {{- toYaml $exporter.batch | nindent 8 }}
+      {{- end }}
+      {{- if $exporter.memoryLimiter }}
+      memory_limiter/{{ $name }}:
+        {{- toYaml $exporter.memoryLimiter | nindent 8 }}
+      {{- end }}
       {{- end }}
     receivers:
-      filelog/ysql:
+      {{- range $receiverName, $receiverConfig := $root.Values.otelCollector.receivers }}
+      {{ $receiverName }}:
+        {{- if $receiverConfig.attributes }}
         attributes:
-          audit_log_type: ysql
+          {{- toYaml $receiverConfig.attributes | nindent 10 }}
+        {{- end }}
         exclude:
         - /mnt/disk0/yb-data/tserver/logs/*.gz
         include:
         - /mnt/disk0/yb-data/tserver/logs/postgresql-*.log
         multiline:
-          line_start_pattern: {{ $root.Values.otelCollector.recievers.ysql.lineStartPattern | quote }}
+          line_start_pattern: {{ $receiverConfig.lineStartPattern | quote }}
         operators:
-        - expr: 'body not matches "^.*\\w+:  AUDIT:(.|\\n|\\r|\\s)*$"'
+        {{- if $receiverConfig.filters }}
+        {{- range $filter := $receiverConfig.filters }}
+        - expr: {{ $filter | quote }}
           type: filter
+        {{- end }}
+        {{- end }}
         - on_error: drop
-          regex: {{ $root.Values.otelCollector.recievers.ysql.regex | quote }}
+          regex: {{ $receiverConfig.regex | quote }}
+          {{- if $receiverConfig.timestamp }}
           timestamp:
-{{ toYaml $root.Values.otelCollector.recievers.ysql.timestamp | indent 12 }}
+{{ toYaml $receiverConfig.timestamp | indent 12 }}
+          {{- end }}
           type: regex_parser
         start_at: beginning
         storage: file_storage/queue
+      {{- end }}
     service:
       extensions:
       - file_storage/queue
       - health_check
       pipelines:
-        {{- range $name := (keys .Values.otelCollector.exporters) }}
+        {{- range $name, $exporter := .Values.otelCollector.exporters }}
         logs/{{ $name }}:
           exporters:
           - {{ $name }}
           processors:
+          {{- if $root.Values.otelCollector.transform }}
+          - transform/replace
+          {{- end }}
           - attributes/{{ $name }}
+          {{- if $exporter.batch }}
+          - batch/{{ $name }}
+          {{- end }}
+          {{- if $exporter.memoryLimiter }}
+          - memory_limiter/{{ $name }}
+          {{- end }}
           receivers:
+          {{- if $exporter.receivers }}
+          {{- range $receiver := $exporter.receivers }}
+          - {{ $receiver }}
+          {{- end }}
+          {{- else }}
+          {{- /* Default fallback based on exporter name for backward compatibility */}}
+          {{- if contains "query_logs" $name }}
+          - filelog/query_logs_ysql
+          {{- else }}
           - filelog/ysql
+          {{- end }}
+          {{- end }}
         {{- end}}
       telemetry:
         logs:
           output_paths:
           - /mnt/disk0/otel-collector/logs/otel-collector.logs
+        metrics:
+          address: "0.0.0.0:8889"
   image: {{ .Values.otelCollector.image | default "otel/opentelemetry-collector-contrib:0.114.0" | quote }}
   ipFamilyPolicy: SingleStack
   managementState: managed

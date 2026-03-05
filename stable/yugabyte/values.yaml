@@ -911,9 +911,31 @@ ocpCompatibility:
 otelCollector:
   enabled: false
   image: ""
+
+  # Optional transform processor for sensitive data masking (applies to all pipelines)
+  transform: {}
+  # transform:
+  #   log_statements:
+  #     - context: log
+  #       statements:
+  #         - 'replace_pattern(body, "password=[^&\\s]+", "password=***")'
+
   exporters: {} # Add exporters here
+  # Example: Audit logs exporter (Datadog)
   # exporters:
   #   datadog:
+  #     # Receivers to connect to this exporter
+  #     receivers:
+  #       - filelog/ysql
+  #     # Custom attributes to add to logs for this exporter
+  #     attributes:
+  #       - action: upsert
+  #         key: ddsource
+  #         value: yugabyte
+  #       - action: upsert
+  #         key: service
+  #         value: yb-otel-collector
+  #     # Exporter-specific configuration
   #     api:
   #       key: <KEY>
   #       site: datadoghq.com
@@ -922,15 +944,60 @@ otelCollector:
   #     sending_queue:
   #       enabled: true
   #       storage: file_storage/queue
+  #
+  # Example: Query logs exporter (with batch and memory limiter)
+  #   datadog_query_logs:
+  #     receivers:
+  #       - filelog/query_logs_ysql
+  #     attributes:
+  #       - action: upsert
+  #         key: ddsource
+  #         value: yugabyte
+  #       - action: upsert
+  #         key: service
+  #         value: yb-query-logs
+  #     # Optional batch processor for this exporter
+  #     batch:
+  #       send_batch_size: 100
+  #       send_batch_max_size: 1000
+  #       timeout: 10s
+  #     # Optional memory limiter for this exporter
+  #     memoryLimiter:
+  #       check_interval: 10s
+  #       limit_mib: 2048
+  #     api:
+  #       key: <KEY>
+  #       site: datadoghq.com
 
-  recievers:
-    ysql:
+  receivers:
+    # Audit logs receiver
+    filelog/ysql:
+      # Attributes to tag logs from this receiver
+      attributes:
+        yugabyte.audit_log_type: ysql
+      # Filter expressions (logs matching these are dropped)
+      filters:
+        - 'body not matches "^.*\\w+:  AUDIT:(.|\\n|\\r|\\s)*$"'
       # Set ysql receiver params here, based on log_line_prefix set in ysql_pg.conf
       lineStartPattern: "(?P<timestamp_with_ms>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}[.]\\d{3} \\w{3})[ ][[](?P<process_id>\\d+)[]][ ]"
       regex: "(?P<timestamp_with_ms>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}[.]\\d{3} \\w{3})[ ][[](?P<process_id>\\d+)[]][ ](?P<log_level>\\w+):  AUDIT: (?P<audit_type>\\w+),(?P<statement_id>\\d+),(?P<substatement_id>\\d+),(?P<class>\\w+),(?P<command>[^,]+),(?P<object_type>[^,]*),(?P<object_name>[^,]*),(?P<statement>(.|\\n|\\r|\\s)*)"
       timestamp:
         layout: '%Y-%m-%d %H:%M:%S.%L %Z'
         parse_from: 'attributes.timestamp_with_ms'
+    # Query logs receiver (uncomment to enable)
+    # filelog/query_logs_ysql:
+    #   attributes:
+    #     yugabyte.query_log_type: ysql
+    #   # Filter expressions (logs matching these are dropped)
+    #   filters:
+    #     - 'body matches "^.*\\w+:  AUDIT:(.|\\n|\\r|\\s)*$"'
+    #     - 'body matches "unable to find pgstat entry for abnormally terminated PID"'
+    #     - 'body matches "^[IWEF]\\d{4} \\d{2}:\\d{2}:\\d{2}\\.\\d{6} \\d+ .*\\.cc:\\d+"'
+    #   lineStartPattern: ".*([A-Z]\\d{4})|((?P<timestamp_without_ms>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\w{3})[ ][|][ ]([^ ]+)[ ][:][ ])"
+    #   regex: "(?P<timestamp_without_ms>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\w{3})[ ][|][ ]([^ ]+)[ ][:][ ](?P<log_level>\\w+):[ ](?P<message>(.|\n|\r|\\s)*)"
+    #   timestamp:
+    #     layout: '%Y-%m-%d %H:%M:%S %Z'
+    #     parse_from: 'attributes.timestamp_without_ms'
   resources: {}
   # resources:
   #   requests:
