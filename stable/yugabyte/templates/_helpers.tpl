@@ -666,6 +666,30 @@ securityContext:
 {{- end -}}
 
 {{/*
+  Returns OpenTelemetryCollector name used for sidecar injection.
+*/}}
+{{- define "yugabyte.otel.collectorName" -}}
+{{- .Values.oldNamingStyle | ternary "yb-otel" (printf "yb-otel-%s" (include "yugabyte.fullname" .)) -}}
+{{- end -}}
+
+{{/*
+  Returns true when OTel sidecar should be injected for given service.
+  - Always inject on yb-tservers when otelCollector.enabled=true
+  - Also inject on yb-masters when otelCollector.runOnMaster=true
+*/}}
+{{- define "yugabyte.otel.shouldInject" -}}
+{{- if not .root.Values.otelCollector.enabled -}}
+false
+{{- else if eq .serviceName "yb-tservers" -}}
+true
+{{- else if and (eq .serviceName "yb-masters") .root.Values.otelCollector.runOnMaster -}}
+true
+{{- else -}}
+false
+{{- end -}}
+{{- end -}}
+
+{{/*
 Get ipFamily and ipFamilyPolicy settings.
 */}}
 {{- define "yugabyte.ipFamilyConfig" }}
