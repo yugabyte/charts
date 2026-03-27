@@ -946,7 +946,8 @@ ocpCompatibility:
 otelCollector:
   enabled: false
   image: ""
-
+  # When metricsExport is enabled, we need OTEL on master as well
+  runOnMaster: false
   # Preferred: complete OpenTelemetry collector config, rendered by YBA and passed through to
   # spec.config verbatim.
   config: ""

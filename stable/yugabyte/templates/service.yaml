@@ -214,11 +214,11 @@ spec:
         checksum/rootCA: {{ (not $root.Values.tls.rootCAChecksum) | ternary (cat $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key | sha256sum) $root.Values.tls.rootCAChecksum }}
       {{- end }}
       {{- end }}
-      {{- if and (eq $service.name "yb-tservers") ($root.Values.otelCollector.enabled) }}
-        sidecar.opentelemetry.io/inject: {{ $root.Values.oldNamingStyle | ternary "otel-yb-tserver" (printf "otel-%s-%s" (include "yugabyte.fullname" $root) $service.label) | quote }}
+      {{- end }}
+      {{- if eq (include "yugabyte.otel.shouldInject" (dict "root" $root "serviceName" $service.name) | trim) "true" }}
+        sidecar.opentelemetry.io/inject: {{ include "yugabyte.otel.collectorName" $root | quote }}
         checksum/otel: {{ $root.Values.otelCollector | toYaml | sha256sum }} # Required to trigger a pod restart when the config changes
       {{- end}}
-      {{- end }}
       labels:
         {{- include "yugabyte.labels" $root | indent 8 }}
         {{- include "yugabyte.applabel" ($appLabelArgs) | indent 8 }}
