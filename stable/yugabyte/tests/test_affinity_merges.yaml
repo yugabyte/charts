@@ -184,8 +184,60 @@ tests:
                 operator: In
                 values:
                 - yb-tserver
-            topologyKey: kubernetes.io/hostname                
+            topologyKey: kubernetes.io/hostname
         requiredDuringSchedulingIgnoredDuringExecution:
           random_key2: random_value2
-    documentIndex: 4  
-
+    documentIndex: 4
+- it: Test single zone with default empty affinity has podAntiAffinity
+  template: templates/service.yaml
+  set:
+    AZ: us-west1-a
+    oldNamingStyle: true
+    master:
+      affinity: {}
+    tserver:
+      affinity: {}
+  asserts:
+  - isSubset:
+      path: spec.template.spec.affinity.podAntiAffinity
+      content:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - "yb-master"
+            topologyKey: kubernetes.io/hostname
+    documentIndex: 1
+  - isSubset:
+      path: spec.template.spec.affinity.podAntiAffinity
+      content:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - "yb-tserver"
+            topologyKey: kubernetes.io/hostname
+    documentIndex: 4
+  - isSubset:
+      path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution
+      content:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: failure-domain.beta.kubernetes.io/zone
+            operator: In
+            values:
+            - us-west1-a
+        - matchExpressions:
+          - key: topology.kubernetes.io/zone
+            operator: In
+            values:
+            - us-west1-a
+    documentIndex: 1

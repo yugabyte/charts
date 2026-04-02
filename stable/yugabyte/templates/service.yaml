@@ -307,8 +307,8 @@ spec:
           {{- $nodeAffinityData = mustMerge $baseAffinity $nodeAffinityData -}}
         {{- end -}}
 
-        {{- $podAntiAffinityData := dict -}}
         {{- $basePodAntiAffinity := include "yugabyte.podAntiAffinity" ($appLabelArgs) | fromYaml -}}
+        {{- $podAntiAffinityData := $basePodAntiAffinity -}}
         {{- if eq $service.name "yb-masters" -}}
           {{- with $root.Values.master.affinity -}}
             {{- $userPodAntiAffinity := get . "podAntiAffinity" | default (dict) -}}

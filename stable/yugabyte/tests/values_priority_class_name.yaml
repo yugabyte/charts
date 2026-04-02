@@ -4,8 +4,6 @@ replicas:
   master: 1
   tserver: 1
 
- ""
-
 master:
   priorityClassName: ""
 
