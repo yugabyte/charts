@@ -85,6 +85,23 @@ Source - https://github.com/helm/charts/issues/5167#issuecomment-843962731
 {{- end -}}
 {{- end -}}
 
+
+{{/*
+A super set of getOrGeneratePassword, where if a value is provided in Values, we just return it,
+otherwise we will fall back to "getOrGenerate" which will generate a password if it does not already
+exist in the provided secret
+
+                [------- Used in getOrGeneratePassword -------] [ value from Values ]
+Exptects dict of .Name .Namespace .Kind .Key .Length (optional) and .UserValue
+*/}}
+{{- define "getValuesOrGetOrGeneratePassword" }}
+{{- if .UserValue -}}
+{{- .UserValue | b64enc -}}
+{{- else -}}
+{{ include "getOrGeneratePassword" .}}
+{{- end -}}
+{{- end -}}
+
 {{/*
 Similar to getOrGeneratePassword but written for migration from
 ConfigMap to Secret. Secret is given precedence, and then the upgrade
@@ -93,18 +110,26 @@ TODO: remove this after few releases i.e. once all old platform
 installations are upgraded, and use getOrGeneratePassword.
 */}}
 {{- define "getOrGeneratePasswordConfigMapToSecret" }}
-{{- $len := (default 8 .Length) | int -}}
-{{- $obj := (lookup "v1" "Secret" .Namespace .Name).data -}}
-{{- if $obj }}
-{{- index $obj .Key -}}
-{{- else -}}
-{{- $obj := (lookup "v1" "ConfigMap" .Namespace .Name).data -}}
-{{- if $obj }}
-{{- index $obj .Key | b64enc -}}
-{{- else -}}
-{{- randAlphaNum $len | b64enc -}}
+{{- $cachedValue := "" -}}
+{{- $pc := index .Values "passwordCache" -}}
+{{- if $pc -}}
+{{- $cachedValue = index $pc .Key | default "" -}}
 {{- end -}}
+{{- if not $cachedValue -}}
+  {{- $len := (default 8 .Length) | int -}}
+  {{- $obj := (lookup "v1" "Secret" .Namespace .Name).data -}}
+  {{- if $obj }}
+  {{- $cachedValue = index $obj .Key -}}
+  {{- else -}}
+  {{- $obj := (lookup "v1" "ConfigMap" .Namespace .Name).data -}}
+  {{- if $obj }}
+  {{- $cachedValue = index $obj .Key | b64enc -}}
+  {{- else -}}
+  {{- $cachedValue = randAlphaNum $len | b64enc -}}
+  {{- end -}}
+  {{- end -}}
 {{- end -}}
+{{- $cachedValue -}}
 {{- end -}}
 
 {{/*
@@ -294,6 +319,39 @@ Common labels to be applied to all objects
 {{- end -}}
 
 {{/*
+Get or generate perf-advisor server cert and key in PEM format (tls.crt / tls.key).
+Reuses YBA's tls.certificate/key/ca_certificate values when provided.
+*/}}
+{{- define "yugaware.getOrCreatePerfAdvisorServerPem" -}}
+{{- $root := .Root -}}
+{{- if and $root.Values.tls.certificate $root.Values.tls.key -}}
+  {{- if $root.Values.tls.ca_certificate -}}
+    {{- $decodedCert := $root.Values.tls.certificate | b64dec -}}
+    {{- $decodedCaCert := $root.Values.tls.ca_certificate | b64dec -}}
+    {{- $tlsCrt := (printf "%s\n%s" $decodedCert $decodedCaCert) | b64enc -}}
+tls.crt: {{ $tlsCrt }}
+tls.key: {{ $root.Values.tls.key }}
+  {{- else -}}
+tls.crt: {{ $root.Values.tls.certificate }}
+tls.key: {{ $root.Values.tls.key }}
+  {{- end -}}
+{{- else -}}
+  {{- $result := (lookup "v1" "Secret" .Namespace .Name).data -}}
+  {{- if and $result (index $result "tls.crt") (index $result "tls.key") -}}
+tls.crt: {{ index $result "tls.crt" }}
+tls.key: {{ index $result "tls.key" }}
+  {{- else -}}
+    {{- $caCert := genCA $root.Values.tls.hostname 3650 -}}
+    {{- $cert := genSignedCert $root.Values.tls.hostname nil nil 3650 $caCert -}}
+    {{- $tlsCrt := (printf "%s\n%s" $cert.Cert $caCert.Cert) | b64enc -}}
+    {{- $tlsKey := $cert.Key | b64enc -}}
+tls.crt: {{ $tlsCrt }}
+tls.key: {{ $tlsKey }}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Compare a version string to stable and preview versions. Versions must not include build numbers
 Usage: {{ include "yb_version_compare" (list $version $stable $preview) }}
 Returns: 1 if version > target, 0 if equal, -1 if version < target. Target is stable if version matches stable pattern, else preview.
@@ -326,4 +384,24 @@ Returns: 1 if version > target, 0 if equal, -1 if version < target. Target is st
     {{- end -}}
   {{- end -}}
   {{- if eq $result 1 -}}1{{- else if eq $result 0 -}}0{{- else -}}-1{{- end -}}
+{{- end -}}
+
+{{/*
+Returns the perf advisor cors.orgin urls
+*/}}
+{{- define "perfAdvisor.corsOriginUrls" -}}
+{{- $port := int .Values.perfAdvisor.port -}}
+{{- if .Values.tls.enabled -}}
+{{- if ne $port 443 -}}
+https://{{ .Values.tls.hostname }}:{{ $port }}{{- if .Values.perfAdvisor.cors.origin -}},{{ .Values.perfAdvisor.cors.origin }}{{- end -}}
+{{- else -}}
+https://{{ .Values.tls.hostname }}{{- if .Values.perfAdvisor.cors.origin -}},{{ .Values.perfAdvisor.cors.origin }}{{- end -}}
+{{- end -}}
+{{- else -}}
+{{- if ne $port 80 -}}
+http://{{ .Values.perfAdvisor.hostname }}:{{ $port }}{{- if .Values.perfAdvisor.cors.origin -}},{{ .Values.perfAdvisor.cors.origin }}{{- end -}}
+{{- else -}}
+http://{{ .Values.perfAdvisor.hostname }}{{- if .Values.perfAdvisor.cors.origin -}},{{ .Values.perfAdvisor.cors.origin }}{{- end -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}

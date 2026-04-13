@@ -466,6 +466,9 @@ spec:
             - --storage.tsdb.path=/prometheus_data
             - --web.enable-admin-api
             - --web.enable-lifecycle
+            {{- if .Values.perfAdvisor.enabled }}
+            - --web.enable-remote-write-receiver
+            {{- end }}
             - --storage.tsdb.retention.time={{ .Values.prometheus.retentionTime }}
             - --query.max-concurrency={{ .Values.prometheus.queryConcurrency }}
             - --query.max-samples={{ .Values.prometheus.queryMaxSamples }}

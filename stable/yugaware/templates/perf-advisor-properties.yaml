@@ -1,0 +1,46 @@
+{{- if .Values.perfAdvisor.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-perf-advisor-properties
+  labels:
+    app: {{ .Release.Name }}-perf-advisor
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service | quote }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
+data:
+  override.properties: |
+  {{- if .Values.postgres.external.host }}
+    spring.datasource.username={{ .Values.postgres.external.user }}
+    spring.datasource.url=jdbc:postgresql://{{ .Values.postgres.external.host }}:{{ .Values.postgres.external.port }}/{{ .Values.perfAdvisor.dbname }}
+  {{- else }}
+    spring.datasource.username={{ .Values.postgres.user }}
+    spring.datasource.url=jdbc:postgresql://{{ .Release.Name }}-postgres:5432/{{ .Values.perfAdvisor.dbname }}
+  {{- end }}
+    pa.log.dir=data/
+    pa.prometheus.url=http://{{ .Release.Name }}-yugaware-ui:9090
+    pa.security.cors.origin={{ include "perfAdvisor.corsOriginUrls" . }}
+    {{- if .Values.tls.enabled}}
+    pa.api.url=https://localhost:{{ .Values.perfAdvisor.port }}
+    {{- else }}
+    pa.api.url=http://localhost:{{ .Values.perfAdvisor.port }}
+    {{- end }}
+    db-scheduler.threads={{ .Values.perfAdvisor.taskRunner.threads }}
+  {{- if .Values.tls.enabled }}
+    server.ssl.enabled=true
+    server.ssl.key-store-type=PKCS12
+    server.ssl.key-store=/opt/yugabyte/perf-advisor/certs/tls.p12
+  {{- if .Values.tls.sslProtocols }}
+    server.ssl.enabled-protocols={{ .Values.tls.sslProtocols }}
+  {{- end }}
+  {{- end }}
+    pa.callhome.enabled={{ .Values.perfAdvisor.callhome.enabled }}
+    pa.callhome.environment={{ .Values.perfAdvisor.callhome.environment }}
+    pa.deployment.type=yugaware-helm
+    pa.metrics.export.jsonl.directory=/opt/yugabyte/perf-advisor/data/collected/metrics
+    pa.metrics.export.topology=/opt/yugabyte/perf-advisor/conf/metrics-export.yml
+    pa.support-bundle.path=/opt/yugabyte/perf-advisor/data/support-bundle
+{{- end }}

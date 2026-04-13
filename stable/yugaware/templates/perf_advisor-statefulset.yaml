@@ -1,0 +1,257 @@
+{{- if .Values.perfAdvisor.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-perf-advisor
+  labels:
+    app: {{ .Release.Name }}-perf-advisor
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service | quote }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
+spec:
+  serviceName: {{ .Release.Name }}-perf-advisor-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-perf-advisor
+  template:
+    metadata:
+      annotations:
+        checksum/perfAdvisorConfig: {{ include (print $.Template.BasePath "/perf-advisor-properties.yaml") . | sha256sum }}
+        checksum/metricsExportTopology: {{ include (print $.Template.BasePath "/perf-advisor-metrics-export-topology.yaml") . | sha256sum }}
+        checksum/perfAdvisorSecret: {{ include (print $.Template.BasePath "/perf-advisor-secret.yaml") . | sha256sum }}
+        checksum/globalConfig: {{ include (print $.Template.BasePath "/global-config.yaml") . | sha256sum }}
+        {{- if .Values.tls.enabled }}
+        checksum/perfAdvisorCerts: {{ include (print $.Template.BasePath "/perf-advisor-certs.yaml") . | sha256sum }}
+        {{- end }}
+      {{- if .Values.perfAdvisor.annotations }}
+      {{ toYaml .Values.perfAdvisor.annotations | nindent 8 }}
+      {{- end }}
+      labels:
+        app: {{ .Release.Name }}-perf-advisor
+        chart: {{ include "yugaware.chart" . }}
+        release: {{ .Release.Name }}
+        heritage: {{ .Release.Service | quote }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 8 }}
+{{- end }}
+    spec:
+      serviceAccountName: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
+      imagePullSecrets:
+        - name: {{ .Values.image.pullSecret }}
+      {{- if .Values.image.extraPullSecrets }}
+      {{- range .Values.image.extraPullSecrets }}
+        - name: {{ . }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.perfAdvisor.spec }}
+      {{- toYaml .Values.perfAdvisor.spec | nindent 6 }}
+      {{- end }}
+      # TODO: Add security context once the image supports it
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8}}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+      {{- with .Values.tolerations }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- end }}
+      initContainers:
+        - name: db-init
+          image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_password
+            - name: DB_HOST
+            {{- if .Values.postgres.external.host }}
+              value: "{{ .Values.postgres.external.host }}"
+            {{- else }}
+              value: "{{ .Release.Name }}-postgres"
+            {{- end }}
+            - name: DB_PORT
+            {{- if .Values.postgres.external.host }}
+              value: "{{ .Values.postgres.external.port }}"
+            {{- else }}
+              value: "5432"
+            {{- end }}
+            - name: DB_USER
+            {{- if .Values.postgres.external.host }}
+              value: "{{ .Values.postgres.external.user }}"
+            {{- else }}
+              value: "{{ .Values.postgres.user }}"
+            {{- end }}
+            - name: DB_NAME
+              value: "{{ .Values.perfAdvisor.dbname }}"
+          command:
+            - 'sh'
+            - '-c'
+            - |
+              until pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; do
+                echo "Waiting for PostgreSQL..."
+                sleep 5
+              done
+              psql -h $DB_HOST -p $DB_PORT -U $DB_USER -tc \
+                "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || \
+                psql -h $DB_HOST -p $DB_PORT -U $DB_USER -c "CREATE DATABASE \"$DB_NAME\""
+              echo "Database '$DB_NAME' is ready"
+        {{- if (.Values.tls.enabled) }}
+        - name: keystore-generator
+          image: {{ include "full_image" (dict "containerName" "perf_advisor" "root" .) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: KEYSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-perf-advisor-secret
+                  key: KEYSTORE_PASSWORD
+          volumeMounts:
+            - name: export-certs
+              mountPath: /export_certs
+            - name: perf-advisor-certs
+              mountPath: /opt/yugabyte/perf-advisor/certs
+          {{- if .Values.tls.certManager.enabled }}
+            - name: {{ .Release.Name }}-perf-advisor-tls-cert
+              mountPath: /opt/yugabyte/perf-advisor/pem-certs/
+              readOnly: true
+          {{- else }}
+            - name: {{ .Release.Name }}-perf-advisor-tls-pem
+              mountPath: /opt/yugabyte/perf-advisor/pem-certs/
+              readOnly: true
+          {{- end }}
+          command:
+            - "/bin/bash"
+            - "/export_certs/export-certs.sh"
+        {{- end }}
+      containers:
+        {{- if .Values.perfAdvisor.sidecars }}
+        {{- toYaml .Values.perfAdvisor.sidecars | nindent 8 }}
+        {{- end }}
+        - name: perf-advisor
+          image: {{ include "full_image" (dict "containerName" "perf_advisor" "root" .) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Leaving as command to allow override for debugging purposes
+          command:
+            - "/bin/bash"
+            - "-c"
+            - |
+              /opt/yugabyte/perf-advisor/backend/bin/perf-advisor \
+                --spring.config.additional-location=/opt/yugabyte/perf-advisor/conf/override.properties
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_password
+            - name: PA_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-perf-advisor-secret
+                  key: PA_API_TOKEN
+            - name: JAVA_OPTS
+              value: "-XX:InitialRAMPercentage={{ .Values.perfAdvisor.initialRamPercentage }} -XX:MaxRAMPercentage={{ .Values.perfAdvisor.maxRamPercentage }}"
+          {{- if (.Values.tls.enabled) }}
+            - name: PA_WEB_TLS_KEYSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-perf-advisor-secret
+                  key: KEYSTORE_PASSWORD
+          {{- end }}
+            - name: SPRING_PROFILES_ACTIVE
+              value: "api,task-runner,collector"
+          ports:
+            - containerPort: 8080
+          {{- if .Values.perfAdvisor.pod.probes.enabled }}
+          startupProbe:
+            failureThreshold: {{ div .Values.perfAdvisor.pod.probes.startupTimeSec.max (div .Values.perfAdvisor.pod.probes.startupTimeSec.min 2) }}
+            initialDelaySeconds: {{ .Values.perfAdvisor.pod.probes.startupTimeSec.min }}
+            periodSeconds: {{ div .Values.perfAdvisor.pod.probes.startupTimeSec.min 2 }}
+            timeoutSeconds: {{ div .Values.perfAdvisor.pod.probes.startupTimeSec.min 4 }}
+            httpGet:
+                path: /actuator/health
+                port: 8080
+          livenessProbe:
+            failureThreshold: {{ .Values.perfAdvisor.pod.probes.livenessProbe.failureThreshold }}
+            periodSeconds: {{ .Values.perfAdvisor.pod.probes.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ div .Values.perfAdvisor.pod.probes.livenessProbe.periodSeconds 2 }}
+            httpGet:
+                path: /actuator/health
+                port: 8080
+          {{- end }}
+          {{- if .Values.perfAdvisor.resources }}
+          resources: {{ toYaml .Values.perfAdvisor.resources | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: perf-advisor-config
+              mountPath: /opt/yugabyte/perf-advisor/conf
+            - name: perf-advisor-storage
+              mountPath: /opt/yugabyte/perf-advisor/data
+          {{- if (.Values.tls.enabled) }}
+            - name: perf-advisor-certs
+              mountPath: /opt/yugabyte/perf-advisor/certs
+              readOnly: true
+          {{- end }}
+
+      volumes:
+        - name: perf-advisor-config
+          projected:
+            sources:
+              - configMap:
+                  name: {{ .Release.Name }}-perf-advisor-properties
+                  items:
+                      - key: override.properties
+                        path: override.properties
+              - configMap:
+                  name: {{ .Release.Name }}-perf-advisor-metrics-export-topology
+                  items:
+                    - key: metrics-export.yml
+                      path: metrics-export.yml
+        - name: perf-advisor-certs
+          emptyDir: {}
+        {{- if (.Values.tls.enabled) }}
+        - name: export-certs
+          configMap:
+            name: {{ .Release.Name }}-perf-advisor-export-certs
+            items:
+              - key: export-certs.sh
+                path: export-certs.sh
+        {{- if .Values.tls.certManager.enabled }}
+        - name: {{ .Release.Name }}-perf-advisor-tls-cert
+          secret:
+            secretName: {{ .Release.Name }}-perf-advisor-tls-cert
+        {{- else }}
+        - name: {{ .Release.Name }}-perf-advisor-tls-pem
+          secret:
+            secretName: {{ .Release.Name }}-perf-advisor-tls-pem
+        {{- end }}
+        {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: perf-advisor-storage
+        {{- if .Values.perfAdvisor.storageAnnotations }}
+        annotations:
+{{ toYaml .Values.perfAdvisor.storageAnnotations | indent 10 }}
+        {{- end }}
+        labels:
+          app: {{ .Release.Name }}-perf-advisor
+          chart: {{ template "yugaware.chart" . }}
+          release: {{ .Release.Name }}
+          heritage: {{ .Release.Service | quote }}
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.perfAdvisor.storageClass }}
+        storageClassName: {{ .Values.perfAdvisor.storageClass }}
+        {{- else }}
+        storageClassName: {{ .Values.yugaware.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.perfAdvisor.storage }}
+{{- end }}

@@ -1,0 +1,819 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/quintush/helm-unittest/master/schema/helm-testsuite.json
+suite: Perf Advisor integration
+templates:
+  - perf_advisor-statefulset.yaml
+  - perf-advisor-properties.yaml
+  - perf-advisor-secret.yaml
+  - perf-advisor-certs.yaml
+  - perf-advisor-metrics-export-topology.yaml
+  - perf-advisor-service.yaml
+  - global-config.yaml
+  - service.yaml
+  - configs.yaml
+tests:
+
+  ##############################################################################
+  # Disabled by default — nothing rendered
+  ##############################################################################
+
+  - it: should not create statefulset when perfAdvisor is disabled
+    template: perf_advisor-statefulset.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not create properties when perfAdvisor is disabled
+    template: perf-advisor-properties.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not create secret when perfAdvisor is disabled
+    template: perf-advisor-secret.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not create perf-advisor service when disabled
+    template: perf-advisor-service.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not create certs when perfAdvisor is disabled
+    template: perf-advisor-certs.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not create postgres service when perfAdvisor disabled
+    template: service.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  ##############################################################################
+  # StatefulSet — basic
+  ##############################################################################
+
+  - it: should create statefulset with correct name
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-perf-advisor
+      - equal:
+          path: spec.serviceName
+          value: RELEASE-NAME-perf-advisor-service
+
+  - it: should use correct perf-advisor image
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].image
+          value: "quay.io/yugabyte/yb-troubleshoot-platform:9999.9.0-b0"
+
+  - it: should use commonRegistry override for image
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      image.commonRegistry: myregistry.io
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].image
+          value: "myregistry.io/yugabyte/yb-troubleshoot-platform:9999.9.0-b0"
+
+  - it: should honour custom image tag
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      image.perf_advisor.tag: "1.2.3.4-b5"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].image
+          value: "quay.io/yugabyte/yb-troubleshoot-platform:1.2.3.4-b5"
+
+  - it: should use imagePullPolicy from values
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      image.pullPolicy: Always
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].imagePullPolicy
+          value: Always
+
+  - it: should set replica count to 1
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  ##############################################################################
+  # StatefulSet — persistent storage (volumeClaimTemplates)
+  ##############################################################################
+
+  - it: should define volumeClaimTemplates for perf-advisor-storage
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].metadata.name
+          value: perf-advisor-storage
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.accessModes[0]
+          value: ReadWriteOnce
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: 50Gi
+
+  - it: should honour custom perfAdvisor.storage size
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      perfAdvisor.storage: 200Gi
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: 200Gi
+
+  - it: should fall back to yugaware.storageClass when perfAdvisor.storageClass is empty
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      yugaware.storageClass: yugaware-sc
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: yugaware-sc
+
+  - it: should prefer perfAdvisor.storageClass over yugaware.storageClass
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      yugaware.storageClass: yugaware-sc
+      perfAdvisor.storageClass: fast-ssd
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: fast-ssd
+
+  - it: should apply storageAnnotations when provided
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      perfAdvisor.storageAnnotations:
+        foo: bar
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].metadata.annotations.foo
+          value: bar
+
+  - it: should mount perf-advisor-storage at /opt/yugabyte/perf-advisor/data
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].volumeMounts
+          content:
+            name: perf-advisor-storage
+            mountPath: /opt/yugabyte/perf-advisor/data
+          any: true
+
+  ##############################################################################
+  # StatefulSet — env vars and profiles
+  ##############################################################################
+
+  - it: should set default spring profiles
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].env[?(@.name == "SPRING_PROFILES_ACTIVE")].value
+          value: "api,task-runner,collector"
+
+  - it: should set JAVA_OPTS with ram percentages
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].env[?(@.name == "JAVA_OPTS")].value
+          value: "-XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=90"
+
+  - it: should reference yugaware-global-config for postgres password
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].env[?(@.name == "POSTGRES_PASSWORD")].valueFrom.secretKeyRef.name
+          value: RELEASE-NAME-yugaware-global-config
+
+  ##############################################################################
+  # StatefulSet — db-init init container
+  ##############################################################################
+
+  - it: should have db-init init container
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - exists:
+          path: spec.template.spec.initContainers[?(@.name == "db-init")]
+
+  - it: db-init should connect to internal postgres by default
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "db-init")].env[?(@.name == "DB_HOST")].value
+          value: RELEASE-NAME-postgres
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "db-init")].env[?(@.name == "DB_PORT")].value
+          value: "5432"
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "db-init")].env[?(@.name == "DB_USER")].value
+          value: postgres
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "db-init")].env[?(@.name == "DB_NAME")].value
+          value: ts
+
+  - it: db-init should connect to external postgres when configured
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      postgres.external.host: ext-pg.example.com
+      postgres.external.port: 5433
+      postgres.external.user: admin
+      postgres.external.pass: secret
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "db-init")].env[?(@.name == "DB_HOST")].value
+          value: ext-pg.example.com
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "db-init")].env[?(@.name == "DB_PORT")].value
+          value: "5433"
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "db-init")].env[?(@.name == "DB_USER")].value
+          value: admin
+
+  - it: should allow custom database name
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      perfAdvisor.dbname: custom_db
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name == "db-init")].env[?(@.name == "DB_NAME")].value
+          value: custom_db
+
+  ##############################################################################
+  # StatefulSet — TLS
+  ##############################################################################
+
+  - it: should not have keystore-generator when TLS disabled
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.initContainers[?(@.name == "keystore-generator")]
+
+  - it: should have keystore-generator when TLS enabled
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: true
+    asserts:
+      - exists:
+          path: spec.template.spec.initContainers[?(@.name == "keystore-generator")]
+
+  - it: should mount tls-pem volume when TLS enabled without cert-manager
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: RELEASE-NAME-perf-advisor-tls-pem
+            secret:
+              secretName: RELEASE-NAME-perf-advisor-tls-pem
+          any: true
+
+  - it: should mount tls-cert volume when cert-manager enabled
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: true
+      tls.certManager.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: RELEASE-NAME-perf-advisor-tls-cert
+            secret:
+              secretName: RELEASE-NAME-perf-advisor-tls-cert
+          any: true
+
+  - it: should set PA_WEB_TLS_KEYSTORE_PASSWORD env when TLS enabled
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: true
+    asserts:
+      - exists:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].env[?(@.name == "PA_WEB_TLS_KEYSTORE_PASSWORD")]
+
+  ##############################################################################
+  # StatefulSet — resources and probes
+  ##############################################################################
+
+  - it: should set container resources
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - isNotEmpty:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].resources
+
+  - it: should not have probes by default
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].startupProbe
+      - notExists:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].livenessProbe
+
+  - it: should enable probes when configured
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      perfAdvisor.pod.probes.enabled: true
+    asserts:
+      - exists:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].startupProbe
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].startupProbe.httpGet.path
+          value: /actuator/health
+      - exists:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].livenessProbe
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "perf-advisor")].livenessProbe.httpGet.path
+          value: /actuator/health
+
+  ##############################################################################
+  # StatefulSet — labels, security context, serviceAccount
+  ##############################################################################
+
+  - it: should propagate commonLabels to statefulset
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      commonLabels:
+        team: platform
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            team: platform
+
+  # TODO: assert securityContext.fsGroup once the perf-advisor image supports
+  # non-root / fsGroup.
+  - it: should not set pod security context yet
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - notExists:
+          path: spec.template.spec.securityContext
+
+  - it: should use yugaware serviceAccount
+    template: perf_advisor-statefulset.yaml
+    set:
+      perfAdvisor.enabled: true
+      yugaware.serviceAccount: my-sa
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: my-sa
+
+  ##############################################################################
+  # Properties ConfigMap
+  ##############################################################################
+
+  - it: properties should connect to internal postgres
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "spring\\.datasource\\.url=jdbc:postgresql://RELEASE-NAME-postgres:5432/ts"
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "spring\\.datasource\\.username=postgres"
+
+  - it: properties should connect to external postgres
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+      postgres.external.host: ext-pg.example.com
+      postgres.external.port: 5433
+      postgres.external.user: extuser
+      postgres.external.pass: secret
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "spring\\.datasource\\.url=jdbc:postgresql://ext-pg\\.example\\.com:5433/ts"
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "spring\\.datasource\\.username=extuser"
+
+  - it: properties should set prometheus URL to yugaware-ui service
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.prometheus\\.url=http://RELEASE-NAME-yugaware-ui:9090"
+
+  - it: properties should set deployment type to yugaware-helm
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.deployment\\.type=yugaware-helm"
+
+  - it: properties should include TLS settings when enabled
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "server\\.ssl\\.enabled=true"
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "server\\.ssl\\.key-store-type=PKCS12"
+
+  - it: properties should honour custom dbname
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+      perfAdvisor.dbname: mydb
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "spring\\.datasource\\.url=jdbc:postgresql://RELEASE-NAME-postgres:5432/mydb"
+
+  - it: properties should include callhome settings
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+      perfAdvisor.callhome.enabled: false
+      perfAdvisor.callhome.environment: prod
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.callhome\\.enabled=false"
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.callhome\\.environment=prod"
+
+  ##############################################################################
+  # Secret
+  ##############################################################################
+
+  - it: secret should contain PA_API_TOKEN
+    template: perf-advisor-secret.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - isKind:
+          of: Secret
+      - exists:
+          path: data.PA_API_TOKEN
+
+  - it: secret should not contain KEYSTORE_PASSWORD when TLS disabled
+    template: perf-advisor-secret.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: false
+    asserts:
+      - notExists:
+          path: data.KEYSTORE_PASSWORD
+
+  - it: secret should contain KEYSTORE_PASSWORD when TLS enabled
+    template: perf-advisor-secret.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: true
+    asserts:
+      - exists:
+          path: data.KEYSTORE_PASSWORD
+
+  ##############################################################################
+  # Certs
+  ##############################################################################
+
+  - it: should not create certs when TLS disabled
+    template: perf-advisor-certs.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should create tls-pem secret and export-certs configmap without cert-manager
+    template: perf-advisor-certs.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: Secret
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-perf-advisor-tls-pem
+        documentIndex: 0
+      - isKind:
+          of: ConfigMap
+        documentIndex: 1
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-perf-advisor-export-certs
+        documentIndex: 1
+
+  - it: should create cert-manager Certificate and export-certs configmap
+    template: perf-advisor-certs.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: true
+      tls.certManager.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: Certificate
+        documentIndex: 0
+      - equal:
+          path: spec.secretName
+          value: RELEASE-NAME-perf-advisor-tls-cert
+        documentIndex: 0
+      - isKind:
+          of: ConfigMap
+        documentIndex: 1
+
+  ##############################################################################
+  # Perf-advisor service
+  ##############################################################################
+
+  - it: service should inherit yugaware.service.type
+    template: perf-advisor-service.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.type
+          value: LoadBalancer
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-perf-advisor-service
+
+  - it: service should allow overriding service type to ClusterIP
+    template: perf-advisor-service.yaml
+    set:
+      perfAdvisor.enabled: true
+      yugaware.service.type: ClusterIP
+    asserts:
+      - equal:
+          path: spec.type
+          value: ClusterIP
+
+  - it: service should default to port 8080
+    template: perf-advisor-service.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 8080
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8080
+
+  - it: service should allow custom port
+    template: perf-advisor-service.yaml
+    set:
+      perfAdvisor.enabled: true
+      perfAdvisor.port: 9090
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 9090
+
+  - it: should not create ServiceMonitor by default
+    template: perf-advisor-service.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should create ServiceMonitor when enabled
+    template: perf-advisor-service.yaml
+    set:
+      perfAdvisor.enabled: true
+      perfAdvisor.serviceMonitor.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ServiceMonitor
+        documentIndex: 1
+
+  ##############################################################################
+  # Postgres service auto-creation
+  ##############################################################################
+
+  - it: should auto-create postgres service when perfAdvisor enabled
+    template: service.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-postgres
+        documentIndex: 1
+      - equal:
+          path: spec.type
+          value: ClusterIP
+        documentIndex: 1
+      - equal:
+          path: spec.ports[0].port
+          value: 5432
+        documentIndex: 1
+
+  - it: should still create postgres service when explicitly enabled
+    template: service.yaml
+    set:
+      postgres.service.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-postgres
+        documentIndex: 1
+
+  ##############################################################################
+  # Metrics-export topology
+  ##############################################################################
+
+  - it: should not create metrics-export topology when perfAdvisor disabled
+    template: perf-advisor-metrics-export-topology.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should create metrics-export topology when perfAdvisor enabled
+    template: perf-advisor-metrics-export-topology.yaml
+    set:
+      perfAdvisor.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-perf-advisor-metrics-export-topology
+
+  ##############################################################################
+  # perfAdvisor.corsOriginUrls helper — 4 main branches
+  #
+  # The helper builds the value for `pa.security.cors.origin` in the
+  # perf-advisor properties ConfigMap. It branches on:
+  #   1. tls.enabled  -> https vs http
+  #   2. perfAdvisor.port == default scheme port (443/80) -> with/without :port
+  ##############################################################################
+
+  # Case 1: TLS enabled, port != 443 -> https://<tls.hostname>:<port>
+  - it: cors origin should be https with custom port when TLS enabled and port != 443
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: true
+      tls.hostname: secure.example.com
+      perfAdvisor.port: 8443
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.security\\.cors\\.origin=https://secure\\.example\\.com:8443(\\s|$)"
+
+  # Case 2: TLS enabled, port == 443 -> https://<tls.hostname> (no :port)
+  - it: cors origin should omit port when TLS enabled and port == 443
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: true
+      tls.hostname: secure.example.com
+      perfAdvisor.port: 443
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.security\\.cors\\.origin=https://secure\\.example\\.com(\\s|$)"
+      # Make sure ":443" is not appended.
+      - notMatchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.security\\.cors\\.origin=https://secure\\.example\\.com:443"
+
+  # Case 3: TLS disabled, port != 80 -> http://<perfAdvisor.hostname>:<port>
+  - it: cors origin should be http with custom port when TLS disabled and port != 80
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: false
+      perfAdvisor.hostname: app.example.com
+      perfAdvisor.port: 9090
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.security\\.cors\\.origin=http://app\\.example\\.com:9090(\\s|$)"
+
+  # Case 4: TLS disabled, port == 80 -> http://<perfAdvisor.hostname> (no :port)
+  - it: cors origin should omit port when TLS disabled and port == 80
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: false
+      perfAdvisor.hostname: app.example.com
+      perfAdvisor.port: 80
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.security\\.cors\\.origin=http://app\\.example\\.com(\\s|$)"
+      - notMatchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.security\\.cors\\.origin=http://app\\.example\\.com:80"
+
+  # Optional extension: each branch should also append perfAdvisor.cors.origin
+  # when set (comma-separated). Spot-check this on case 1 and case 4.
+  - it: cors origin should append perfAdvisor.cors.origin when set (TLS, custom port)
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: true
+      tls.hostname: secure.example.com
+      perfAdvisor.port: 8443
+      perfAdvisor.cors.origin: "https://extra.example.com"
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.security\\.cors\\.origin=https://secure\\.example\\.com:8443,https://extra\\.example\\.com(\\s|$)"
+
+  - it: cors origin should append perfAdvisor.cors.origin when set (no TLS, port 80)
+    template: perf-advisor-properties.yaml
+    set:
+      perfAdvisor.enabled: true
+      tls.enabled: false
+      perfAdvisor.hostname: app.example.com
+      perfAdvisor.port: 80
+      perfAdvisor.cors.origin: "http://extra.example.com"
+    asserts:
+      - matchRegex:
+          path: data["override.properties"]
+          pattern: "pa\\.security\\.cors\\.origin=http://app\\.example\\.com,http://extra\\.example\\.com(\\s|$)"
