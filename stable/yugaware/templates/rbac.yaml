@@ -239,14 +239,12 @@ rules:
   - "update"
 # required to validate storage class during provider creation and
 # volume expansion
-{{- if not .Values.rbac.namespaced }}
 - apiGroups:
   - "storage.k8s.io"
   resources:
   - "storageclasses"
   verbs:
   - "get"
-{{- end }}
 # required to validate existance of issuer during provider creation.
 - apiGroups:
   - "cert-manager.io"

@@ -166,6 +166,14 @@ rules:
   - "issuers"
   verbs:
   - "get"
+# required to validate storage class during provider creation and
+# volume expansion
+- apiGroups:
+  - "storage.k8s.io"
+  resources:
+  - "storageclasses"
+  verbs:
+  - "get"
 ---
 
 apiVersion: rbac.authorization.k8s.io/v1
