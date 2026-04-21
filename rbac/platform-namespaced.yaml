@@ -173,12 +173,30 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: yugabyte-storageclass-management
+  name: yugabyte-cluster-list
 rules:
 - apiGroups:
   - "storage.k8s.io"
   resources:
   - "storageclasses"
+  verbs:
+  - "get"
+# required to scrape resource metrics like CPU, memory, etc.
+# required to validate zones during provider creation
+# required to auto-fill the zone labels for provider creation
+- apiGroups:
+  - ""
+  resources:
+  - "nodes"
+  verbs:
+  - "list"
+  - "get"
+  - "watch"
+# required to scrape resource metrics like CPU, memory, etc.
+- apiGroups:
+  - ""
+  resources:
+  - "nodes/proxy"
   verbs:
   - "get"
 ---
@@ -214,11 +232,11 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: yugabyte-storageclass-management
+  name: yugabyte-cluster-list
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: yugabyte-storageclass-management
+  name: yugabyte-cluster-list
 subjects:
   - kind: ServiceAccount
     name: yugabyte-platform-universe-management
