@@ -9,7 +9,8 @@
            (.Values.rbac.namespaced)) }}
 {{ fail "When using operator in a specific namespace, you must either 1) provide a service account with the correct permissions or 2) deploy the operator in the same namespace with rbac.namespaced set to true, or 3) use global rbac.create without rbac.namespaced"}}
 {{- end }}
-{{- if and (not .Values.yugaware.kubernetesOperatorNamespace) .Values.rbac.namespaced }}
+{{- if and .Values.yugaware.kubernetesOperatorEnabled
+       (and (not .Values.yugaware.kubernetesOperatorNamespace) .Values.rbac.namespaced) }}
 {{ fail "Cannot use the operator globally with namespaced RBAC"}}
 {{- end }}
 {{ if not .Values.yugaware.serviceAccount }}
@@ -272,7 +273,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ .Release.Name }}-sc-management
+  name: {{ .Release.Name }}-cluster-list
   labels:
 {{- if .Values.commonLabels }}
 {{ include "yugaware.commonLabels" . | indent 4 }}
@@ -285,11 +286,29 @@ rules:
   verbs:
   - "get"
   - "list"
+# required to scrape resource metrics like CPU, memory, etc.
+# required to validate zones during provider creation
+# required to auto-fill the zone labels for provider creation
+- apiGroups:
+  - ""
+  resources:
+  - "nodes"
+  verbs:
+  - "list"
+  - "get"
+  - "watch"
+# required to scrape resource metrics like CPU, memory, etc.
+- apiGroups:
+  - ""
+  resources:
+  - "nodes/proxy"
+  verbs:
+  - "get"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ .Release.Name }}-storageclass-management
+  name: {{ .Release.Name }}-cluster-list
   labels:
     k8s-app: yugaware
     kubernetes.io/cluster-service: "true"
@@ -300,7 +319,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ .Release.Name }}-sc-management
+  name: {{ .Release.Name }}-cluster-list
 subjects:
 - kind: ServiceAccount
   name: {{ .Values.yugaware.serviceAccount | default .Release.Name }}
