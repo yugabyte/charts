@@ -668,6 +668,36 @@ spec:
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
         imagePullPolicy: "IfNotPresent"
         env:
+        {{- if .Values.authCredentials.ysql.user }}
+        - name: YSQL_USER
+          value: "{{ .Values.authCredentials.ysql.user }}"
+        {{- end }}
+        {{- if or (.Values.authCredentials.ysql.password) (.Values.authCredentials.ysql.passwordSecretName) }}
+        - name: YSQL_PASSWORD
+          {{- if .Values.authCredentials.ysql.passwordSecretName }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.authCredentials.ysql.passwordSecretName }}
+              key: ysqlPassword
+          {{- else }}
+          value: "{{ .Values.authCredentials.ysql.password }}"
+          {{- end -}}
+        {{- end }}
+        {{- if .Values.authCredentials.ycql.user }}
+        - name: YCQL_USER
+          value: "{{ .Values.authCredentials.ycql.user }}"
+        {{- end }}
+        {{- if or (.Values.authCredentials.ycql.password) (.Values.authCredentials.ycql.passwordSecretName) }}
+        - name: YCQL_PASSWORD
+          {{- if .Values.authCredentials.ycql.passwordSecretName  }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.authCredentials.ycql.passwordSecretName }}
+              key: ycqlPassword
+          {{- else }}
+          value: "{{ .Values.authCredentials.ycql.password }}"
+          {{- end -}
+        {{- end }}
         - name: HOSTNAME
           valueFrom:
             fieldRef:
@@ -714,16 +744,16 @@ spec:
               -secure={{ $root.Values.tls.enabled }} \
             {{- end }}
             {{- if $root.Values.authCredentials.ysql.user }}
-              -ysql_username={{ $root.Values.authCredentials.ysql.user }} \
+              -ysql_username=${YSQL_USER} \
             {{- end }}
             {{- if $root.Values.authCredentials.ycql.user }}
-              -ycql_username={{ $root.Values.authCredentials.ycql.user }} \
+              -ycql_username=${YCQL_USER} \
             {{- end }}
-            {{- if $root.Values.authCredentials.ysql.password }}
-              -ysql_password={{ $root.Values.authCredentials.ysql.password }} \
+            {{- if or (.Values.authCredentials.ysql.password) (.Values.authCredentials.ysql.passwordSecretName) }}
+              -ysql_password=${YSQL_PASSWORD}  \
             {{- end }}
-            {{- if $root.Values.authCredentials.ycql.password }}
-              -ycql_password={{ $root.Values.authCredentials.ycql.password }} \
+            {{- if or (.Values.authCredentials.ycql.password) (.Values.authCredentials.ycql.passwordSecretName) }}
+              -ycql_password=${YCQL_PASSWORD} \
             {{- end }}
             || echo "ERROR: yugabyted-ui failed. This might be because your yugabyte \
             version is older than 2.21.0. If this is the case, set yugabytedUi.enabled to false \
