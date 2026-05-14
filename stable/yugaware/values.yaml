@@ -49,10 +49,6 @@ image:
     tag: 2.18.1.0-b84
     name: yugabytedb/yugabyte
 
-  perf_advisor:
-    registry: "quay.io"
-    tag: 9999.9.0-b0
-    name: yugabyte/yb-troubleshoot-platform
 
 yugaware:
   replicas: 1
@@ -91,16 +87,16 @@ yugaware:
         min: 20 # minimum expected time for yugaware to start
         max: 600 # maximum expected time for yugaware to start, k8s will restart pod on timeout
       startupProbe:
-        enabled: true
+        enabled: true 
       livenessProbe:
-        enabled: true
+        enabled: true 
         periodSeconds: 30 # query period
         failureThreshold: 10 # number of failed checks to restart pod
       readinessProbe:
-        enabled: false
+        enabled: false 
         httpGet:
-          path:  /api/app_version
-          port: yugaware
+          path:  /api/app_version   
+          port: yugaware 
         initialDelaySeconds: 30
         periodSeconds: 10
         timeoutSeconds: 5
@@ -287,66 +283,6 @@ yugabytedb:
       cpu: "2"
       memory: 4Gi
 
-perfAdvisor:
-  enabled: false
-  dbname: "ts"
-  storage: 50Gi
-  # if blank, default to the yugaware storage class
-  storageClass: ""
-  storageAnnotations: {}
-  initialRamPercentage: 25
-  maxRamPercentage: 90
-  protocol: TCP
-  port: 8080
-  cors:
-    # Comma separated list of allowed origins
-    origin: ""
-  api:
-    token: ""
-  callhome:
-    enabled: true
-    environment: dev
-  serviceMonitor:
-    enabled: false
-    annotations: {}
-  taskRunner:
-    threads: 30
-  pod:
-    annotations: {}
-    labels: {}
-    terminationGracePeriodSeconds: 30
-    probes: # HTTP healthcheck probes configuration
-      enabled: false # add or not livenessProbe and startupProbe to the container
-      startupTimeSec:
-        min: 20 # minimum expected time for perf-advisor to start
-        max: 600 # maximum expected time for perf-advisor to start, k8s will restart pod on timeout
-      livenessProbe:
-        periodSeconds: 30 # query period for liveness probe
-        failureThreshold: 10 # number of failed checks to restart pod
-  hostname: "localhost"
-
-  sidecars:
-    # - name: sidecar1
-    #   image: ...
-  resources:
-    limits:
-      cpu: "2"
-      memory: 4Gi
-    requests:
-      cpu: "2"
-      memory: 4Gi
-  spec:
-    # name: value
-    # name2: value2
-  annotations:
-    # name: value
-    # name2: value2
-  service:
-    # extra service annotations
-    annotations:
-    # name: value
-    # name2: value2
-
 tls:
   enabled: false
   hostname: "localhost"
@@ -382,9 +318,6 @@ tls:
       # Can be 2048, 4096 or 8192 for RSA
       # Or 256, 384 or 521 for ECDSA
       keySize: 2048
-  perfAdvisor:
-    keystore:
-      password: ""
 
 ## yugaware pod Security Context
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
