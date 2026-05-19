@@ -366,25 +366,33 @@ Generate server PGSQL proxy bind address.
 {{- end -}}
 
 {{/*
-Get YugaByte master addresses
+Get YugaByte master addresses.
+Usage: {{ include "yugabyte.master_addresses" (dict "root" $root "vars" $masterStsVars) }}
+  - root: the chart root context (.)
+  - vars: the result of "yugabyte.stsIndexVars" for the "yb-masters" service
 */}}
 {{- define "yugabyte.master_addresses" -}}
-  {{- $master_replicas := .Values.replicas.master | int -}}
-  {{- $domain_name := .Values.domainName -}}
-  {{- $newNamingStylePrefix := printf "%s-" (include "yugabyte.fullname" .) -}}
-  {{- $prefix := ternary "" $newNamingStylePrefix $.Values.oldNamingStyle -}}
-  {{- range .Values.Services -}}
-    {{- if eq .name "yb-masters" -}}
-      {{- range $index := until $master_replicas -}}
-        {{- if ne $index 0 }},{{ end -}}
-        {{- if eq $.Values.multicluster.kubernetesClusterId "" }}
-          {{- $prefix }}yb-master-{{ $index }}.{{ $prefix }}yb-masters.${NAMESPACE}.svc.{{ $domain_name }}:7100
-        {{- else }}
-          {{- $prefix }}yb-master-{{ $index }}.{{ $.Values.multicluster.kubernetesClusterId }}.{{ $prefix }}yb-masters.${NAMESPACE}.svc.{{ $domain_name }}:7100
-        {{- end }}
+  {{- $root := .root -}}
+  {{- $vars := .vars -}}
+  {{- $domain_name := $root.Values.domainName -}}
+  {{- $newNamingStylePrefix := printf "%s-" (include "yugabyte.fullname" $root) -}}
+  {{- $prefix := ternary "" $newNamingStylePrefix $root.Values.oldNamingStyle -}}
+  {{- $addrs := list -}}
+  {{- range $stsIdx := until (int $vars.stsCount) -}}
+    {{- $loopVars := include "yugabyte.stsIndexLoopVars" (dict "stsIdx" $stsIdx "stsStart" $vars.stsStart "stsEnd" $vars.stsEnd "replicas" $vars.replicas "moveOpReplicas" $vars.moveOpReplicas) | fromYaml -}}
+    {{- $stsIndexSuffix := $loopVars.stsIndexSuffix -}}
+    {{- $currentReplicas := $loopVars.currentReplicas | int -}}
+    {{- range $index := until $currentReplicas -}}
+      {{- $addr := "" -}}
+      {{- if eq $root.Values.multicluster.kubernetesClusterId "" -}}
+        {{- $addr = printf "%syb-master%s-%d.%syb-masters.${NAMESPACE}.svc.%s:7100" $prefix $stsIndexSuffix $index $prefix $domain_name -}}
+      {{- else -}}
+        {{- $addr = printf "%syb-master%s-%d.%s.%syb-masters.${NAMESPACE}.svc.%s:7100" $prefix $stsIndexSuffix $index $root.Values.multicluster.kubernetesClusterId $prefix $domain_name -}}
       {{- end -}}
+      {{- $addrs = append $addrs $addr -}}
     {{- end -}}
   {{- end -}}
+  {{- join "," $addrs -}}
 {{- end -}}
 
 {{/*
