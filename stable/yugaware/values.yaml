@@ -321,6 +321,8 @@ tls:
 
 ## yugaware pod Security Context
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+## Applied at the pod level; settings inherit to all containers in the pod
+## unless overridden via containerSecurityContext below.
 securityContext:
   enabled: true
   ## fsGroup related values are set at the pod level.
@@ -332,10 +334,20 @@ securityContext:
   runAsGroup: 10001
   runAsNonRoot: true
   additionalSettings: {}
-  ## pg prerun is a root based init container which will modify the PG data dir's
-  ## owner to current user. Without this PG does not start. Required when modifying
-  ## the runAsUser setting or switch from root to non-root.
-  runPGPrerun: true
+
+## yugaware containers Security Context
+## Applied at the container level for each container in the yugaware pod.
+## When enabled, this overrides the values inherited from the pod-level
+## securityContext on a per-container basis.
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+containerSecurityContext:
+  enabled: false
+  ## Expected to have runAsUser values != 0 when
+  ## runAsNonRoot is set to true, otherwise container creation fails.
+  runAsUser: 10001
+  runAsGroup: 10001
+  runAsNonRoot: true
+  additionalSettings: {}
 
 helm:
   timeout: 900

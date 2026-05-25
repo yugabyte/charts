@@ -241,11 +241,15 @@ Check export of nss_wrapper environment variables required
 */}}
 {{- define "getSecurityContext" }}
 securityContext:
-  runAsUser: {{ required "runAsUser cannot be empty" .Values.securityContext.runAsUser }}
-  runAsGroup: {{ .Values.securityContext.runAsGroup | default 0 }}
-  runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
-  {{- if .Values.securityContext.additionalSettings }}
-{{ toYaml .Values.securityContext.additionalSettings | indent 2}}
+  runAsUser: {{ required "runAsUser cannot be empty" .Values.containerSecurityContext.runAsUser }}
+  {{- if ne .Values.securityContext.runAsGroup nil }}
+  runAsGroup: {{ .Values.securityContext.runAsGroup }}
+  {{- else }}
+  runAsGroup: {{ .Values.securityContext.runAsUser }}
+  {{- end }}
+  runAsNonRoot: {{ .Values.containerSecurityContext.runAsNonRoot }}
+  {{- if .Values.containerSecurityContext.additionalSettings }}
+{{ toYaml .Values.containerSecurityContext.additionalSettings | indent 2}}
   {{- end }}
 {{- end -}}
 

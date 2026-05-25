@@ -50,8 +50,18 @@ spec:
       {{- if .Values.securityContext.enabled }}
       securityContext:
         fsGroup: {{ .Values.securityContext.fsGroup }}
+        runAsUser: {{ required "runAsUser cannot be empty" .Values.securityContext.runAsUser }}
+        {{- if ne .Values.securityContext.runAsGroup nil }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        {{- else }}
+        runAsGroup: {{ .Values.securityContext.runAsUser }}
+        {{- end }}
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
         {{- if (semverCompare ">=1.20-x" .Capabilities.KubeVersion.Version) }}
         fsGroupChangePolicy: {{ .Values.securityContext.fsGroupChangePolicy }}
+        {{- end }}
+        {{- if .Values.securityContext.additionalSettings }}
+        {{- toYaml .Values.securityContext.additionalSettings | nindent 8 }}
         {{- end }}
       {{- end }}
       {{- if .Values.nodeSelector }}
@@ -207,13 +217,15 @@ spec:
             - '-c'
             - |
               cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && /bin/bash /init-container/init-permissions.sh && /bin/bash /prometheus-init/init-prometheus.sh;
-          {{- include "getSecurityContext" . | indent 10 }}
           {{- else }}
           command:
             - 'bash'
             - '-c'
             - |
               cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && /bin/bash /prometheus-init/init-prometheus.sh;
+          {{- end }}
+          {{- if .Values.containerSecurityContext.enabled }}
+          {{- include "getSecurityContext" . | indent 10 }}
           {{- end }}
           volumeMounts:
           - name: prometheus-config
@@ -245,7 +257,9 @@ spec:
           {{ end -}}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/bin/bash", "/pg_prerun/pg-prerun.sh"]
+          {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | indent 10 }}
+          {{- end }}
           env:
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
@@ -289,7 +303,7 @@ spec:
         - name: postgres
           image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.securityContext.enabled }}
+          {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | indent 10 }}
           {{- end }}
           env:
@@ -371,7 +385,7 @@ spec:
         - name: ybdb
           image: {{ include "full_image" (dict "containerName" "ybdb" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.securityContext.enabled }}
+          {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | indent 10 }}
           {{- end }}
           env:
@@ -420,9 +434,9 @@ spec:
         - name: prometheus
           image: {{ include "full_image" (dict "containerName" "prometheus" "root" .) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.securityContext.enabled }}
+          {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | nindent 10 }}
-          {{- else if (not .Values.ocpCompatibility.enabled) }}
+          {{- else if (and (not .Values.securityContext.enabled) (not .Values.ocpCompatibility.enabled)) }}
           securityContext:
             runAsUser: 0
           {{- end }}
@@ -475,7 +489,7 @@ spec:
         {{- end }}
         - name: yugaware
           image: {{ include "full_yugaware_image" . }}
-          {{- if .Values.securityContext.enabled }}
+          {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | nindent 10 }}
           {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}

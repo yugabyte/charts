@@ -27,3 +27,6 @@ ocpCompatibility:
 
 securityContext:
   enabled: false
+
+containerSecurityContext:
+  enabled: false
