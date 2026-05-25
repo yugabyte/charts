@@ -152,8 +152,20 @@ spec:
           key: {{ .envName }}
     {{- end }}
     {{- end }}
-  {{- if .Values.podSecurityContext.enabled }}
+  {{- if .Values.containerSecurityContext.enabled }}
   {{- include "getSecurityContext" . | nindent 2 }}
+  {{- else if .Values.podSecurityContext.enabled }}
+  securityContext:
+    runAsUser: {{ required "runAsUser cannot be empty" .Values.podSecurityContext.runAsUser }}
+    {{- if ne .Values.podSecurityContext.runAsGroup nil }}
+    runAsGroup: {{ .Values.podSecurityContext.runAsGroup }}
+    {{- else }}
+    runAsGroup: {{ .Values.podSecurityContext.runAsUser }}
+    {{- end }}
+    runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
+    {{- if .Values.podSecurityContext.additionalSettings }}
+    {{- toYaml .Values.podSecurityContext.additionalSettings | nindent 4 }}
+    {{- end }}
   {{- else if not .Values.ocpCompatibility.enabled }}
   securityContext:
     runAsUser: 0

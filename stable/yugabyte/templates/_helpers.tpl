@@ -653,10 +653,16 @@ tcpSocket:
 */}}
 {{- define "getSecurityContext" }}
 securityContext:
-  runAsUser: {{ required "runAsUser cannot be empty" .Values.podSecurityContext.runAsUser }}
-  runAsGroup: {{ .Values.podSecurityContext.runAsGroup | default 0 }}
-  fsGroup: {{ .Values.podSecurityContext.fsGroup }}
-  runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
+  runAsUser: {{ required "runAsUser cannot be empty" .Values.containerSecurityContext.runAsUser }}
+  {{- if ne .Values.containerSecurityContext.runAsGroup nil }}
+  runAsGroup: {{ .Values.containerSecurityContext.runAsGroup }}
+  {{- else }}
+  runAsGroup: {{ .Values.containerSecurityContext.runAsUser }}
+  {{- end }}
+  runAsNonRoot: {{ .Values.containerSecurityContext.runAsNonRoot }}
+  {{- if .Values.containerSecurityContext.additionalSettings }}
+{{ toYaml .Values.containerSecurityContext.additionalSettings | indent 2}}
+  {{- end }}
 {{- end -}}
 
 {{/*
