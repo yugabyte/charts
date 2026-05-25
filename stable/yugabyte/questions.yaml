@@ -171,4 +171,30 @@ questions:
         type: boolean
         required: false
         label: Cert-Manager Support
+  - variable: containerSecurityContext.enabled
+    default: false
+    description: "Enable Container Security Context"
+    label: Enable Container Security Context
+    type: boolean
+    show_subquestion_if: true
+    group: "Security Context"
+    subquestions:
+      - variable: containerSecurityContext.runAsUser
+        default: 10001
+        required: false
+        type: int
+        label: runAsUser
+        description: "runAsUser"
+      - variable: containerSecurityContext.runAsGroup
+        default: 10001
+        required: false
+        type: int
+        label: runAsGroup
+        description: "runAsGroup"
+      - variable: containerSecurityContext.runAsNonRoot
+        default: true
+        required: false
+        type: boolean
+        label: runAsNonRoot
+        description: "runAsNonRoot"
 

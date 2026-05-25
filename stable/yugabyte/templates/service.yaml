@@ -249,11 +249,17 @@ spec:
       {{- end }}
       {{- if $root.Values.podSecurityContext.enabled }}
       securityContext:
-        {{- $podSecurityContext := omit $root.Values.podSecurityContext "enabled" "additionalSettings" -}}
-        {{- if $root.Values.podSecurityContext.additionalSettings -}}
-        {{- $podSecurityContext = merge $podSecurityContext $root.Values.podSecurityContext.additionalSettings -}}
-        {{- end -}}
-        {{- toYaml $podSecurityContext | nindent 8 }}
+        fsGroup: {{ $root.Values.podSecurityContext.fsGroup }}
+        runAsUser: {{ required "runAsUser cannot be empty" $root.Values.podSecurityContext.runAsUser }}
+        {{- if ne $root.Values.podSecurityContext.runAsGroup nil }}
+        runAsGroup: {{ $root.Values.podSecurityContext.runAsGroup }}
+        {{- else }}
+        runAsGroup: {{ $root.Values.podSecurityContext.runAsUser }}
+        {{- end }}
+        runAsNonRoot: {{ $root.Values.podSecurityContext.runAsNonRoot }}
+        {{- if $root.Values.podSecurityContext.additionalSettings }}
+        {{- toYaml $root.Values.podSecurityContext.additionalSettings | nindent 8 }}
+        {{- end }}
       {{- end }}
       {{- if $root.Values.nodeSelector }}
       nodeSelector:
@@ -353,6 +359,9 @@ spec:
         - name: certmanager-init
           image: {{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}
           imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
+          {{- if $root.Values.containerSecurityContext.enabled }}
+          {{- include "getSecurityContext" $root | nindent 10 }}
+          {{- end }}
           command:
             - "/bin/bash"
             - "-c"
@@ -424,6 +433,9 @@ spec:
       - name: "{{ $service.label }}"
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
         imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
+        {{- if $root.Values.containerSecurityContext.enabled }}
+        {{- include "getSecurityContext" $root | nindent 8 }}
+        {{- end }}
         lifecycle:
           postStart:
             exec:
@@ -633,6 +645,9 @@ spec:
       - name: yb-cleanup
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
         imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
+        {{- if $root.Values.containerSecurityContext.enabled }}
+        {{- include "getSecurityContext" $root | nindent 8 }}
+        {{- end }}
         env:
         - name: USER
           value: "yugabyte"
@@ -667,6 +682,9 @@ spec:
       - name: yugabyted-ui
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
         imagePullPolicy: "IfNotPresent"
+        {{- if $root.Values.containerSecurityContext.enabled }}
+        {{- include "getSecurityContext" $root | nindent 8 }}
+        {{- end }}
         env:
         - name: HOSTNAME
           valueFrom:
@@ -741,6 +759,9 @@ spec:
       - name: yb-controller
         image: "{{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}"
         imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
+        {{- if $root.Values.containerSecurityContext.enabled }}
+        {{- include "getSecurityContext" $root | nindent 8 }}
+        {{- end }}
         {{- if $root.Values.ybc.useYBDBImage }}
         env:
         - name: POD_IP
