@@ -230,7 +230,6 @@ spec:
           - name: init-container-script
             mountPath: /init-container
           {{- end }}
-        {{- end }}
         {{- if .Values.securityContext.enabled }}
         {{- if not .Values.useYugabyteDB }}
         - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
