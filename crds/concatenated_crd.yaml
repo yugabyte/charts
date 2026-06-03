@@ -2,14 +2,288 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: restorejobs.operator.yugabyte.io
+  name: backups.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
   scope: Namespaced
   names:
-    plural: restorejobs
-    singular: restorejob
-    kind: RestoreJob
+    plural: backups
+    singular: backup
+    kind: Backup
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: Custom resource definition for YugabyteDB backups.
+          type: object
+          properties:
+            status:
+              type: object
+              description: Backup status for the backup custom resource.
+              properties:
+                message:
+                  description: String log message from backup controller
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the backup resource.
+                  type: string
+                taskUUID:
+                  description: Internal UUID of the task associated with the backup resource.
+                  type: string
+            spec:
+              type: object
+              properties:
+                backupType:
+                  description: >
+                    Type of backup to be taken.
+                    Allowed values are -
+                    YQL_TABLE_TYPE REDIS_TABLE_TYPE PGSQL_TABLE_TYPE TRANSACTION_STATUS_TABLE_TYPE
+                  type: string
+                  enum:
+                    - YQL_TABLE_TYPE
+                    - PGSQL_TABLE_TYPE
+                sse:
+                  description: Server side encryption for the backup.
+                  type: boolean
+                storageConfig:
+                  description: >
+                    Storage configuration for the backup,
+                    should contain name of storage config object
+                  type: string
+                universe:
+                  description: >
+                    Name of the universe for which backup is to be taken,
+                    refers to a ybuniverse CR name.
+                  type: string
+                tableByTableBackup:
+                  description: Boolean indicating if backup is to be taken table by table.
+                  type: boolean
+                keyspace:
+                  description: Name of keyspace to be backed up.
+                  type: string
+                timeBeforeDelete:
+                  description: Time before backup is deleted from storage in milliseconds.
+                  type: integer
+                  minimum: 0
+                incrementalBackupBase:
+                  description: >
+                    Base backup Custom Resource name. Operator will add an incremental backup
+                    to the existing chain of backups at the last.
+                  type: string
+              required:
+              - keyspace
+              - backupType
+              - storageConfig
+              - universe
+
+
+---
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: drconfigs.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: drconfigs
+    singular: drconfig
+    kind: DrConfig
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: Custom resource definition for YugabyteDB DR config.
+          type: object
+          properties:
+            status:
+              type: object
+              description: Dr config status for the Dr config custom resource.
+              properties:
+                message:
+                  description: String log message from dr config controller
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the dr config resource.
+                  type: string
+                taskUUID:
+                  description: Internal UUID of the task associated with the dr config.
+                  type: string
+            spec:
+              type: object
+              x-kubernetes-validations:
+                - rule: self.sourceUniverse != self.targetUniverse
+                  message: "The source and target universes cannot be the same"
+                # Allow changes only for:
+                # 1. No change (normal case)
+                # 2. Switchover: source becomes target AND target becomes source
+                # 3. Failover: source becomes old target AND target becomes empty string
+                # 4. Restart/Change replica: source stays the same, target changes (including from empty to new value)
+                - rule: >
+                    (oldSelf.sourceUniverse == self.sourceUniverse && oldSelf.targetUniverse == self.targetUniverse) ||
+                    (self.sourceUniverse == oldSelf.targetUniverse && self.targetUniverse == oldSelf.sourceUniverse) ||
+                    (self.sourceUniverse == oldSelf.targetUniverse && self.targetUniverse == '') ||
+                    (self.sourceUniverse == oldSelf.sourceUniverse && self.targetUniverse != oldSelf.targetUniverse && self.targetUniverse != '')
+                  message: "sourceUniverse and targetUniverse can only be changed for switchover (swap), failover (target becomes source, target cleared), or restart/change replica (source unchanged, target changed)"
+              properties:
+                sourceUniverse:
+                  description: >
+                    Name of the source universe for which DrConfig needs to be setup.
+                    During switchover, this swaps with targetUniverse.
+                    During failover, this should be set to the old targetUniverse value.
+                  type: string
+                targetUniverse:
+                  description: >
+                    Name of the target universe for which DrConfig needs to be setup.
+                    During switchover, this swaps with sourceUniverse.
+                    Set to empty string to trigger failover operation.
+                    Can be changed to a new universe for restart after failover or to change replica.
+                  type: string
+                databases:
+                  description: >
+                    The list of databases for which replication needs to happen between the
+                    source and target universes
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  x-kubernetes-validations:
+                    - rule: self.all(db, size(db) > 0)
+                      message: "Database names cannot be empty"
+                name:
+                  description: Name of the DR config
+                  type: string
+                storageConfig:
+                  description: >
+                    Storage configuration for the backup,
+                    should contain name of storage config object
+                  type: string
+                paused:
+                  description: >
+                    Controls the active state of the DR config.
+                    Set to true to pause replication, set to false to resume.
+                    Default is false (active/running).
+                  type: boolean
+                  default: false
+              required:
+              - sourceUniverse
+              - targetUniverse
+              - databases
+              - name
+              - storageConfig
+
+
+---
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: pitrconfigs.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: pitrconfigs
+    singular: pitrconfig
+    kind: PitrConfig
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: Custom resource definition for PITR config.
+          type: object
+          properties:
+            status:
+              type: object
+              description: PITR config status for the PITR config custom resource.
+              properties:
+                message:
+                  description: String log message from PITR config controller
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the PITR config resource.
+                  type: string
+                taskUUID:
+                  description: Internal UUID of the task associated with the PITR config.
+                  type: string
+            spec:
+              type: object
+              description: PITR configuration spec
+              x-kubernetes-validations:
+                - message: retentionPeriodInSeconds must be greater than intervalInSeconds
+                  rule: self.retentionPeriodInSeconds > self.intervalInSeconds
+              properties:
+                universe:
+                  description: >
+                    Name of the universe for which PitrConfig needs to be setup
+                  type: string
+                  x-kubernetes-validations:
+                  - message: universe cannot be changed
+                    rule: self == oldSelf
+                name:
+                  description: Name of the PITR config
+                  type: string
+                tableType:
+                  description: The table type for which PITR has to be configured
+                  type: string
+                  enum:
+                    - YSQL
+                    - YCQL
+                database:
+                  description: The database for which PITR has to be configured
+                  type: string
+                intervalInSeconds:
+                  description: The schedule interval of the PITR snapshot
+                  type: integer
+                  minimum: 0
+                  default: 86400
+                retentionPeriodInSeconds:
+                  description: The retention period of the PITR snapshot
+                  type: integer
+                  minimum: 0
+                  default: 604800
+              required:
+              - universe
+              - name
+              - tableType
+              - database
+
+
+---
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: pitrrestores.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: pitrrestores
+    singular: pitrrestore
+    kind: PitrRestore
     categories:
       - all
       - yugabyte
@@ -22,303 +296,55 @@ spec:
       schema:
         openAPIV3Schema:
           type: object
-          description: Custom resource definition for YugabyteDB restore job
+          description: Custom resource definition for YugabyteDB PITR restore job
           properties:
             status:
               type: object
-              description: Restore job status for the restore job custom resource.
+              description: PITR restore status for the PITR restore custom resource.
               properties:
                 message:
-                  description: String log message from restore job controller
+                  description: String log message from PITR restore controller
                   type: string
                 taskUUID:
                   description: >
                     Internal UUID of the task associated with
-                    the restore job resource.
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the restore operation.
+                    the PITR restore resource.
                   type: string
             spec:
               type: object
+              description: PITR restore specification
               properties:
-                actionType:
-                  description: Type of action to be taken. Allowed values - RESTORE
-                  type: string
-                  enum:
-                    - RESTORE
                 universe:
                   description: >
-                    Name of the universe for which restore is to be taken,
+                    Name of the universe on which PITR restore is to be performed,
                     refers to a ybuniverse CR name.
                   type: string
-                backup:
+                  x-kubernetes-validations:
+                    - message: universe cannot be changed
+                      rule: self == oldSelf
+                pitrConfig:
                   description: >
-                    Name of the backup to be restored,
-                    refers to a backup CR name.
+                    Name of the PITR config to use for restore,
+                    refers to a pitrconfig CR name.
                   type: string
-                keyspace:
-                  description: Name of the keyspace to be restored.
-                  type: string
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: support-bundles.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: support-bundles
-    singular: support-bundle
-    kind: SupportBundle
-    shortNames:
-    - sb
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: >
-            Custom resource definition for YugabyteDB support bundle to capture logs,
-            events in case of failures.
-          type: object
-          properties:
-            status:
-              description: Support bundle status for the support bundle custom resource.
-              type: object
-              properties:
-                status:
+                  x-kubernetes-validations:
+                    - message: pitrConfig cannot be changed
+                      rule: self == oldSelf
+                restoreTime:
                   description: >
-                    Status of the support bundle.
-                    Allowed values - generating, ready, failed
+                    The point-in-time to restore to, specified in ISO 8601 / RFC 3339 format.
+                    UTC time with 'Z' suffix is recommended (e.g., "2024-02-09T15:30:00Z").
+                    Timezone offsets are also supported (e.g., "2024-02-09T10:30:00-05:00").
+                    Must be within the PITR config's retention window.
                   type: string
-                  enum:
-                  - generating
-                  - ready
-                  - failed
-                access:
-                  description: Access details for the generated support bundle to download.
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the support bundle resource.
-                  type: string
-            spec:
-              type: object
-              properties:
-                universeName:
-                  description: >
-                    Name of the universe for which support bundle is to be generated,
-                    refers to a ybuniverse CR name.
-                  type: string
-                collectionTimerange:
-                  description: Time range for which logs and events are to be collected.
-                  type: object
-                  properties:
-                    startDate:
-                      description: Start date for the logs and events collection.
-                      type: string
-                      example: 2022-12-12T13:07:18Z,
-                      format: date-time
-                    endDate:
-                      description: End date for the logs and events collection.
-                      type: string
-                      example: 2022-12-12T13:07:18Z,
-                      format: date-time
-                  required:
-                  - startDate
-                components:
-                  description: >
-                    Components for which logs and events are to be collected. If not provided, all
-                    components will be collected.
-                  type: array
-                  items:
-                    type: string
-                    enum:
-                    - UniverseLogs
-                    - ApplicationLogs
-                    - OutputFiles
-                    - ErrorFiles
-                    - CoreFiles
-                    - GFlags
-                    - Instance
-                    - ConsensusMeta
-                    - TabletMeta
-                    - YbcLogs
-                    - K8sInfo
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: releases.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: releases
-    singular: release
-    kind: Release
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      additionalPrinterColumns:
-        - name: Version
-          type: string
-          description: The state of the universe
-          jsonPath: .spec.config.version
-        - name: Status
-          type: string
-          description: The state of the universe
-          jsonPath: .status.message
-        - name: Downloaded
-          type: string
-          description: The Software version of the Universe
-          jsonPath: .status.success
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          description: >
-            Custom resource definition for YugabyteDB release, describes a release.
-          properties:
-            status:
-              description: Release status on the cluster.
-              type: object
-              properties:
-                message:
-                  description: String log message from release controller
-                  type: string
-                success:
-                  description: >
-                    Boolean indicating if the release was successfully
-                    downloaded and usable
-                  type: boolean
-                resourceUUID:
-                  description: Internal UUID of the release resource.
-                  type: string
-            spec:
-              type: object
-              description: Release object specification.
-              properties:
-                config:
-                  description: Release download configration, we support GCS, S3 and HTTP.
-                  type: object
-                  properties:
-                    version:
-                      description: >
-                        Version of the release chart to use.
-                        Refer to the release charts at charts.yugabyte.com
-                      type: string
-                    downloadConfig:
-                      description: >
-                        Download configugration,
-                        we support GCS, S3 and HTTP as download sources for now.
-                      type: object
-                      properties:
-                        s3:
-                          description: S3 download configuration
-                          type: object
-                          properties:
-                            accessKeyId:
-                              description: S3 access key
-                              type: string
-                            secretAccessKey:
-                              description: S3 secret key. Deprecated, use secretAccessKeySecret
-                              type: string
-                            secretAccessKeySecret:
-                              description: S3 secret key secret. Overrides secretAccessKey
-                              type: object
-                              properties:
-                                name:
-                                  description: Name of the secret
-                                  type: string
-                                namespace:
-                                  description: Namespace of the secret
-                                  type: string
-                              required:
-                              - name
-                            paths:
-                              description: S3 paths to download the release from
-                              type: object
-                              properties:
-                                x86_64:
-                                  type: string
-                                  description: Optional Path to x86_64 package
-                                x86_64_checksum:
-                                  type: string
-                                  description: Checksum for x86_64 package
-                                helmChart:
-                                  type: string
-                                  description: Required Path to the Helm chart package
-                                helmChartChecksum:
-                                  description: Optional checksum for Helm chart package
-                                  type: string
-                        gcs:
-                          type: object
-                          properties:
-                            paths:
-                              type: object
-                              properties:
-                                x86_64:
-                                  type: string
-                                  description: Optional Path to x86_64 package
-                                x86_64_checksum:
-                                  type: string
-                                  description: Optional Checksum for x86_64 package
-                                helmChart:
-                                  type: string
-                                  description: Path to the Helm chart package
-                                helmChartChecksum:
-                                  type: string
-                                  description: Optional checksum for Helm chart package
-                            credentialsJson:
-                              type: string
-                              description: |
-                                GCS service key JSON. Deprecated, use credentialsJsonSecret instead.
-                            credentialsJsonSecret:
-                              type: object
-                              properties:
-                                name:
-                                  description: Name of the secret
-                                  type: string
-                                namespace:
-                                  description: Namespace of the secret
-                                  type: string
-                              required:
-                              - name
-                        http:
-                          type: object
-                          properties:
-                            paths:
-                              type: object
-                              properties:
-                                x86_64:
-                                  type: string
-                                  description: Optional Path to x86_64 package
-                                x86_64_checksum:
-                                  type: string
-                                  description: Optional Checksum for x86_64 package
-                                helmChart:
-                                  type: string
-                                  description: Path to the Helm chart package
-                                helmChartChecksum:
-                                  type: string
-                                  description: Optional checksum for Helm chart package
+                  format: date-time
+                  x-kubernetes-validations:
+                    - message: restoreTime cannot be changed
+                      rule: self == oldSelf
+              required:
+                - universe
+                - pitrConfig
+                - restoreTime
 
 
 ---
@@ -509,14 +535,14 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: ybcertificates.operator.yugabyte.io
+  name: releases.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
   scope: Namespaced
   names:
-    plural: ybcertificates
-    singular: ybcertificate
-    kind: YBCertificate
+    plural: releases
+    singular: release
+    kind: Release
     categories:
       - all
       - yugabyte
@@ -524,89 +550,175 @@ spec:
     - name: v1alpha1
       subresources:
         status: {}
+      additionalPrinterColumns:
+        - name: Version
+          type: string
+          description: The state of the universe
+          jsonPath: .spec.config.version
+        - name: Status
+          type: string
+          description: The state of the universe
+          jsonPath: .status.message
+        - name: Downloaded
+          type: string
+          description: The Software version of the Universe
+          jsonPath: .status.success
       served: true
       storage: true
       schema:
         openAPIV3Schema:
-          description: >
-            Custom resource definition for YugabyteDB certificate management configuration.
           type: object
+          description: >
+            Custom resource definition for YugabyteDB release, describes a release.
           properties:
             status:
-              description: >
-                Certificate management status for the YBCertificate custom resource.
+              description: Release status on the cluster.
               type: object
               properties:
                 message:
-                  description: String log message from certificate controller.
+                  description: String log message from release controller
                   type: string
                 success:
                   description: >
-                    Boolean indicating if the certificate configuration was successfully created.
+                    Boolean indicating if the release was successfully
+                    downloaded and usable
                   type: boolean
                 resourceUUID:
-                  description: Internal UUID of the certificate configuration resource.
+                  description: Internal UUID of the release resource.
                   type: string
             spec:
               type: object
-              description: >
-                Specification for the YBCertificate resource.
-                Required fields: certType, certificateSecretRef
-              required:
-                - certType
-                - certificateSecretRef
+              description: Release object specification.
               properties:
-                certType:
-                  description:
-                    Type of certificate configuration to be created.
-                    Allowed values - SELF_SIGNED, K8S_CERT_MANAGER
-                  type: string
-                  enum:
-                    - SELF_SIGNED
-                    - K8S_CERT_MANAGER
-                  x-kubernetes-validations:
-                    - rule: "self in ['SELF_SIGNED', 'K8S_CERT_MANAGER']"
-                      message: "certType must be either SELF_SIGNED or K8S_CERT_MANAGER"
-
-                # Certificate secret reference (common for both types)
-                certificateSecretRef:
-                  description: |
-                    Secret reference containing certificate and key content.
-                    For SELF_SIGNED: secret must contain both 'ca.crt' and 'ca.key'
-                    For K8S_CERT_MANAGER: secret must contain 'ca.crt'
-                    Recommended to use type: "tls" for better Kubernetes integration
+                config:
+                  description: Release download configration, we support GCS, S3 and HTTP.
                   type: object
-                  required:
-                    - name
                   properties:
-                    name:
+                    version:
+                      description: >
+                        Version of the release chart to use.
+                        Refer to the release charts at charts.yugabyte.com
                       type: string
-                      description: Name of the secret (required)
+                    downloadConfig:
+                      description: >
+                        Download configugration,
+                        we support GCS, S3 and HTTP as download sources for now.
+                      type: object
                       x-kubernetes-validations:
-                        - rule: "self.size() > 0"
-                          message: "name cannot be empty"
-                    namespace:
-                      type: string
-                      description: |
-                        Namespace of the secret (optional, defaults to the namespace
-                        where the YBCertificate is created)
-                      x-kubernetes-validations:
-                        - rule: "self.size() > 0"
-                          message: "name cannot be empty"
+                        - rule: >-
+                            (has(self.s3) && has(self.s3.paths) && has(self.s3.paths.x86_64) ? 1 : 0) +
+                            (has(self.gcs) && has(self.gcs.paths) && has(self.gcs.paths.x86_64) ? 1 : 0) +
+                            (has(self.http) && has(self.http.paths) && has(self.http.paths.x86_64) ? 1 : 0) == 1
+                          message: "Exactly one x86_64 path must be specified across s3, gcs, and http"
+                        - rule: >-
+                            (has(self.s3) && has(self.s3.paths) && has(self.s3.paths.helmChart) ? 1 : 0) +
+                            (has(self.gcs) && has(self.gcs.paths) && has(self.gcs.paths.helmChart) ? 1 : 0) +
+                            (has(self.http) && has(self.http.paths) && has(self.http.paths.helmChart) ? 1 : 0) == 1
+                          message: "Exactly one helmChart path must be specified across s3, gcs, and http"
+                      properties:
+                        s3:
+                          description: S3 download configuration
+                          type: object
+                          properties:
+                            accessKeyId:
+                              description: S3 access key
+                              type: string
+                            secretAccessKey:
+                              description: S3 secret key. Deprecated, use secretAccessKeySecret
+                              type: string
+                            secretAccessKeySecret:
+                              description: S3 secret key secret. Overrides secretAccessKey
+                              type: object
+                              properties:
+                                name:
+                                  description: Name of the secret
+                                  type: string
+                                namespace:
+                                  description: Namespace of the secret
+                                  type: string
+                              required:
+                              - name
+                            paths:
+                              description: S3 paths to download the release from
+                              type: object
+                              properties:
+                                x86_64:
+                                  type: string
+                                  description: Optional Path to x86_64 package
+                                x86_64_checksum:
+                                  type: string
+                                  description: Checksum for x86_64 package
+                                helmChart:
+                                  type: string
+                                  description: Required Path to the Helm chart package
+                                helmChartChecksum:
+                                  description: Optional checksum for Helm chart package
+                                  type: string
+                        gcs:
+                          type: object
+                          properties:
+                            paths:
+                              type: object
+                              properties:
+                                x86_64:
+                                  type: string
+                                  description: Optional Path to x86_64 package
+                                x86_64_checksum:
+                                  type: string
+                                  description: Optional Checksum for x86_64 package
+                                helmChart:
+                                  type: string
+                                  description: Path to the Helm chart package
+                                helmChartChecksum:
+                                  type: string
+                                  description: Optional checksum for Helm chart package
+                            credentialsJson:
+                              type: string
+                              description: |
+                                GCS service key JSON. Deprecated, use credentialsJsonSecret instead.
+                            credentialsJsonSecret:
+                              type: object
+                              properties:
+                                name:
+                                  description: Name of the secret
+                                  type: string
+                                namespace:
+                                  description: Namespace of the secret
+                                  type: string
+                              required:
+                              - name
+                        http:
+                          type: object
+                          properties:
+                            paths:
+                              type: object
+                              properties:
+                                x86_64:
+                                  type: string
+                                  description: Optional Path to x86_64 package
+                                x86_64_checksum:
+                                  type: string
+                                  description: Optional Checksum for x86_64 package
+                                helmChart:
+                                  type: string
+                                  description: Path to the Helm chart package
+                                helmChartChecksum:
+                                  type: string
+                                  description: Optional checksum for Helm chart package
 
 
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: backups.operator.yugabyte.io
+  name: restorejobs.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
   scope: Namespaced
   names:
-    plural: backups
-    singular: backup
-    kind: Backup
+    plural: restorejobs
+    singular: restorejob
+    kind: RestoreJob
     categories:
       - all
       - yugabyte
@@ -618,238 +730,45 @@ spec:
       storage: true
       schema:
         openAPIV3Schema:
-          description: Custom resource definition for YugabyteDB backups.
           type: object
+          description: Custom resource definition for YugabyteDB restore job
           properties:
             status:
               type: object
-              description: Backup status for the backup custom resource.
+              description: Restore job status for the restore job custom resource.
               properties:
                 message:
-                  description: String log message from backup controller
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the backup resource.
+                  description: String log message from restore job controller
                   type: string
                 taskUUID:
-                  description: Internal UUID of the task associated with the backup resource.
+                  description: >
+                    Internal UUID of the task associated with
+                    the restore job resource.
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the restore operation.
                   type: string
             spec:
               type: object
               properties:
-                backupType:
-                  description: >
-                    Type of backup to be taken.
-                    Allowed values are -
-                    YQL_TABLE_TYPE REDIS_TABLE_TYPE PGSQL_TABLE_TYPE TRANSACTION_STATUS_TABLE_TYPE
+                actionType:
+                  description: Type of action to be taken. Allowed values - RESTORE
                   type: string
                   enum:
-                    - YQL_TABLE_TYPE
-                    - PGSQL_TABLE_TYPE
-                sse:
-                  description: Server side encryption for the backup.
-                  type: boolean
-                storageConfig:
-                  description: >
-                    Storage configuration for the backup,
-                    should contain name of storage config object
-                  type: string
+                    - RESTORE
                 universe:
                   description: >
-                    Name of the universe for which backup is to be taken,
+                    Name of the universe for which restore is to be taken,
                     refers to a ybuniverse CR name.
                   type: string
-                tableByTableBackup:
-                  description: Boolean indicating if backup is to be taken table by table.
-                  type: boolean
+                backup:
+                  description: >
+                    Name of the backup to be restored,
+                    refers to a backup CR name.
+                  type: string
                 keyspace:
-                  description: Name of keyspace to be backed up.
+                  description: Name of the keyspace to be restored.
                   type: string
-                timeBeforeDelete:
-                  description: Time before backup is deleted from storage in milliseconds.
-                  type: integer
-                  minimum: 0
-                incrementalBackupBase:
-                  description: >
-                    Base backup Custom Resource name. Operator will add an incremental backup
-                    to the existing chain of backups at the last.
-                  type: string
-              required:
-              - keyspace
-              - backupType
-              - storageConfig
-              - universe
-
-
----
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: drconfigs.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: drconfigs
-    singular: drconfig
-    kind: DrConfig
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: Custom resource definition for YugabyteDB DR config.
-          type: object
-          properties:
-            status:
-              type: object
-              description: Dr config status for the Dr config custom resource.
-              properties:
-                message:
-                  description: String log message from dr config controller
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the dr config resource.
-                  type: string
-                taskUUID:
-                  description: Internal UUID of the task associated with the dr config.
-                  type: string
-            spec:
-              type: object
-              x-kubernetes-validations:
-                - rule: self.sourceUniverse != self.targetUniverse
-                  message: >
-                    "The source and target universes cannot be the same"
-              properties:
-                sourceUniverse:
-                  description: >
-                    Name of the source universe for which DrConfig needs to be setup
-                  type: string
-                  x-kubernetes-validations:
-                  - message: sourceUniverse cannot be changed
-                    rule: self == oldSelf
-                targetUniverse:
-                  description: >
-                    Name of the target universe for which DrConfig needs to be setup
-                  type: string
-                  x-kubernetes-validations:
-                  - message: targetUniverse cannot be changed
-                    rule: self == oldSelf
-                databases:
-                  description: >
-                    The list of databases for which replication needs to happen between the
-                    source and target universes
-                  type: array
-                  items:
-                    type: string
-                  minItems: 1
-                  x-kubernetes-validations:
-                    - rule: self.all(db, size(db) > 0)
-                      message: "Database names cannot be empty"
-                name:
-                  description: Name of the DR config
-                  type: string
-                storageConfig:
-                  description: >
-                    Storage configuration for the backup,
-                    should contain name of storage config object
-                  type: string
-              required:
-              - sourceUniverse
-              - targetUniverse
-              - databases
-              - name
-              - storageConfig
-
-
----
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: pitrconfigs.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: pitrconfigs
-    singular: pitrconfig
-    kind: PitrConfig
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: Custom resource definition for PITR config.
-          type: object
-          properties:
-            status:
-              type: object
-              description: PITR config status for the PITR config custom resource.
-              properties:
-                message:
-                  description: String log message from PITR config controller
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the PITR config resource.
-                  type: string
-                taskUUID:
-                  description: Internal UUID of the task associated with the PITR config.
-                  type: string
-            spec:
-              type: object
-              description: PITR configuration spec
-              x-kubernetes-validations:
-                - message: retentionPeriodInSeconds must be greater than intervalInSeconds
-                  rule: self.retentionPeriodInSeconds > self.intervalInSeconds
-              properties:
-                universe:
-                  description: >
-                    Name of the universe for which PitrConfig needs to be setup
-                  type: string
-                  x-kubernetes-validations:
-                  - message: universe cannot be changed
-                    rule: self == oldSelf
-                name:
-                  description: Name of the PITR config
-                  type: string
-                tableType:
-                  description: The table type for which PITR has to be configured
-                  type: string
-                  enum:
-                    - YSQL
-                    - YCQL
-                database:
-                  description: The database for which PITR has to be configured
-                  type: string
-                intervalInSeconds:
-                  description: The schedule interval of the PITR snapshot
-                  type: integer
-                  minimum: 0
-                  default: 86400
-                retentionPeriodInSeconds:
-                  description: The retention period of the PITR snapshot
-                  type: integer
-                  minimum: 0
-                  default: 604800
-              required:
-              - universe
-              - name
-              - tableType
-              - database
 
 
 ---
@@ -1060,7 +979,7 @@ spec:
                         aws_secret_access_key_secret instead
                       type: string
                     USE_IAM:
-                      description: Use IAM for storage account access. Valid for S3/GCS.
+                      description: Use IAM for storage account access. Valid for S3/GCS/AZ.
                       type: boolean
                     BACKUP_LOCATION:
                       description: Backup location for the storage configuration.
@@ -1142,6 +1061,100 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  name: support-bundles.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: support-bundles
+    singular: support-bundle
+    kind: SupportBundle
+    shortNames:
+    - sb
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: >
+            Custom resource definition for YugabyteDB support bundle to capture logs,
+            events in case of failures.
+          type: object
+          properties:
+            status:
+              description: Support bundle status for the support bundle custom resource.
+              type: object
+              properties:
+                status:
+                  description: >
+                    Status of the support bundle.
+                    Allowed values - generating, ready, failed
+                  type: string
+                  enum:
+                  - generating
+                  - ready
+                  - failed
+                access:
+                  description: Access details for the generated support bundle to download.
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the support bundle resource.
+                  type: string
+            spec:
+              type: object
+              properties:
+                universeName:
+                  description: >
+                    Name of the universe for which support bundle is to be generated,
+                    refers to a ybuniverse CR name.
+                  type: string
+                collectionTimerange:
+                  description: Time range for which logs and events are to be collected.
+                  type: object
+                  properties:
+                    startDate:
+                      description: Start date for the logs and events collection.
+                      type: string
+                      example: 2022-12-12T13:07:18Z,
+                      format: date-time
+                    endDate:
+                      description: End date for the logs and events collection.
+                      type: string
+                      example: 2022-12-12T13:07:18Z,
+                      format: date-time
+                  required:
+                  - startDate
+                components:
+                  description: >
+                    Components for which logs and events are to be collected. If not provided, all
+                    components will be collected.
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                    - UniverseLogs
+                    - ApplicationLogs
+                    - OutputFiles
+                    - ErrorFiles
+                    - CoreFiles
+                    - GFlags
+                    - Instance
+                    - ConsensusMeta
+                    - TabletMeta
+                    - YbcLogs
+                    - K8sInfo
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
   name: ybuniverses.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
@@ -1165,6 +1178,16 @@ spec:
                 rule: self.replicationFactor <= self.numNodes
               - message: placementInfo cannot be removed once set.
                 rule: has(self.placementInfo) || !has(oldSelf.placementInfo)
+              - message: >
+                  tserverVolume cannot be present if deviceInfo or masterDeviceInfo is present.
+                  The new volume fields are mutually exclusive with the old deviceInfo fields.
+                rule: >
+                  !has(self.tserverVolume) || (!has(self.deviceInfo) && !has(self.masterDeviceInfo))
+              - message: >
+                  masterVolume cannot be present if deviceInfo or masterDeviceInfo is present.
+                  The new volume fields are mutually exclusive with the old deviceInfo fields.
+                rule: >
+                  !has(self.masterVolume) || (!has(self.deviceInfo) && !has(self.masterDeviceInfo))
             properties:
               universeName:
                 type: string
@@ -1298,6 +1321,12 @@ spec:
               ybSoftwareVersion:
                 description: Version of DB software to use in the universe.
                 type: string
+              useYbdbInbuiltYbc:
+                description: >
+                  Use YBDB inbuilt YBC (immutable YBC) for the universe. When true, YBC runs from
+                  the same container image as the database instead of being installed at runtime.
+                type: boolean
+                default: false
               providerName:
                 description: Preexisting Provider name to use in the universe.
                 type: string
@@ -1306,8 +1335,8 @@ spec:
                   rule: self == oldSelf
               zoneFilter:
                 description: >
-                  Only deploy yugabytedb nodes in these zones mentioned in the list.
-                  Defaults to all zones if unspecified.
+                  Filter the zones to be added by the auto-provider.
+                  Only used when providerName is not specified.
                 type: array
                 x-kubernetes-validations:
                 - message: zoneFilter cannot be changed
@@ -1369,6 +1398,8 @@ spec:
                   Enable LoadBalancer access to the universe.
                   Creates a service with Type:LoadBalancer
                   in the universe for tserver and masters.
+                  WARNING: Enabling LoadBalancer may expose universe servers via public IPs.
+                  Use with caution. To use an internal LoadBalancer, ensure you set appropriate Kubernetes overrides to avoid exposing nodes publicly.
                 type: boolean
                 default: false
                 x-kubernetes-validations:
@@ -1379,6 +1410,7 @@ spec:
                   Device information for the tservers in universe to
                   refer to storage information for volume,
                   storage classes etc.
+                  DEPRECATED: Use tserverVolume instead. deviceInfo and tserverVolume are mutually exclusive.
                 properties:
                   volumeSize:
                     type: integer
@@ -1392,14 +1424,18 @@ spec:
                   storageClass:
                     type: string
                     x-kubernetes-validations:
-                      - message:   StorageClass cannot be changed once set.
+                      - message: StorageClass cannot be changed once set.
                         rule: self == oldSelf
+                    description: >
+                      Storage class for the volumes. Only used when providerName is not specified
+                      to populate storageClass of generated auto-provider.
                 type: object
               masterDeviceInfo:
                 description: >
                   Device information for the masters in universe to
                   refer to storage information for volume,
                   storage classes etc.
+                  DEPRECATED: Use masterVolume instead. masterDeviceInfo and masterVolume are mutually exclusive.
                 properties:
                   volumeSize:
                     type: integer
@@ -1415,7 +1451,136 @@ spec:
                     x-kubernetes-validations:
                       - message:   StorageClass cannot be changed once set.
                         rule: self == oldSelf
+                    description: Storage class for the volumes. Only used when providerName is not specified.
                 type: object
+              tserverVolume:
+                description: >
+                  Volume configuration for tservers in the universe.
+                  This replaces deviceInfo. deviceInfo and tserverVolume are mutually exclusive.
+                type: object
+                properties:
+                  volumeSize:
+                    type: integer
+                    description: Volume size in GiB( defaults to 100 )
+                    default: 100
+                  numVolumes:
+                    type: integer
+                    description: >
+                      Number of volumes per tserver( defaults to 2 ). Modifying values supported with 
+                      DB software versions 2026.1.0 and above.
+                    default: 2
+                  storageClass:
+                    type: string
+                    description: >
+                      Storage class for the volumes. Provider storage class takes precedence over this
+                      since it is at AZ level. To use this, provider storage class values should be empty.
+                      Modifying values supported with DB software versions 2026.1.0 and above.
+                  perAZ:
+                    description: >
+                      Per availability zone volume overrides. Maps AZ codes to volume configuration.
+                      This takes precedence over provider/base volume configuration.  Once this is used, the
+                      provider values are no longer used for volume configuration. If some
+                      AZs are not provided as overrides, the values are picked from base tserverVolume. This
+                      can be set to {} to make all AZs use base tserverVolume.
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        volumeSize:
+                          type: integer
+                          description: Volume size in GiB for this AZ
+                        numVolumes:
+                          type: integer
+                          description: >
+                            Number of volumes per tserver for this AZ. Modifying values supported with 
+                            DB software versions 2026.1.0 and above.
+                        storageClass:
+                          type: string
+                          description: >
+                            Storage class for this AZ. Modifying values supported with 
+                            DB software versions 2026.1.0 and above.
+                x-kubernetes-validations:
+                  - message: tserverVolume cannot be removed once set.
+                    rule: self != null || oldSelf == null
+                  - message: perAZ in tserverVolume cannot be removed once set.
+                    rule: "!has(oldSelf.perAZ) || has(self.perAZ)"
+              masterVolume:
+                description: >
+                  Volume configuration for masters in the universe.
+                  This replaces masterDeviceInfo. masterDeviceInfo and masterVolume are mutually exclusive.
+                type: object
+                properties:
+                  volumeSize:
+                    type: integer
+                    description: Volume size in GiB( defaults to 50 )
+                    default: 50
+                  numVolumes:
+                    type: integer
+                    description: >
+                      Number of volumes per master( defaults to 1 ). Modifying values supported with 
+                      DB software versions 2026.1.0 and above.
+                    default: 1
+                  storageClass:
+                    type: string
+                    description: >
+                      Storage class for the volumes. Provider storage class takes precedence over this
+                      since it is at AZ level. To use this, provider storage class values should be empty.
+                      Modifying values supported with DB software versions 2026.1.0 and above.
+                  perAZ:
+                    description: >
+                      Per availability zone volume overrides. Maps AZ codes to volume configuration.
+                      This takes precedence over provider/base volume configuration. Once this is used, the
+                      provider values are no longer used for volume configuration. If some
+                      AZs are not provided as overrides, the values are picked from base masterVolume. This 
+                      can be set to {} to make all AZs use base masterVolume.
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        volumeSize:
+                          type: integer
+                          description: Volume size in GiB for this AZ
+                        numVolumes:
+                          type: integer
+                          description: >
+                            Number of volumes per master for this AZ. Modifying values supported with 
+                            DB software versions 2026.1.0 and above.
+                        storageClass:
+                          type: string
+                          description: >
+                            Storage class for this AZ. Modifying values supported with 
+                            DB software versions 2026.1.0 and above.
+                x-kubernetes-validations:
+                  - message: masterVolume cannot be removed once set.
+                    rule: self != null || oldSelf == null
+                  - message: perAZ in masterVolume cannot be removed once set.
+                    rule: "!has(oldSelf.perAZ) || has(self.perAZ)"
+              tserverResourceSpec:
+                description: >
+                  Resource specification for the tserver pods in the universe.
+                type: object
+                properties:
+                  cpu:
+                    type: number
+                    description: CPU core count for the tserver pods.
+                    minimum: 1
+                  memory:
+                    type: number
+                    description: Memory in GiB for the tserver pods.
+                    minimum: 1
+              masterResourceSpec:
+                description: >
+                  Resource specification for the master pods in the universe.
+                type: object
+                properties:
+                  cpu:
+                    type: number
+                    description: CPU core count for the master pods.
+                    minimum: 1
+                  memory:
+                    type: number
+                    description: Memory in GiB for the master pods.
+                    minimum: 1
               paused:
                 description: >
                   If the universe is paused. A paused universe will have its statefulsets scaled
@@ -1428,12 +1593,14 @@ spec:
               readReplica:
                 type: object
                 x-kubernetes-validations:
-                - message: placementInfo for read replica cannot be removed once set.
-                  rule: has(self.placementInfo) || !has(oldSelf.placementInfo)
+                  - message: placementInfo for read replica cannot be removed once set.
+                    rule: has(self.placementInfo) || !has(oldSelf.placementInfo)
+                  - message: deviceInfo and tserverVolume are mutually exclusive in readReplica. Only one can be provided.
+                    rule: >
+                      !has(self.deviceInfo) || !has(self.tserverVolume)
                 required:
                 - numNodes
                 - replicationFactor
-                - deviceInfo
                 properties:
                   numNodes:
                     type: integer
@@ -1442,6 +1609,7 @@ spec:
                   deviceInfo:
                     description: >
                       Device information for the readReplica tservers.
+                      DEPRECATED: Use tserverVolume instead. deviceInfo and tserverVolume are mutually exclusive.
                     type: object
                     required:
                     - numVolumes
@@ -1454,6 +1622,68 @@ spec:
                         x-kubernetes-validations:
                           - message: numVolumes cannot be changed once set.
                             rule: "self == oldSelf"
+                  tserverVolume:
+                    description: >
+                      Volume configuration for tservers in the read replica.
+                      This replaces deviceInfo. deviceInfo and tserverVolume are mutually exclusive.
+                    type: object
+                    properties:
+                      volumeSize:
+                        type: integer
+                        description: Volume size in GiB
+                      numVolumes:
+                        type: integer
+                        description: >
+                          Number of volumes per tserver. Modifying values supported with 
+                          DB software versions 2026.1.0 and above.
+                      storageClass:
+                        type: string
+                        description: >
+                          Storage class for the volumes. Provider storage class takes precedence over this
+                          since it is at AZ level. To use this, provider storage class values should be empty.
+                          Modifying values supported with DB software versions 2026.1.0 and above.
+                      perAZ:
+                        description: >
+                          Per availability zone volume overrides. Maps AZ codes to volume configuration.
+                          This takes precedence over provider/base volume configuration.  Once this is used, the
+                          provider values are no longer used for volume configuration. If some
+                          AZs are not provided as overrides, the values are picked from base tserverVolume. This 
+                          can be set to {} to make all AZs use base tserverVolume.
+                        type: object
+                        additionalProperties:
+                          type: object
+                          properties:
+                            volumeSize:
+                              type: integer
+                              description: Volume size in GiB for this AZ
+                            numVolumes:
+                              type: integer
+                              description: >
+                                Number of volumes per tserver for this AZ. Modifying values supported with 
+                                DB software versions 2026.1.0 and above.
+                            storageClass:
+                              type: string
+                              description: >
+                                Storage class for this AZ. Modifying values supported with 
+                                DB software versions 2026.1.0 and above.
+                    x-kubernetes-validations:
+                      - message: tserverVolume cannot be removed once set.
+                        rule: self != null || oldSelf == null
+                      - message: perAZ in readReplica tserverVolume cannot be removed once set.
+                        rule: "!has(oldSelf.perAZ) || has(self.perAZ)"
+                  tserverResourceSpec:
+                    description: >
+                      Resource specification for the tserver pods in the universe.
+                    type: object
+                    properties:
+                      cpu:
+                        type: number
+                        description: CPU core count for the tserver pods.
+                        minimum: 1
+                      memory:
+                        type: number
+                        description: Memory in GiB for the tserver pods.
+                        minimum: 1
                   placementInfo:
                     description: Placement information for the universe.
                     type: object
@@ -1570,6 +1800,7 @@ spec:
                                 x-kubernetes-int-or-string: true
                   master:
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
                     properties:
                       affinity:
                         description: Pod scheduling affinity settings
@@ -1990,9 +2221,6 @@ spec:
                                   type: array
                                   items:
                                     type: string
-
-
-
                       extraEnv:
                         type: array
                         items:
@@ -2071,6 +2299,7 @@ spec:
                               type: string
                   tserver:
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
                     properties:
                       affinity:
                         description: Pod scheduling affinity settings
@@ -2657,5 +2886,95 @@ spec:
       - all
       - yugabyte
   scope: Namespaced
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: ybcertificates.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: ybcertificates
+    singular: ybcertificate
+    kind: YBCertificate
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: >
+            Custom resource definition for YugabyteDB certificate management configuration.
+          type: object
+          properties:
+            status:
+              description: >
+                Certificate management status for the YBCertificate custom resource.
+              type: object
+              properties:
+                message:
+                  description: String log message from certificate controller.
+                  type: string
+                success:
+                  description: >
+                    Boolean indicating if the certificate configuration was successfully created.
+                  type: boolean
+                resourceUUID:
+                  description: Internal UUID of the certificate configuration resource.
+                  type: string
+            spec:
+              type: object
+              description: >
+                Specification for the YBCertificate resource.
+                Required fields: certType, certificateSecretRef
+              required:
+                - certType
+                - certificateSecretRef
+              properties:
+                certType:
+                  description:
+                    Type of certificate configuration to be created.
+                    Allowed values - SELF_SIGNED, K8S_CERT_MANAGER
+                  type: string
+                  enum:
+                    - SELF_SIGNED
+                    - K8S_CERT_MANAGER
+                  x-kubernetes-validations:
+                    - rule: "self in ['SELF_SIGNED', 'K8S_CERT_MANAGER']"
+                      message: "certType must be either SELF_SIGNED or K8S_CERT_MANAGER"
+
+                # Certificate secret reference (common for both types)
+                certificateSecretRef:
+                  description: |
+                    Secret reference containing certificate and key content.
+                    For SELF_SIGNED: secret must contain both 'ca.crt' and 'ca.key'
+                    For K8S_CERT_MANAGER: secret must contain 'ca.crt'
+                    Recommended to use type: "tls" for better Kubernetes integration
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the secret (required)
+                      x-kubernetes-validations:
+                        - rule: "self.size() > 0"
+                          message: "name cannot be empty"
+                    namespace:
+                      type: string
+                      description: |
+                        Namespace of the secret (optional, defaults to the namespace
+                        where the YBCertificate is created)
+                      x-kubernetes-validations:
+                        - rule: "self.size() > 0"
+                          message: "name cannot be empty"
 
 
