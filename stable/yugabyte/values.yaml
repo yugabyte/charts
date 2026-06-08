@@ -927,26 +927,41 @@ ocpCompatibility:
 otelCollector:
   enabled: false
   image: ""
-  exporters: {} # Add exporters here
-  # exporters:
-  #   datadog:
-  #     api:
-  #       key: <KEY>
-  #       site: datadoghq.com
-  #     retry_on_failure:
-  #       enabled: true
-  #     sending_queue:
-  #       enabled: true
-  #       storage: file_storage/queue
 
-  recievers:
-    ysql:
-      # Set ysql receiver params here, based on log_line_prefix set in ysql_pg.conf
-      lineStartPattern: "(?P<timestamp_with_ms>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}[.]\\d{3} \\w{3})[ ][[](?P<process_id>\\d+)[]][ ]"
-      regex: "(?P<timestamp_with_ms>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}[.]\\d{3} \\w{3})[ ][[](?P<process_id>\\d+)[]][ ](?P<log_level>\\w+):  AUDIT: (?P<audit_type>\\w+),(?P<statement_id>\\d+),(?P<substatement_id>\\d+),(?P<class>\\w+),(?P<command>[^,]+),(?P<object_type>[^,]*),(?P<object_name>[^,]*),(?P<statement>(.|\\n|\\r|\\s)*)"
-      timestamp:
-        layout: '%Y-%m-%d %H:%M:%S.%L %Z'
-        parse_from: 'attributes.timestamp_with_ms'
+  # Preferred: complete OpenTelemetry collector config, rendered by YBA and passed through to
+  # spec.config verbatim.
+  config: ""
+  # Example (normally rendered by YBA; shown for reference): export YSQL query logs to Datadog.
+  # The entire document below is placed under the collector's spec.config.
+  # config: |
+  #   receivers:
+  #     filelog/query_logs_ysql:
+  #       include: [/mnt/disk0/yb-data/tserver/logs/postgresql-*.log]
+  #       exclude: [/mnt/disk0/yb-data/tserver/logs/*.gz]
+  #       start_at: beginning
+  #       storage: file_storage/queue
+  #       attributes: {yugabyte.query_log_type: ysql}
+  #   processors:
+  #     attributes/datadog:
+  #       actions:
+  #         - {key: ddsource, value: yugabyte, action: upsert}
+  #         - {key: host, value: '${POD_NAME}', action: upsert}
+  #   exporters:
+  #     datadog:
+  #       api: {site: <DATADOG_SITE>, key: <KEY>}
+  #   extensions:
+  #     file_storage/queue: {directory: /mnt/disk0/otel-collector/queue, create_directory: true}
+  #     health_check: {endpoint: '0.0.0.0:13133', path: /health}
+  #   service:
+  #     extensions: [file_storage/queue, health_check]
+  #     pipelines:
+  #       logs/query_logs:
+  #         receivers: [filelog/query_logs_ysql]
+  #         processors: [attributes/datadog]
+  #         exporters: [datadog]
+  #     telemetry:
+  #       metrics: {address: '0.0.0.0:8889'}
+
   resources: {}
   # resources:
   #   requests:

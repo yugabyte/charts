@@ -29,77 +29,11 @@ metadata:
     {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
     {{- include "yugabyte.labels" $root | indent 4 }}
 spec:
+  # The complete collector config is rendered by YBA and passed through verbatim (YBA owns the
+  # schema -- logs today, metrics/other signals later). Older YBDB versions that predate this
+  # config passthrough use their own bundled chart's structured assembly instead.
   config:
-    exporters:
-      {{- range $name, $exporter := .Values.otelCollector.exporters}}
-      {{ $name }}:
-{{ toYaml $exporter | indent 8 }}
-      {{- end }}
-    extensions:
-      file_storage/queue:
-        create_directory: true
-        compaction:
-          directory: /mnt/disk0/otel-collector/queue
-          on_rebound: true
-          on_start: true
-          rebound_needed_threshold_mib: 100
-          rebound_trigger_threshold_mib: 10
-        directory: /mnt/disk0/otel-collector/queue
-      health_check:
-        endpoint: {{ (printf "%s:13133" (include "yugabyte.webserver_interface" $root)) | quote }}
-        path: "/health"
-    processors:
-      {{- range $name := (keys .Values.otelCollector.exporters) }}
-      attributes/{{ $name }}:
-        actions:
-        - action: upsert
-          key: ddsource
-          value: yugabyte
-        - action: upsert
-          key: service
-          value: yb-otel-collector
-        - action: upsert
-          key: host
-          value: ${POD_NAME}
-      {{- end }}
-    receivers:
-      filelog/ysql:
-        attributes:
-          audit_log_type: ysql
-        exclude:
-        - /mnt/disk0/yb-data/tserver/logs/*.gz
-        include:
-        - /mnt/disk0/yb-data/tserver/logs/postgresql-*.log
-        multiline:
-          line_start_pattern: {{ $root.Values.otelCollector.recievers.ysql.lineStartPattern | quote }}
-        operators:
-        - expr: 'body not matches "^.*\\w+:  AUDIT:(.|\\n|\\r|\\s)*$"'
-          type: filter
-        - on_error: drop
-          regex: {{ $root.Values.otelCollector.recievers.ysql.regex | quote }}
-          timestamp:
-{{ toYaml $root.Values.otelCollector.recievers.ysql.timestamp | indent 12 }}
-          type: regex_parser
-        start_at: beginning
-        storage: file_storage/queue
-    service:
-      extensions:
-      - file_storage/queue
-      - health_check
-      pipelines:
-        {{- range $name := (keys .Values.otelCollector.exporters) }}
-        logs/{{ $name }}:
-          exporters:
-          - {{ $name }}
-          processors:
-          - attributes/{{ $name }}
-          receivers:
-          - filelog/ysql
-        {{- end}}
-      telemetry:
-        logs:
-          output_paths:
-          - /mnt/disk0/otel-collector/logs/otel-collector.logs
+{{ .Values.otelCollector.config | indent 4 }}
   image: {{ .Values.otelCollector.image | default "otel/opentelemetry-collector-contrib:0.114.0" | quote }}
   ipFamilyPolicy: SingleStack
   managementState: managed
