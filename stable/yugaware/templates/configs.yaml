@@ -358,6 +358,9 @@ data:
             # kubelet metrics that match our pods
             - '{pod=~"(.*)yb-(.*)"}'
             - '{__name__=~"kubelet_volume_stats_.*", persistentvolumeclaim=~"(.*)-yb-(.*)"}'
+            # YBA pod and PVC metrics
+            - '{pod=~"{{ .Release.Name }}-yugaware.*"}'
+            - '{__name__=~"kubelet_volume_stats_.*", persistentvolumeclaim=~"{{ .Release.Name }}-yugaware.*"}'
         static_configs:
           - targets:
             - "prometheus-k8s.openshift-monitoring.svc:9091"
@@ -380,12 +383,25 @@ data:
             regex: "(.*)"
             target_label: "az_name"
             replacement: "$1"
-          # rename new name of the CPU metric to the old name and label
+          # rename new name of the CPU metrics to the old name and label
           # ref: https://github.com/kubernetes/kube-state-metrics/blob/master/CHANGELOG.md#v200-alpha--2020-09-16
           - source_labels: ["__name__", "unit"]
             regex: "kube_pod_container_resource_requests;core"
             target_label: "__name__"
             replacement: "kube_pod_container_resource_requests_cpu_cores"
+          - source_labels: ["__name__", "unit"]
+            regex: "kube_pod_container_resource_limits;core"
+            target_label: "__name__"
+            replacement: "kube_pod_container_resource_limits_cpu_cores"
+          # rename new name of the memory metrics to the old name and label
+          - source_labels: ["__name__", "unit"]
+            regex: "kube_pod_container_resource_requests;byte"
+            target_label: "__name__"
+            replacement: "kube_pod_container_resource_requests_memory_bytes"
+          - source_labels: ["__name__", "unit"]
+            regex: "kube_pod_container_resource_limits;byte"
+            target_label: "__name__"
+            replacement: "kube_pod_container_resource_limits_memory_bytes"
 
       {{- else }}
       {{- if .Values.prometheus.scrapeKubernetesNodes }}
@@ -415,7 +431,7 @@ data:
             regex: "kubelet_volume_stats_used_bytes|kubelet_volume_stats_capacity_bytes"
             action: keep
           - source_labels: ["persistentvolumeclaim"]
-            regex: "(.*)-yb-(.*)"
+            regex: "(.*)-yb-(.*)|{{ .Release.Name }}-yugaware.*"
             action: keep
             # Save the name of the metric so we can group_by since we cannot by __name__ directly...
           - source_labels: ["__name__"]
@@ -441,7 +457,7 @@ data:
         metric_relabel_configs:
           # Only keep the metrics which we care about
           - source_labels: ["__name__", "unit"]
-            regex: "kube_pod_container_resource_requests;core"
+            regex: "(kube_pod_container_resource_requests|kube_pod_container_resource_limits);(core|byte)"
             action: keep
           # Save the name of the metric so we can group_by since we cannot by __name__ directly...
           - source_labels: ["__name__"]
@@ -460,19 +476,32 @@ data:
             regex: "(.*)"
             target_label: "az_name"
             replacement: "$1"
-          # Keep metrics from YugabyteDB pods, discard everything else
+          # Keep metrics from YugabyteDB and YBA pods, discard everything else
           - source_labels: ["pod_name"]
-            regex: "(.*)yb-(.*)"
+            regex: "(.*)yb-(.*)|{{ .Release.Name }}-yugaware.*"
             action: keep
-          # rename new name of the CPU metric to the old name and label
+          # rename new name of the CPU metrics to the old name and label
           # ref: https://github.com/kubernetes/kube-state-metrics/blob/master/CHANGELOG.md#v200-alpha--2020-09-16
           - source_labels: ["__name__", "unit"]
             regex: "kube_pod_container_resource_requests;core"
             target_label: "__name__"
             replacement: "kube_pod_container_resource_requests_cpu_cores"
-          # Keep metrics for CPU, discard duplicate metrics
+          - source_labels: ["__name__", "unit"]
+            regex: "kube_pod_container_resource_limits;core"
+            target_label: "__name__"
+            replacement: "kube_pod_container_resource_limits_cpu_cores"
+          # rename new name of the memory metrics to the old name and label
+          - source_labels: ["__name__", "unit"]
+            regex: "kube_pod_container_resource_requests;byte"
+            target_label: "__name__"
+            replacement: "kube_pod_container_resource_requests_memory_bytes"
+          - source_labels: ["__name__", "unit"]
+            regex: "kube_pod_container_resource_limits;byte"
+            target_label: "__name__"
+            replacement: "kube_pod_container_resource_limits_memory_bytes"
+          # Keep metrics for CPU and memory, discard duplicate metrics
           - source_labels: ["__name__"]
-            regex: "kube_pod_container_resource_requests_cpu_cores"
+            regex: "kube_pod_container_resource_requests_cpu_cores|kube_pod_container_resource_requests_memory_bytes|kube_pod_container_resource_limits_cpu_cores|kube_pod_container_resource_limits_memory_bytes"
             action: keep
 
       - job_name: 'kubernetes-cadvisor'
@@ -513,9 +542,9 @@ data:
             regex: "(.*)"
             target_label: "az_name"
             replacement: "$1"
-          # Keep metrics from YugabyteDB pods, discard everything else
+          # Keep metrics from YugabyteDB and YBA pods, discard everything else
           - source_labels: ["pod_name"]
-            regex: "(.*)yb-(.*)"
+            regex: "(.*)yb-(.*)|{{ .Release.Name }}-yugaware.*"
             action: keep
 
       {{- end }}
