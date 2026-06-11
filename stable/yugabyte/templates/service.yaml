@@ -378,7 +378,6 @@ spec:
                   echo "TLS certificate is signed by the CA. Copying to persistent volume.";
                   cp /home/yugabyte/cert-manager/tls.crt /mnt/disk0/certs/node.{{$serverFqdn}}.crt;
                   cp /home/yugabyte/cert-manager/tls.key /mnt/disk0/certs/node.{{$serverFqdn}}.key;
-                  chmod 600 /mnt/disk0/certs/*;
                 else
                   echo "TLS certificate is not signed by the CA. Checking for existing certificates.";
                   if [[ -f /mnt/disk0/certs/node.{{$serverFqdn}}.crt ]]; then
@@ -399,6 +398,9 @@ spec:
               else
                 echo "Using existing server certificate."
               fi
+              # Always normalize cert permissions here;
+              # existing-cert path can otherwise retain group-writable (660) modes in non-root universes.
+              chmod 600 /mnt/disk0/certs/*;
 
           volumeMounts:
             {{- if not $storageEphemeral }}
