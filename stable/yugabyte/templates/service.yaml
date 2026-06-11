@@ -247,7 +247,7 @@ spec:
       {{- if $priorityClassName }}
       priorityClassName: {{ $priorityClassName | quote }}
       {{- end }}
-      {{- if $root.Values.podSecurityContext.enabled }}
+      {{- if and $root.Values.podSecurityContext.enabled (not $root.Values.ocpCompatibility.enabled) }}
       securityContext:
         fsGroup: {{ $root.Values.podSecurityContext.fsGroup }}
         runAsUser: {{ required "runAsUser cannot be empty" $root.Values.podSecurityContext.runAsUser }}
@@ -354,8 +354,11 @@ spec:
       {{- with $root.Values.dnsPolicy }}
       dnsPolicy: {{ . | quote }}
       {{- end }}
-      {{- if and $root.Values.tls.enabled $root.Values.tls.certManager.enabled }}
+      {{- $enableCertManagerInit := and $root.Values.tls.enabled $root.Values.tls.certManager.enabled -}}
+      {{- $enablePgDataOwnershipFixInit := and (eq $service.name "yb-tservers") (not $storageEphemeral) -}}
+      {{- if or $enableCertManagerInit $enablePgDataOwnershipFixInit }}
       initContainers:
+      {{- if $enableCertManagerInit }}
         - name: certmanager-init
           image: {{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}
           imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
@@ -430,6 +433,55 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+      {{- end }}
+      {{- if $enablePgDataOwnershipFixInit }}
+        - name: pgdata-ownership-fix
+          image: {{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}
+          imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
+          {{- if $root.Values.containerSecurityContext.enabled }}
+          {{- include "getSecurityContext" $root | nindent 10 }}
+          {{- end }}
+          env:
+            {{- /* PG_UID is the UID the tserver container runs as; containerSecurityContext overrides podSecurityContext */}}
+            {{- if $root.Values.containerSecurityContext.enabled }}
+            - name: PG_UID
+              value: {{ $root.Values.containerSecurityContext.runAsUser | quote }}
+            {{- else if $root.Values.podSecurityContext.enabled }}
+            - name: PG_UID
+              value: {{ $root.Values.podSecurityContext.runAsUser | quote }}
+            {{- end }}
+            - name: PGDATA_PATH
+              value: "/mnt/disk0/pg_data"
+          command:
+            - "/bin/bash"
+            - "-c"
+            - |
+              set -euo pipefail
+              PGDATA_REAL_PATH="$(readlink -f "${PGDATA_PATH}" 2>/dev/null || echo "${PGDATA_PATH}")"
+              EXPECTED_UID="${PG_UID:-}"
+              if [[ -z "${EXPECTED_UID}" ]]; then
+                EXPECTED_UID="$(id -u)"
+              fi
+              if [[ -e "${PGDATA_REAL_PATH}" ]]; then
+                OWNER_ID="$(stat -c '%u' "${PGDATA_REAL_PATH}")"
+                if [[ "${OWNER_ID}" != "${EXPECTED_UID}" ]]; then
+                  echo "Starting pg_data copy-replace fix as owner ${OWNER_ID} does not match expected uid ${EXPECTED_UID}"
+                  SAFE_PGDATA_REAL_PATH="${PGDATA_REAL_PATH%/}"
+                  BACKUP_DIR="${SAFE_PGDATA_REAL_PATH}_temp_fix"
+                  mv "${SAFE_PGDATA_REAL_PATH}" "${BACKUP_DIR}"
+                  cp -R "${BACKUP_DIR}" "${SAFE_PGDATA_REAL_PATH}"
+                  rm -rf "${BACKUP_DIR}"
+                  echo "pg_data ownership fix completed"
+                else
+                  echo "Skipping pg_data ownership fix; owner uid already matches expected uid ${EXPECTED_UID}"
+                fi
+              else
+                echo "Skipping pg_data ownership fix; path ${PGDATA_REAL_PATH} does not exist"
+              fi
+          volumeMounts:
+            - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir0") (printf "%s0" (include "yugabyte.volume_name" $root)) }}
+              mountPath: /mnt/disk0
+      {{- end }}
       {{- end }}
       containers:
       - name: "{{ $service.label }}"
