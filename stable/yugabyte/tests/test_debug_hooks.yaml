@@ -1,0 +1,142 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/quintush/helm-unittest/master/schema/helm-testsuite.json
+suite: debug hooks config map
+templates:
+- debug_config_map.yaml
+tests:
+- it: renders the role default hooks for every master replica
+  template: templates/debug_config_map.yaml
+  set:
+    replicas:
+      master: 2
+      tserver: 1
+  documentIndex: 0
+  asserts:
+  - isKind:
+      of: ConfigMap
+  - equal:
+      path: metadata.name
+      value: RELEASE-NAME-yugabyte-master-hooks
+  - equal:
+      path: data["yb-master-0-pre_debug_hook.sh"]
+      value: "echo 'hello-from-pre' "
+  - equal:
+      path: data["yb-master-0-post_debug_hook.sh"]
+      value: "echo 'hello-from-post' "
+  - equal:
+      path: data["yb-master-1-pre_debug_hook.sh"]
+      value: "echo 'hello-from-pre' "
+  - equal:
+      path: data["yb-master-1-post_debug_hook.sh"]
+      value: "echo 'hello-from-post' "
+  # no keys are generated beyond the configured replica count
+  - notExists:
+      path: data["yb-master-2-pre_debug_hook.sh"]
+
+- it: renders the role default hooks for every tserver replica
+  template: templates/debug_config_map.yaml
+  set:
+    replicas:
+      master: 1
+      tserver: 2
+  documentIndex: 1
+  asserts:
+  - equal:
+      path: metadata.name
+      value: RELEASE-NAME-yugabyte-tserver-hooks
+  - equal:
+      path: data["yb-tserver-0-pre_debug_hook.sh"]
+      value: "echo 'hello-from-pre' "
+  - equal:
+      path: data["yb-tserver-1-post_debug_hook.sh"]
+      value: "echo 'hello-from-post' "
+  - notExists:
+      path: data["yb-tserver-2-pre_debug_hook.sh"]
+
+- it: applies a role-wide override to all master replicas
+  template: templates/debug_config_map.yaml
+  set:
+    replicas:
+      master: 2
+      tserver: 1
+    debugHooks:
+      master:
+        pre: "echo custom-pre"
+        post: "echo custom-post"
+  documentIndex: 0
+  asserts:
+  - equal:
+      path: data["yb-master-0-pre_debug_hook.sh"]
+      value: "echo custom-pre"
+  - equal:
+      path: data["yb-master-1-pre_debug_hook.sh"]
+      value: "echo custom-pre"
+  - equal:
+      path: data["yb-master-1-post_debug_hook.sh"]
+      value: "echo custom-post"
+
+- it: applies a per-replica override only to the targeted ordinal
+  template: templates/debug_config_map.yaml
+  set:
+    replicas:
+      master: 3
+      tserver: 1
+    debugHooks:
+      master:
+        overrides:
+          "1":
+            pre: "gcore $(pgrep yb-master)"
+            post: "echo done-1"
+  documentIndex: 0
+  asserts:
+  # overridden replica
+  - equal:
+      path: data["yb-master-1-pre_debug_hook.sh"]
+      value: "gcore $(pgrep yb-master)"
+  - equal:
+      path: data["yb-master-1-post_debug_hook.sh"]
+      value: "echo done-1"
+  # neighbours keep the role default
+  - equal:
+      path: data["yb-master-0-pre_debug_hook.sh"]
+      value: "echo 'hello-from-pre' "
+  - equal:
+      path: data["yb-master-2-post_debug_hook.sh"]
+      value: "echo 'hello-from-post' "
+
+- it: falls back to the role default for the phase a per-replica override omits
+  template: templates/debug_config_map.yaml
+  set:
+    replicas:
+      master: 2
+      tserver: 1
+    debugHooks:
+      master:
+        overrides:
+          "0":
+            pre: "echo only-pre-0"
+  documentIndex: 0
+  asserts:
+  - equal:
+      path: data["yb-master-0-pre_debug_hook.sh"]
+      value: "echo only-pre-0"
+  # post was not overridden -> role default
+  - equal:
+      path: data["yb-master-0-post_debug_hook.sh"]
+      value: "echo 'hello-from-post' "
+
+- it: per-replica overrides on master do not leak into tserver hooks
+  template: templates/debug_config_map.yaml
+  set:
+    replicas:
+      master: 1
+      tserver: 1
+    debugHooks:
+      master:
+        overrides:
+          "0":
+            pre: "echo master-only"
+  documentIndex: 1
+  asserts:
+  - equal:
+      path: data["yb-tserver-0-pre_debug_hook.sh"]
+      value: "echo 'hello-from-pre' "
