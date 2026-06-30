@@ -57,6 +57,26 @@ partition:
   master: 0
   tserver: 0
 
+## Scripts mounted at /opt/debug_hooks_config that run before (pre) and after
+## (post) the yb-master / yb-tserver processes. Values are the raw shell script
+## bodies. `pre`/`post` apply to every replica of the role; `overrides` lets you
+## replace the script for an individual replica ordinal (keyed by index as a
+## string). An override that omits pre or post falls back to the role default.
+debugHooks:
+  master:
+    pre: "echo 'hello-from-pre' "
+    post: "echo 'hello-from-post' "
+    overrides: {}
+      # "0":
+      #   pre: "echo 'master-0 custom pre'"
+      #   post: "echo 'master-0 custom post'"
+  tserver:
+    pre: "echo 'hello-from-pre' "
+    post: "echo 'hello-from-post' "
+    overrides: {}
+      # "0":
+      #   pre: "echo 'tserver-0 custom pre'"
+
 updateStrategy:
   type: RollingUpdate
 

@@ -10,8 +10,8 @@ metadata:
     {{- include "yugabyte.labels" . | indent 4 }}
 data:
 {{- range $index := until ( int ( .Values.replicas.master ) ) }}
-  yb-master-{{.}}-pre_debug_hook.sh: "echo 'hello-from-pre' "
-  yb-master-{{.}}-post_debug_hook.sh: "echo 'hello-from-post' "
+  yb-master-{{ $index }}-pre_debug_hook.sh: {{ include "yugabyte.debugHook" (dict "Values" $.Values "role" "master" "index" $index "phase" "pre") | quote }}
+  yb-master-{{ $index }}-post_debug_hook.sh: {{ include "yugabyte.debugHook" (dict "Values" $.Values "role" "master" "index" $index "phase" "post") | quote }}
 {{- end }}
 ---
 {{ $appLabelArgs := dict "label" "yb-tserver" "root" . }}
@@ -25,7 +25,7 @@ metadata:
     {{- include "yugabyte.labels" . | indent 4 }}
 data:
 {{- range $index := until ( int ( .Values.replicas.tserver) ) }}
-  yb-tserver-{{.}}-pre_debug_hook.sh: "echo 'hello-from-pre' "
-  yb-tserver-{{.}}-post_debug_hook.sh: "echo 'hello-from-post' "
+  yb-tserver-{{ $index }}-pre_debug_hook.sh: {{ include "yugabyte.debugHook" (dict "Values" $.Values "role" "tserver" "index" $index "phase" "pre") | quote }}
+  yb-tserver-{{ $index }}-post_debug_hook.sh: {{ include "yugabyte.debugHook" (dict "Values" $.Values "role" "tserver" "index" $index "phase" "post") | quote }}
 {{- end }}
 ---

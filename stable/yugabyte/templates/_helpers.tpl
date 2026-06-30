@@ -680,3 +680,20 @@ ipFamilyPolicy: {{ .Values.ipFamilyPolicy }}
     {{- $commonName -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+Resolve a debug hook script for a given role ("master"/"tserver"), replica
+ordinal index, and phase ("pre"/"post"). Returns the per-replica override if one
+is defined for that ordinal+phase, otherwise the role-level default.
+Usage: include "yugabyte.debugHook" (dict "Values" .Values "role" "master" "index" $idx "phase" "pre")
+*/}}
+{{- define "yugabyte.debugHook" -}}
+  {{- $roleHooks := index .Values.debugHooks .role -}}
+  {{- $default := index $roleHooks .phase -}}
+  {{- $override := index ($roleHooks.overrides | default dict) (toString .index) -}}
+  {{- if $override -}}
+    {{- default $default (index $override .phase) -}}
+  {{- else -}}
+    {{- $default -}}
+  {{- end -}}
+{{- end -}}
