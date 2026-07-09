@@ -371,12 +371,18 @@ spec:
             - |
               {{ $serverFqdn := include "yugabyte.server_fqdn" $serviceValues }}
               mkdir -p /mnt/disk0/certs;
-              chmod u+x /mnt/disk0/certs;
-              if [ -L /mnt/disk0/certs/certs ]; then
-                echo "Cleaning up old recursive symlink at /mnt/disk0/certs/certs if it exists";
-                chmod --reference="$(dirname /mnt/disk0/certs)" /mnt/disk0/certs
-                rm -f /mnt/disk0/certs/certs;
+              # On upgrade from a root-run universe, /mnt/disk0/certs and its
+              # contents are owned by UID 0, so
+              # copy-replace to recreate them owned by the current UID.
+              if [ "$(stat -c '%u' /mnt/disk0/certs)" != "$(id -u)" ]; then
+                echo "Reclaiming ownership of /mnt/disk0/certs (owner $(stat -c '%u' /mnt/disk0/certs) -> uid $(id -u))";
+                rm -rf /mnt/disk0/certs_ownfix;
+                mv /mnt/disk0/certs /mnt/disk0/certs_ownfix;
+                mkdir -p /mnt/disk0/certs;
+                cp -R /mnt/disk0/certs_ownfix/. /mnt/disk0/certs/;
+                rm -rf /mnt/disk0/certs_ownfix;
               fi
+              chmod u+x /mnt/disk0/certs;
               echo "Creating ephemeral /opt/certs/yugabyte/ as symlink to persisted /mnt/disk0/certs/"
               ln -sF /mnt/disk0/certs /opt/certs/yugabyte
               # Copy the root CA certificate to the persistent volume
@@ -435,7 +441,7 @@ spec:
                   fieldPath: metadata.namespace
       {{- end }}
       {{- if $enablePgDataOwnershipFixInit }}
-        - name: pgdata-ownership-fix
+        - name: pgdata-ownership-check
           image: {{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}
           imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
           {{- if $root.Values.containerSecurityContext.enabled }}
