@@ -123,7 +123,7 @@ spec:
               - key: no_scrape.yml
                 path: no_scrape.yml
         {{- end }}
-        {{- if .Values.securityContext.enabled }}
+        {{- if eq (include "checkInitPermissionsRequired" .) "true" }}
         - name: init-container-script
           configMap:
             name: {{ .Release.Name }}-yugaware-init
@@ -204,6 +204,30 @@ spec:
       dnsPolicy: {{ . | quote }}
       {{- end }}
       initContainers:
+        {{- if eq (include "checkInitPermissionsRequired" .) "true" }}
+        # Fix on-disk permissions (e.g. pem files, provision scripts) for every
+        # non-root deployment (general non-root or OCP).
+        - image: {{ include "full_yugaware_image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.initContainers.initPermissions.resources }}
+          resources: {{- toYaml .Values.initContainers.initPermissions.resources | nindent 12 }}
+          {{ end -}}
+          name: init-permissions
+          command:
+            - 'bash'
+            - '-c'
+            - |
+              /bin/bash /init-container/init-permissions.sh;
+          {{- if .Values.containerSecurityContext.enabled }}
+          {{- include "getSecurityContext" . | indent 10 }}
+          {{- end }}
+          volumeMounts:
+          - name: yugaware-storage
+            mountPath: /opt/yugabyte/yugaware/data/
+            subPath: data
+          - name: init-container-script
+            mountPath: /init-container
+        {{- end }}
         {{- if .Values.prometheus.enabled }}
         - image: {{ include "full_yugaware_image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -211,19 +235,11 @@ spec:
           resources: {{- toYaml .Values.initContainers.prometheusConfiguration.resources | nindent 12 }}
           {{ end -}}
           name: prometheus-configuration
-          {{- if .Values.securityContext.enabled }}
-          command:
-            - 'bash'
-            - '-c'
-            - |
-              cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && /bin/bash /init-container/init-permissions.sh && /bin/bash /prometheus-init/init-prometheus.sh;
-          {{- else }}
           command:
             - 'bash'
             - '-c'
             - |
               cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && /bin/bash /prometheus-init/init-prometheus.sh;
-          {{- end }}
           {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | indent 10 }}
           {{- end }}
@@ -240,13 +256,6 @@ spec:
             subPath: prometheus_data
           - name: prometheus-init-script
             mountPath: /prometheus-init
-          {{- if .Values.securityContext.enabled }}
-          - name: yugaware-storage
-            mountPath: /opt/yugabyte/yugaware/data/
-            subPath: data
-          - name: init-container-script
-            mountPath: /init-container
-          {{- end }}
         {{- end }}
         {{- if .Values.securityContext.enabled }}
         {{- if not .Values.useYugabyteDB }}

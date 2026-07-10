@@ -1,4 +1,4 @@
-{{- if .Values.securityContext.enabled }}
+{{- if eq (include "checkInitPermissionsRequired" .) "true" }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
