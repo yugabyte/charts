@@ -503,6 +503,14 @@ initContainers:
         cpu: "0.25"
         memory: 500Mi
 
+  ## Fixes on-disk permissions for non-root deployments (general non-root or
+  ## OpenShift).
+  initPermissions:
+    resources:
+      requests:
+        cpu: "0.25"
+        memory: 500Mi
+
   dbInit:
     resources:
       requests:

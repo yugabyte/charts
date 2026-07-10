@@ -198,6 +198,21 @@ Check export of nss_wrapper environment variables required
   {{- end -}}
 {{- end -}}
 
+{{/*
+Check if the init-permissions init container should run.
+It must run for every non-root case: either the pod-level securityContext is
+enabled (general non-root), or we are on OpenShift where securityContext is
+disabled but an arbitrary non-root UID is assigned by the platform (OCP).
+It is independent of Prometheus.
+*/}}
+{{- define "checkInitPermissionsRequired" -}}
+  {{- if or .Values.securityContext.enabled .Values.ocpCompatibility.enabled -}}
+    {{- printf "true" -}}
+  {{- else -}}
+    {{- printf "false" -}}
+  {{- end -}}
+{{- end -}}
+
 
 {{/*
   Verify the extraVolumes and extraVolumeMounts mappings.
