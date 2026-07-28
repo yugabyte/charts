@@ -982,14 +982,15 @@ otelCollector:
   #     telemetry:
   #       metrics: {address: '0.0.0.0:8889'}
 
-  resources: {}
-  # resources:
-  #   requests:
-  #     cpu: "100m"
-  #     memory: "256Mi"
-  #   limits:
-  #     cpu: "200m"
-  #     memory: "512Mi"
+  
+  # For high volume query logging, raise the CPU limit (or drop it) rather than the memory limit --
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
 
   # Add secret environment variables here if using AWS CloudWatch or GCP Log Explorer.
   secretEnv: []
