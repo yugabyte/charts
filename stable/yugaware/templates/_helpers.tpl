@@ -257,10 +257,10 @@ It is independent of Prometheus.
 {{- define "getSecurityContext" }}
 securityContext:
   runAsUser: {{ required "runAsUser cannot be empty" .Values.containerSecurityContext.runAsUser }}
-  {{- if ne .Values.securityContext.runAsGroup nil }}
-  runAsGroup: {{ .Values.securityContext.runAsGroup }}
+  {{- if ne .Values.containerSecurityContext.runAsGroup nil }}
+  runAsGroup: {{ .Values.containerSecurityContext.runAsGroup }}
   {{- else }}
-  runAsGroup: {{ .Values.securityContext.runAsUser }}
+  runAsGroup: {{ .Values.containerSecurityContext.runAsUser }}
   {{- end }}
   runAsNonRoot: {{ .Values.containerSecurityContext.runAsNonRoot }}
   {{- if .Values.containerSecurityContext.additionalSettings }}
