@@ -589,6 +589,12 @@ data:
           - files:
             - '/opt/yugabyte/prometheus/targets/node-agent.*.json'
 
+      - job_name: 'otel-collector'
+        metrics_path: "/metrics"
+        file_sd_configs:
+          - files:
+            - '/opt/yugabyte/prometheus/targets/otel.*.json'
+
       - job_name: "node"
         file_sd_configs:
           - files:
