@@ -206,11 +206,15 @@ postgres:
     huge_pages: off
 
   service:
-    ## Expose internal Postgres as a Service
-    enabled: false
+    ## Expose the database YugabyteDB Anywhere uses as a Service named
+    ## <release>-postgres, so other pods in the namespace can reach it. Required by the
+    ## perf-advisor sub-chart. The Service follows whichever backend is in use - the
+    ## bundled postgres, YugabyteDB (useYugabyteDB), or an external server
+    ## (postgres.external.host).
+    enabled: true
     ## Additional Service annotations
     annotations: {}
-    ## Service type
+    ## Service type. Ignored when postgres.external.host is set.
     type: "ClusterIP"
     ## IP address for the LoadBalancer, works only if supported by the cloud provider
     ip: ""
@@ -486,6 +490,13 @@ prometheus:
   ## Enabling 'selfmonitor' allows Prometheus to collect and monitor its metrics.
   selfMonitor: true
 
+  ## Accept Prometheus remote-write from other pods (--web.enable-remote-write-receiver).
+  ## The perf-advisor sub-chart remote-writes the metrics it collects into this Prometheus,
+  ## so it needs this enabled. Note that port 9090 is published on the
+  ## <release>-yugaware-ui Service, so wherever that Service is reachable, so is the
+  ## remote-write endpoint - set this to false if you do not want that.
+  enableRemoteWriteReceiver: true
+
 # Arbitrary key=value config entries for application.docker.conf
 additionalAppConf:
   stringConf: {}
@@ -531,3 +542,72 @@ initContainers:
 
 preupgradeChecks:
   enabled: true
+
+## Perf Advisor, deployed as a sub-chart from charts/perf-advisor-chart.
+##
+## Set perf-advisor-chart.yugaware.enabled to false to skip it entirely - nothing from the
+## sub-chart is rendered. Leaving it true deploys Perf Advisor alongside YugabyteDB
+## Anywhere, reusing this chart's PostgreSQL and Prometheus rather than standing up its own:
+##
+##   postgres   <release>-postgres:5432, database "ts" (Perf Advisor creates it on first
+##              start), password from the <release>-yugaware-global-config secret.
+##              Needs postgres.service.enabled above.
+##   prometheus http://<release>-yugaware-ui:9090, for both queries and remote-write.
+##              Needs yugaware.service.enabled and prometheus.enableRemoteWriteReceiver.
+##
+## IMPORTANT: Helm resolves values before templates render, so this chart cannot pass its
+## own database settings down to the sub-chart - they have to be repeated in the
+## postgres.external block below whenever you move off the defaults:
+##
+##   * changing postgres.user above    -> set postgres.external.user here to match
+##   * postgres.external.* above       -> copy host, port and user into postgres.external
+##                                        here. Leave them empty otherwise, so Perf Advisor
+##                                        reaches the in-pod database over the
+##                                        <release>-postgres Service.
+##   * useYugabyteDB: true             -> set postgres.external.user here to yugabytedb.user
+##   * prometheus.enabled: false above -> set prometheus.external.url here
+##
+## templates/perf-advisor-validation.yaml checks the two copies agree and fails the render
+## with the exact value to fix if they drift apart, so a database change made in one place
+## but not the other cannot silently point Perf Advisor at the wrong server.
+##
+## Two things never need repeating:
+##
+##   password  Perf Advisor reads postgres_password out of <release>-yugaware-global-config,
+##             which this chart already fills with whichever credentials are in use.
+##             (postgres.external.pass on the sub-chart has no effect here - the template
+##             consuming it is skipped in yugaware mode. Use postgres.external.secret
+##             .name/.key to override the password with a different one.)
+##   dbname    Perf Advisor keeps its own "ts" database, separate from YugabyteDB Anywhere's.
+##
+## The database account needs CREATE DATABASE: Perf Advisor creates "ts" on first start. With
+## the bundled PostgreSQL it already has that; on an external server it is yours to grant.
+##
+## The sub-chart's own values.yaml (charts/perf-advisor-chart/values.yaml) documents every
+## other knob - anything set here overrides it.
+perf-advisor-chart:
+  yugaware:
+    enabled: true
+
+  ## The sub-chart defaults to a 'perfadvisorserviceaccount' ServiceAccount and a
+  ## 'perfadvisorsecret' pull secret, neither of which exists in this release. Empty means
+  ## the namespace default ServiceAccount; the pull secret tracks image.pullSecret above.
+  serviceAccountName: ""
+  imagePullSecretName: yugabyte-k8s-pull-secret
+
+  image:
+    postgres:
+      ## Only used by the db-init init container. Matching image.postgres.tag above means
+      ## the node already has this image and does not pull a second postgres.
+      tag: '14.23'
+
+  postgres:
+    ## Must mirror the postgres block above - see the note on this section. Empty host/port
+    ## means "the database in the yugaware pod", reached over the <release>-postgres Service.
+    external:
+      host: ""
+      port: 5432
+      user: postgres
+      ## Perf Advisor's own database, not the one YugabyteDB Anywhere uses. It is created on
+      ## first start, so the account above needs CREATE DATABASE.
+      dbname: ts
