@@ -237,7 +237,6 @@ spec:
             - '-c'
             - |
               cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && /bin/bash /prometheus-init/init-prometheus.sh;
-          {{- end }}
           {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | indent 10 }}
           {{- end }}
