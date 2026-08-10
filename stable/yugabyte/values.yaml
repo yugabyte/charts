@@ -980,7 +980,16 @@ otelCollector:
   #         processors: [attributes/datadog]
   #         exporters: [datadog]
   #     telemetry:
-  #       metrics: {address: '0.0.0.0:8889'}
+  #       metrics:
+  #         readers:
+  #           - pull:
+  #               exporter:
+  #                 prometheus:
+  #                   host: 0.0.0.0
+  #                   port: 8889
+  #                   without_scope_info: true
+  #                   without_type_suffix: true
+  #                   without_units: true
 
   
   # For high volume query logging, raise the CPU limit (or drop it) rather than the memory limit --
