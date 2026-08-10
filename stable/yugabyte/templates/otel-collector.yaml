@@ -33,7 +33,9 @@ spec:
   # config passthrough use their own bundled chart's structured assembly instead.
   config:
 {{ .Values.otelCollector.config | indent 4 }}
-  image: {{ .Values.otelCollector.image | default "otel/opentelemetry-collector-contrib:0.114.0" | quote }}
+  # Keep in step with ManageOtelCollector.OtelCollectorVersion; 0.121.0 is the floor (awss3
+  # s3_partition_format).
+  image: {{ .Values.otelCollector.image | default "otel/opentelemetry-collector-contrib:0.145.0" | quote }}
   ipFamilyPolicy: SingleStack
   managementState: managed
   mode: sidecar
