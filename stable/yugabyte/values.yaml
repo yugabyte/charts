@@ -800,7 +800,10 @@ tserver:
   serviceAccount: ""
 
   ## Memory limit hard % (between 1-100) of the memory limit.
-  memoryLimitHardPercentage: 85
+  ## Kept at 70% to leave headroom for PostgreSQL and other non-TServer memory
+  ## usage in the pod. This matches the VM defaults with the master's share
+  ## added back in, since the master runs in a separate pod on Kubernetes.
+  memoryLimitHardPercentage: 70
 
   ## Readiness Probe
   readinessProbe:
