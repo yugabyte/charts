@@ -100,7 +100,9 @@ spec:
         logs:
           output_paths:
           - /mnt/disk0/otel-collector/logs/otel-collector.logs
-  image: {{ .Values.otelCollector.image | default "otel/opentelemetry-collector-contrib:0.114.0" | quote }}
+  # Keep in step with ManageOtelCollector.OtelCollectorVersion so VM and K8s universes in a
+  # release run the same collector build.
+  image: {{ .Values.otelCollector.image | default "otel/opentelemetry-collector-contrib:0.145.0" | quote }}
   ipFamilyPolicy: SingleStack
   managementState: managed
   mode: sidecar
