@@ -74,15 +74,7 @@ spec:
     matchLabels:
       app: {{ .Release.Name }}-yugaware
 {{- end }}
-{{- if and .Values.postgres.service.enabled (not .Values.postgres.external.host) }}
-{{- /*
-  Publishes the in-pod database so other pods in the namespace can reach it. The
-  perf-advisor sub-chart connects here by default, which is why it is on by default.
-
-  Only rendered for the in-pod database. With postgres.external.host set there is no
-  database container in this pod to select, and the sub-chart is pointed straight at the
-  external server through perf-advisor-chart.postgres.external instead - see values.yaml.
-*/}}
+{{- if and (not .Values.useYugabyteDB) .Values.postgres.service.enabled }}
 ---
 apiVersion: v1
 kind: Service
@@ -104,8 +96,7 @@ spec:
   ports:
   - name: postgres
     port: 5432
-    {{- /* YugabyteDB serves YSQL on its own port, so keep 5432 stable for clients. */}}
-    targetPort: {{ .Values.useYugabyteDB | ternary (.Values.yugabytedb.config.ysqlPort | default 5433) 5432 }}
+    targetPort: 5432
   selector:
     app: {{ .Release.Name }}-yugaware
   type: {{ .Values.postgres.service.type }}

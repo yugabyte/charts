@@ -346,19 +346,3 @@ Returns: 1 if version > target, 0 if equal, -1 if version < target. Target is st
   {{- end -}}
   {{- if eq $result 1 -}}1{{- else if eq $result 0 -}}0{{- else -}}-1{{- end -}}
 {{- end -}}
-
-{{/*
-Get the "platform url" for yba <-> pa integration. Leverage the yugaware-ui service for the hostname
-Arg1: .Values.tls.enabled
-Arg2: .Release.Name
-*/}}
-{{- define "yugaware.getPlatformUrl -}}
-  {{- $args := . -}}
-  {{- $tlsEnabled := index $args 0 -}}
-  {{- $releaseName := index $args 1 -}}
-  {{- if $enabled -}}
-https://{{ $releaseName }}-yugaware-ui:443
-  {{- else -}}
-http://{{ $releaseName }}-yugaware-ui:80
-  {{- end -}}
-{{- end -}}

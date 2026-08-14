@@ -30,10 +30,3 @@ securityContext:
 
 containerSecurityContext:
   enabled: false
-
-## Perf Advisor is not shipped on OpenShift: its image is not UBI based, so it does not
-## belong in the RH certified bundle, and the sub-chart has no securityContext plumbing for
-## the restricted SCC.
-perf-advisor-chart:
-  yugaware:
-    enabled: false

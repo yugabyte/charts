@@ -132,21 +132,6 @@ data:
     {{- if eq .Values.ip_version_support "v6_only" }}
       env_proxy_selector.enabled = false
     {{- end }}
-    {{- /*
-      The sub-chart's values live under a key with dashes, which a field selector cannot
-      express (.Values.perf-advisor-chart parses as subtraction) - hence index.
-    */}}
-    {{- $pa := (index .Values "perf-advisor-chart") | default dict }}
-    {{- if (($pa.yugaware) | default dict).enabled }}
-      {{- $paPort := include "getServicePort" (dict "Values" $pa) }}
-      {{- if (($pa.tls) | default dict).enabled }}
-      pa.url = "https://{{ .Release.Name }}-perf-advisor-service:{{ $paPort }}"
-      {{- else }}
-      pa.url = "http://{{ .Release.Name }}-perf-advisor-service:{{ $paPort }}"
-      {{- end }}
-      pa.api_token = ${PA_API_TOKEN}
-      platform.url = "{{ include "yugaware.getPlatformUrl" .Values.tls.enabled .Release.Name }}"
-    {{- end }}
     }
 
     play.filters {

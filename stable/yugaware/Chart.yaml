@@ -11,15 +11,5 @@ maintainers:
   email: sanketh@yugabyte.com
 - name: Govardhan Reddy Jalla
   email: gjalla@yugabyte.com
-dependencies:
-# Perf Advisor. Vendored as charts/perf-advisor-chart-0.3.0.tgz because it is not published
-# to charts.yugabyte.com - see stable/yugaware/README.md for the refresh procedure.
-# The condition doubles as the sub-chart's own "deployed under yugaware" switch: when it is
-# false the chart is not rendered at all, which is what we want (rendering it with
-# yugaware.enabled=false would deploy a second postgres and prometheus).
-- name: perf-advisor-chart
-  version: "1.3.0-b7"
-  repository: "https://releases.yugabyte.com/perf-advisor"
-  condition: perf-advisor-chart.yugaware.enabled
 annotations:
   charts.openshift.io/name: yugaware
