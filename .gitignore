@@ -1,4 +1,10 @@
 # editor and IDE
 .idea
 *.iml
+
+# Yugaware tests
 stable/yugabyte/tests/__snapshot__/
+
+# Yugaware subcharts
+stable/yugaware/charts
+stable/yugaware/Chart.lock
