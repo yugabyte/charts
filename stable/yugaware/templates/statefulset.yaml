@@ -490,6 +490,12 @@ spec:
             - --query.max-concurrency={{ .Values.prometheus.queryConcurrency }}
             - --query.max-samples={{ .Values.prometheus.queryMaxSamples }}
             - --query.timeout={{ .Values.prometheus.queryTimeout }}
+            {{- if .Values.prometheus.enableRemoteWriteReceiver }}
+            # Lets in-cluster clients push metrics in over the 9090 port published on the
+            # {{ .Release.Name }}-yugaware-ui Service. The perf-advisor sub-chart relies on
+            # this to remote-write the metrics it collects.
+            - --web.enable-remote-write-receiver
+            {{- end }}
           ports:
             - containerPort: 9090
         {{- end }}
@@ -563,6 +569,15 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: app_secret
+            {{- if (((index .Values "perf-advisor-chart") | default dict).yugaware | default dict).enabled }}
+            # Referenced as ${PA_API_TOKEN} by pa.api_token in configs.yaml. The secret is
+            # created by the perf-advisor sub-chart, which is why this is gated on it.
+            - name: PA_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-perf-advisor-secret
+                  key: PA_API_TOKEN
+            {{- end }}
             {{- with .Values.yugaware.extraEnv }}{{ toYaml . | nindent 12 }}{{ end }}
           ports:
             - containerPort: 9000
