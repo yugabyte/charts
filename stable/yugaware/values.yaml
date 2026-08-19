@@ -32,17 +32,17 @@ image:
 
   postgres:
     # For non default postgres image, set postgres.sampleConfig values accordingly.
-    registry: ""
+    registry: quay.io/yugabyte
     tag: '14.23'
-    name: postgres
+    name: hardened-postgres
     # Postgres postgresql.conf.sample location on container. This will be used to mount
     # configmap with custom settings.
     sampleConfLocation: /usr/share/postgresql/postgresql.conf.sample
 
   prometheus:
-    registry: ""
-    tag: v3.13.1
-    name: prom/prometheus
+    registry: quay.io/yugabyte
+    tag: 3.13.2
+    name: hardened-prometheus
 
   ybdb:
     registry: ""
