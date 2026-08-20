@@ -67,6 +67,9 @@ spec:
       - name: post-install-job
         image: {{ include "full_yugaware_image" . }}
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- if .Values.hooks.postInstallJob.resources }}
+        resources: {{- toYaml .Values.hooks.postInstallJob.resources | nindent 10 }}
+        {{- end }}
         command:
         - "curl"
         - "-X"
