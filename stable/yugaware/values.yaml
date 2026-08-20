@@ -531,3 +531,40 @@ initContainers:
 
 preupgradeChecks:
   enabled: true
+
+## Resources for the containers of the short-lived Helm hook Jobs. These run
+## outside the yugaware pod, so they are not covered by the settings above.
+## Clusters with a policy that every container declares requests and limits
+## need these; adjust them to satisfy any namespace LimitRange.
+hooks:
+  ## Pre-upgrade check, gated by preupgradeChecks.enabled above. Runs the
+  ## yugaware JVM, so it needs more headroom than the other hooks.
+  nodeAgentPrecheck:
+    resources:
+      requests:
+        cpu: "0.25"
+        memory: 256Mi
+      limits:
+        cpu: "0.25"
+        memory: 256Mi
+
+  ## Pre-upgrade postgres password sync. Runs a single kubectl exec.
+  pgPasswordUpdate:
+    resources:
+      requests:
+        cpu: "0.1"
+        memory: 128Mi
+      limits:
+        cpu: "0.1"
+        memory: 128Mi
+
+  ## Post-install customer registration, gated by
+  ## yugaware.defaultUser.enabled. Runs a single curl.
+  postInstallJob:
+    resources:
+      requests:
+        cpu: "0.1"
+        memory: 128Mi
+      limits:
+        cpu: "0.1"
+        memory: 128Mi
