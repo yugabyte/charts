@@ -92,7 +92,7 @@ spec:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_db
             - name: POSTGRES_HOST
-              value: {{ $postgresIp }}
+              value: {{ $postgresIp | quote }}
             - name: POSTGRES_PORT
               {{- if .Values.postgres.external.host }}
               value: {{ .Values.postgres.external.port | quote }}
@@ -133,7 +133,6 @@ metadata:
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 data:
   application.docker.conf: |
-  application.docker.conf: |
     include classpath("application.common.conf")
     play.crypto.secret=${APP_SECRET}
     play.i18n.langs = [ "en" ]
@@ -147,7 +146,7 @@ data:
       default.host="{{ .Values.postgres.external.host }}"
       default.port={{ .Values.postgres.external.port }}
   {{ else }}
-      default.host={{ $postgresIp }}
+      default.host={{ $postgresIp | quote }}
   {{ end }}
   {{- if .Values.useYugabyteDB }}
       default.port={{ .Values.yugabytedb.config.ysqlPort | default "5433" }}
