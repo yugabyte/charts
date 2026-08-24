@@ -60,8 +60,8 @@ Generate app selector.
 app: "{{ .label }}"
 {{- else }}
 app.kubernetes.io/name: "{{ .label }}"
-{{- end }}
 release: {{ .root.Release.Name | quote }}
+{{- end }}
 {{- end }}
 
 {{/*
