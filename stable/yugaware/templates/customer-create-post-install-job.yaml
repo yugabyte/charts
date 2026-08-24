@@ -87,6 +87,9 @@ spec:
         {{- if .Values.containerSecurityContext.enabled }}
         {{- include "getSecurityContext" . | nindent 8 }}
         {{- end }}
+        {{- if .Values.hooks.postInstallJob.resources }}
+        resources: {{- toYaml .Values.hooks.postInstallJob.resources | nindent 10 }}
+        {{- end }}
         command:
         - "curl"
         - "-X"
