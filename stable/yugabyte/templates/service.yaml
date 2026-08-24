@@ -355,8 +355,8 @@ spec:
       dnsPolicy: {{ . | quote }}
       {{- end }}
       {{- $enableCertManagerInit := and $root.Values.tls.enabled $root.Values.tls.certManager.enabled -}}
-      {{- $enablePgDataOwnershipFixInit := and (eq $service.name "yb-tservers") (not $storageEphemeral) -}}
-      {{- if or $enableCertManagerInit $enablePgDataOwnershipFixInit }}
+      {{- $enableDataDirInit := (not $storageEphemeral) -}}
+      {{- if or $enableCertManagerInit $enableDataDirInit }}
       initContainers:
       {{- if $enableCertManagerInit }}
         - name: certmanager-init
@@ -440,34 +440,39 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
       {{- end }}
-      {{- if $enablePgDataOwnershipFixInit }}
-        - name: pgdata-ownership-check
+      {{- if $enableDataDirInit }}
+        - name: data-dir-init
           image: {{ $root.Values.Image.repository }}:{{ $root.Values.Image.tag }}
           imagePullPolicy: {{ $root.Values.Image.pullPolicy }}
           {{- if $root.Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" $root | nindent 10 }}
           {{- end }}
-          env:
-            {{- /* PG_UID is the UID the tserver container runs as; containerSecurityContext overrides podSecurityContext */}}
-            {{- if $root.Values.containerSecurityContext.enabled }}
-            - name: PG_UID
-              value: {{ $root.Values.containerSecurityContext.runAsUser | quote }}
-            {{- else if $root.Values.podSecurityContext.enabled }}
-            - name: PG_UID
-              value: {{ $root.Values.podSecurityContext.runAsUser | quote }}
-            {{- end }}
-            - name: PGDATA_PATH
-              value: "/mnt/disk0/pg_data"
           command:
             - "/bin/bash"
             - "-c"
             - |
               set -euo pipefail
-              PGDATA_REAL_PATH="$(readlink -f "${PGDATA_PATH}" 2>/dev/null || echo "${PGDATA_PATH}")"
-              EXPECTED_UID="${PG_UID:-}"
-              if [[ -z "${EXPECTED_UID}" ]]; then
-                EXPECTED_UID="$(id -u)"
+              # data-dir-init runs as the same uid the DB will run as, so id -u is the
+              # uid these dirs must be owned by.
+              EXPECTED_UID="$(id -u)"
+              # cores: runc creates the main container's missing workingDir as root before
+              # dropping to the non-root user. If the DB can already write cores do nothing
+              # Only when it is genuinely not writable do we recreate it -- via a
+              # rename (mv)Old dumps are disposable; the moved-aside dir is root-owned
+              # so only a privileged step can reclaim its space.
+              mkdir -p /mnt/disk0/cores
+              if touch /mnt/disk0/cores/.data-dir-init-wtest 2>/dev/null; then
+                rm -f /mnt/disk0/cores/.data-dir-init-wtest 2>/dev/null || true
+              else
+                echo "cores not writable by uid ${EXPECTED_UID}; recreating (old dir kept as cores_stale)"
+                mv /mnt/disk0/cores /mnt/disk0/cores_stale 2>/dev/null \
+                  && mkdir -p /mnt/disk0/cores \
+                  || echo "WARNING: could not recreate /mnt/disk0/cores; check /mnt/disk0 permissions" >&2
               fi
+              # pg_data (tserver only; self-skips on master where the path is absent):
+              # reclaim ownership so PostgreSQL's data-dir owner check passes after a
+              # root->non-root migration.
+              PGDATA_REAL_PATH="$(readlink -f /mnt/disk0/pg_data 2>/dev/null || echo /mnt/disk0/pg_data)"
               if [[ -e "${PGDATA_REAL_PATH}" ]]; then
                 OWNER_ID="$(stat -c '%u' "${PGDATA_REAL_PATH}")"
                 if [[ "${OWNER_ID}" != "${EXPECTED_UID}" ]]; then
@@ -503,7 +508,6 @@ spec:
                 - "bash"
                 - "-c"
                 - >
-                  mkdir -p /mnt/disk0/cores;
                   mkdir -p /mnt/disk0/yb-data/scripts;
                   if [ ! -f /mnt/disk0/yb-data/scripts/log_cleanup.sh ]; then
                     if [ -f /home/yugabyte/bin/log_cleanup.sh ]; then
