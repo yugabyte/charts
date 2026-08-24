@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/quintush/helm-unittest/master/schema/helm-testsuite.json
+suite: appselector release label by naming style
+tests:
+- it: oldNamingStyle StatefulSet selector has no release label (master)
+  template: templates/service.yaml
+  release:
+    name: yb-demo
+  set:
+    oldNamingStyle: true
+  documentSelector:
+    path: metadata.name
+    value: yb-master
+  asserts:
+  - equal:
+      path: spec.selector.matchLabels
+      value:
+        app: yb-master
+
+- it: oldNamingStyle StatefulSet selector has no release label (tserver)
+  template: templates/service.yaml
+  release:
+    name: yb-demo
+  set:
+    oldNamingStyle: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.selector.matchLabels
+      value:
+        app: yb-tserver
+
+- it: oldNamingStyle headless Service selector has no release label
+  template: templates/service.yaml
+  release:
+    name: yb-demo
+  set:
+    oldNamingStyle: true
+  documentSelector:
+    path: metadata.name
+    value: yb-masters
+  asserts:
+  - equal:
+      path: spec.selector
+      value:
+        app: yb-master
+
+- it: oldNamingStyle pod template still carries the release label
+  template: templates/service.yaml
+  release:
+    name: yb-demo
+  set:
+    oldNamingStyle: true
+  documentSelector:
+    path: metadata.name
+    value: yb-master
+  asserts:
+  - equal:
+      path: spec.template.metadata.labels.release
+      value: yb-demo
+
+- it: new naming style StatefulSet selector keeps the release label
+  template: templates/service.yaml
+  release:
+    name: yb-demo
+  set:
+    oldNamingStyle: false
+  documentSelector:
+    path: metadata.name
+    value: yb-demo-yugabyte-yb-master
+  asserts:
+  - equal:
+      path: spec.selector.matchLabels
+      value:
+        app.kubernetes.io/name: yb-master
+        release: yb-demo
