@@ -600,7 +600,15 @@ spec:
           {{- $preCommands := ( (eq $service.name "yb-masters") | ternary $root.Values.master.advanced.preCommands $root.Values.tserver.advanced.preCommands ) }} {{- with $preCommands }} {{ . | nindent 12 }} {{- end }}
           {{- if and (not $root.Values.preflight.skipUlimit) (not $root.Values.preflight.skipAll) }}
             if [ -f /home/yugabyte/tools/k8s_preflight.py ]; then
+              {{- if and (eq $service.name "yb-tservers") (not $root.Values.preflight.skipShm) $root.Values.tserver.shm $root.Values.tserver.shm.enabled }}
+              if /home/yugabyte/tools/k8s_preflight.py all --help 2>/dev/null | grep -q -- '--check_shm'; then
+                /home/yugabyte/tools/k8s_preflight.py all --check_shm
+              else
+                /home/yugabyte/tools/k8s_preflight.py all
+              fi
+              {{- else }}
               /home/yugabyte/tools/k8s_preflight.py all
+              {{- end }}
             fi && \
           {{- end }}
           {{- if (and (not $storageEphemeral) (not $root.Values.preflight.skipAll)) }}
@@ -673,6 +681,10 @@ spec:
             mountPath: /tmp
           - name: tserver-gflags
             mountPath: /opt/tserver/conf
+          {{- if and $root.Values.tserver.shm $root.Values.tserver.shm.enabled }}
+          - name: yugabyte-dshm
+            mountPath: /dev/shm
+          {{- end }}
           {{- else if (eq $service.name "yb-masters") }}
           - name: master-gflags
             mountPath: /opt/master/conf
@@ -954,6 +966,12 @@ spec:
         {{- end }}
         - name: tserver-tmp
           emptyDir: {}
+        {{- if and $root.Values.tserver.shm $root.Values.tserver.shm.enabled }}
+        - name: yugabyte-dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ $root.Values.tserver.shm.sizeLimit | quote }}
+        {{- end }}
         {{- end }}
         {{- if $root.Values.tls.enabled }}
         {{- if $root.Values.tls.certManager.enabled }}

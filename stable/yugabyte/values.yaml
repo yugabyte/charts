@@ -795,6 +795,14 @@ tserver:
   #   path: /home/yugabyte/nfs-backup
   extraVolumeMounts: []
 
+  ## Container /dev/shm (tmpfs). Kubernetes defaults this to 64Mi; PG-TServer
+  ## shared memory (big_shared_memory_allocated_limit) can allocate up to 128Mi.
+  ## Memory emptyDir counts against the pod memory limit. Disable if you already
+  ## mount /dev/shm via extraVolumes.
+  shm:
+    enabled: true
+    sizeLimit: 256Mi
+
   ## Set service account for tserver DB pods. The service account
   ## should exist in the namespace where the tserver DB pods are brought up.
   serviceAccount: ""
@@ -895,6 +903,10 @@ preflight:
   ## Set to true to skip ulimit verification
   ## SkipAll has higher priority
   skipUlimit: false
+
+  ## Set to true to skip tserver /dev/shm size verification
+  ## SkipAll has higher priority. Only applied when tserver.shm.enabled is true.
+  skipShm: false
 
 ## Liveness Probe configuration for both master and tserver pods
 livenessProbe:
