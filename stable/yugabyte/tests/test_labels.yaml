@@ -529,36 +529,26 @@ tests:
       app.kubernetes.io/name: overridden-name
       release: overridden-release
       environment: production
+  documentSelector:
+    path: kind
+    value: StatefulSet
   asserts:
-  # Verify StatefulSet exists at documentIndex 2
-  - matchRegex:
-      path: kind
-      pattern: StatefulSet
-      documentIndex: 2
   # Selector should use service-specific app label, not overridden value
   - equal:
       path: spec.selector.matchLabels['app.kubernetes.io/name']
       value: yb-master
-      documentIndex: 2
   - exists:
       path: spec.selector.matchLabels.release
-      documentIndex: 2
   # Pod template should also have service-specific app label
   - equal:
       path: spec.template.metadata.labels['app.kubernetes.io/name']
       value: yb-master
-      documentIndex: 2
   - exists:
       path: spec.template.metadata.labels.release
-      documentIndex: 2
   # Custom labels should still be present
-  - exists:
-      path: spec.template.metadata.labels.environment
-      documentIndex: 2
   - equal:
       path: spec.template.metadata.labels.environment
       value: production
-      documentIndex: 2
 
 # Test custom labels on multiple object types
 - it: custom labels appear on ConfigMap

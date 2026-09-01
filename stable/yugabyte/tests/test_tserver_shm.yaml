@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/quintush/helm-unittest/master/schema/helm-testsuite.json
+suite: tserver /dev/shm Memory emptyDir
+tests:
+- it: mounts yugabyte-dshm on tserver by default
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - contains:
+      path: spec.template.spec.volumes
+      content:
+        name: yugabyte-dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "256Mi"
+  - contains:
+      path: spec.template.spec.containers[0].volumeMounts
+      content:
+        name: yugabyte-dshm
+        mountPath: /dev/shm
+
+- it: does not mount yugabyte-dshm on master
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+  documentSelector:
+    path: metadata.name
+    value: yb-master
+  asserts:
+  - notContains:
+      path: spec.template.spec.volumes
+      content:
+        name: yugabyte-dshm
+
+- it: omits yugabyte-dshm when tserver.shm.enabled is false
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    tserver.shm.enabled: false
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - notContains:
+      path: spec.template.spec.volumes
+      content:
+        name: yugabyte-dshm
