@@ -638,7 +638,7 @@ perf-advisor-chart:
       ## the node already has this image and does not pull a second postgres.
       tag: '14.23'
     perfAdvisor:
-      tag: '1.4.0-b10'
+      tag: '1.4.0-b12'
 
   postgres:
     ## Must mirror the postgres block above - see the note on this section. Empty host/port
