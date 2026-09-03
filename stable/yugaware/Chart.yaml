@@ -13,7 +13,7 @@ maintainers:
   email: gjalla@yugabyte.com
 dependencies:
 - name: perf-advisor-chart
-  version: "1.3.0-b12"
+  version: "1.4.0-b12"
   repository: "https://releases.yugabyte.com/perf-advisor"
   condition: perf-advisor-chart.yugaware.enabled
 annotations:
