@@ -2,6 +2,892 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  name: ybcertificates.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: ybcertificates
+    singular: ybcertificate
+    kind: YBCertificate
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: >
+            Custom resource definition for YugabyteDB certificate management configuration.
+          type: object
+          properties:
+            status:
+              description: >
+                Certificate management status for the YBCertificate custom resource.
+              type: object
+              properties:
+                message:
+                  description: String log message from certificate controller.
+                  type: string
+                success:
+                  description: >
+                    Boolean indicating if the certificate configuration was successfully created.
+                  type: boolean
+                resourceUUID:
+                  description: Internal UUID of the certificate configuration resource.
+                  type: string
+            spec:
+              type: object
+              description: >
+                Specification for the YBCertificate resource.
+                Required fields: certType, certificateSecretRef
+              required:
+                - certType
+                - certificateSecretRef
+              properties:
+                certType:
+                  description:
+                    Type of certificate configuration to be created.
+                    Allowed values - SELF_SIGNED, K8S_CERT_MANAGER
+                  type: string
+                  enum:
+                    - SELF_SIGNED
+                    - K8S_CERT_MANAGER
+                  x-kubernetes-validations:
+                    - rule: "self in ['SELF_SIGNED', 'K8S_CERT_MANAGER']"
+                      message: "certType must be either SELF_SIGNED or K8S_CERT_MANAGER"
+
+                # Certificate secret reference (common for both types)
+                certificateSecretRef:
+                  description: |
+                    Secret reference containing certificate and key content.
+                    For SELF_SIGNED: secret must contain both 'ca.crt' and 'ca.key'
+                    For K8S_CERT_MANAGER: secret must contain 'ca.crt'
+                    Recommended to use type: "tls" for better Kubernetes integration
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the secret (required)
+                      x-kubernetes-validations:
+                        - rule: "self.size() > 0"
+                          message: "name cannot be empty"
+                    namespace:
+                      type: string
+                      description: |
+                        Namespace of the secret (optional, defaults to the namespace
+                        where the YBCertificate is created)
+                      x-kubernetes-validations:
+                        - rule: "self.size() > 0"
+                          message: "name cannot be empty"
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: support-bundles.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: support-bundles
+    singular: support-bundle
+    kind: SupportBundle
+    shortNames:
+    - sb
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: >
+            Custom resource definition for YugabyteDB support bundle to capture logs,
+            events in case of failures.
+          type: object
+          properties:
+            status:
+              description: Support bundle status for the support bundle custom resource.
+              type: object
+              properties:
+                status:
+                  description: >
+                    Status of the support bundle.
+                    Allowed values - generating, ready, failed
+                  type: string
+                  enum:
+                  - generating
+                  - ready
+                  - failed
+                access:
+                  description: Access details for the generated support bundle to download.
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the support bundle resource.
+                  type: string
+            spec:
+              type: object
+              properties:
+                universeName:
+                  description: >
+                    Name of the universe for which support bundle is to be generated,
+                    refers to a ybuniverse CR name.
+                  type: string
+                collectionTimerange:
+                  description: Time range for which logs and events are to be collected.
+                  type: object
+                  properties:
+                    startDate:
+                      description: Start date for the logs and events collection.
+                      type: string
+                      example: 2022-12-12T13:07:18Z,
+                      format: date-time
+                    endDate:
+                      description: End date for the logs and events collection.
+                      type: string
+                      example: 2022-12-12T13:07:18Z,
+                      format: date-time
+                  required:
+                  - startDate
+                components:
+                  description: >
+                    Components for which logs and events are to be collected. If not provided, all
+                    components will be collected.
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                    - UniverseLogs
+                    - ApplicationLogs
+                    - OutputFiles
+                    - ErrorFiles
+                    - CoreFiles
+                    - GFlags
+                    - Instance
+                    - ConsensusMeta
+                    - TabletMeta
+                    - YbcLogs
+                    - K8sInfo
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: telemetryproviders.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: telemetryproviders
+    singular: telemetryprovider
+    shortNames:
+      - ytp
+    kind: TelemetryProvider
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Provider
+          type: string
+          description: The telemetry provider backing this configuration
+          jsonPath: .spec.provider
+        - name: State
+          type: string
+          description: The state of the telemetry provider
+          jsonPath: .status.state
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: >
+            Custom resource definition for a YugabyteDB Anywhere telemetry
+            provider, the export destination used by DB audit logs, query logs
+            and metrics export. The whole spec is immutable: YBA exposes no edit
+            API for a telemetry provider, so changing any setting (credentials
+            included) requires deleting this resource and creating a new one,
+            which YBA only allows while no universe references the provider.
+          type: object
+          properties:
+            status:
+              description: Telemetry provider status for the telemetry provider custom resource.
+              type: object
+              properties:
+                state:
+                  description: >
+                    State of the telemetry provider: Ready, Error, or InUse when a
+                    delete was refused because a universe still exports to it.
+                  type: string
+                resourceUUID:
+                  description: >
+                    Internal UUID of the telemetry provider in YBA. Empty until the
+                    provider has been created; a non-empty value tells the operator the
+                    provider already exists and must not be created again.
+                  type: string
+                taskUUID:
+                  description: Internal UUID of the most recent task associated with the telemetry provider.
+                  type: string
+                message:
+                  description: >
+                    Message for the telemetry provider (validation errors, runtime-flag
+                    gating, connectivity failures, etc.).
+                  type: string
+            spec:
+              type: object
+              x-kubernetes-validations:
+                - rule: "(self.provider == 'DATA_DOG') == has(self.dataDog)"
+                  message: "dataDog must be set if and only if provider is DATA_DOG"
+                - rule: "(self.provider == 'SPLUNK') == has(self.splunk)"
+                  message: "splunk must be set if and only if provider is SPLUNK"
+                - rule: "(self.provider == 'AWS_CLOUDWATCH') == has(self.awsCloudWatch)"
+                  message: "awsCloudWatch must be set if and only if provider is AWS_CLOUDWATCH"
+                - rule: "(self.provider == 'GCP_CLOUD_MONITORING') == has(self.gcpCloudMonitoring)"
+                  message: "gcpCloudMonitoring must be set if and only if provider is GCP_CLOUD_MONITORING"
+                - rule: "(self.provider == 'LOKI') == has(self.loki)"
+                  message: "loki must be set if and only if provider is LOKI"
+                - rule: "(self.provider == 'DYNATRACE') == has(self.dynatrace)"
+                  message: "dynatrace must be set if and only if provider is DYNATRACE"
+                - rule: "(self.provider == 'S3') == has(self.s3)"
+                  message: "s3 must be set if and only if provider is S3"
+                - rule: "(self.provider == 'OTLP') == has(self.otlp)"
+                  message: "otlp must be set if and only if provider is OTLP"
+              properties:
+                provider:
+                  description: Telemetry provider backing this configuration. Immutable once set.
+                  type: string
+                  enum:
+                    - DATA_DOG
+                    - SPLUNK
+                    - AWS_CLOUDWATCH
+                    - GCP_CLOUD_MONITORING
+                    - LOKI
+                    - DYNATRACE
+                    - S3
+                    - OTLP
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "provider is immutable"
+                tags:
+                  description: >
+                    Extra key/value tags attached to every record exported through this
+                    telemetry provider. Immutable.
+                  type: object
+                  default: {}
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "tags is immutable"
+                  additionalProperties:
+                    type: string
+
+                dataDog:
+                  description: >
+                    Configuration for Datadog. Required when provider is DATA_DOG.
+                    Immutable.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "dataDog is immutable"
+                  properties:
+                    site:
+                      description: >
+                        Datadog site the telemetry is sent to, without a scheme
+                        (e.g. datadoghq.com, us3.datadoghq.com, datadoghq.eu).
+                      type: string
+                      minLength: 1
+                    apiKeySecret:
+                      description: Secret holding the Datadog API key.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                          minLength: 1
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                          minLength: 1
+                      required:
+                        - name
+                        - key
+                  required:
+                    - site
+                    - apiKeySecret
+
+                splunk:
+                  description: >
+                    Configuration for Splunk HEC. Required when provider is SPLUNK.
+                    Immutable.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "splunk is immutable"
+                  properties:
+                    endpoint:
+                      description: >
+                        Splunk HTTP Event Collector endpoint
+                        (e.g. https://splunk.example.com:8088/services/collector).
+                      type: string
+                      minLength: 1
+                    tokenSecret:
+                      description: Secret holding the Splunk HEC token.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                          minLength: 1
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                          minLength: 1
+                      required:
+                        - name
+                        - key
+                    source:
+                      description: Optional Splunk source assigned to exported events.
+                      type: string
+                    sourceType:
+                      description: Optional Splunk sourcetype assigned to exported events.
+                      type: string
+                    index:
+                      description: Optional Splunk index the events are written to.
+                      type: string
+                  required:
+                    - endpoint
+                    - tokenSecret
+
+                awsCloudWatch:
+                  description: >
+                    Configuration for AWS CloudWatch Logs. Required when provider is
+                    AWS_CLOUDWATCH. Immutable.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "awsCloudWatch is immutable"
+                  properties:
+                    logGroup:
+                      description: Name of the CloudWatch log group. Required.
+                      type: string
+                      minLength: 1
+                    logStream:
+                      description: Name of the CloudWatch log stream. Required.
+                      type: string
+                      minLength: 1
+                    region:
+                      description: AWS region of the CloudWatch log group. Required.
+                      type: string
+                      minLength: 1
+                    # Spelled roleARN, not roleArn, to match the Java field
+                    # AWSCloudWatchConfig.roleARN so the spec sub-object converts
+                    # directly. S3Config spells the same concept roleArn; the two
+                    # Java classes disagree and the CRD mirrors each faithfully.
+                    roleARN:
+                      description: >
+                        Optional ARN of a role the exporter assumes before writing to
+                        CloudWatch.
+                      type: string
+                    endpoint:
+                      description: Optional custom CloudWatch Logs endpoint.
+                      type: string
+                    accessKeyIdSecret:
+                      description: Secret holding the AWS access key ID.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                          minLength: 1
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                          minLength: 1
+                      required:
+                        - name
+                        - key
+                    secretAccessKeySecret:
+                      description: Secret holding the AWS secret access key.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                          minLength: 1
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                          minLength: 1
+                      required:
+                        - name
+                        - key
+                  required:
+                    - logGroup
+                    - logStream
+                    - region
+                    - accessKeyIdSecret
+                    - secretAccessKeySecret
+
+                gcpCloudMonitoring:
+                  description: >
+                    Configuration for GCP Cloud Monitoring / Cloud Logging. Required when
+                    provider is GCP_CLOUD_MONITORING. Immutable.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "gcpCloudMonitoring is immutable"
+                  properties:
+                    project:
+                      description: >
+                        GCP project ID the logs are written to. Optional only when the
+                        service account credentials JSON carries a project_id; otherwise
+                        required.
+                      type: string
+                    credentialsSecret:
+                      description: >
+                        Secret holding the GCP service account credentials JSON. The
+                        service account needs the logging.logEntries.create and
+                        logging.logEntries.route permissions.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                          minLength: 1
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the JSON.
+                          type: string
+                          minLength: 1
+                      required:
+                        - name
+                        - key
+                  required:
+                    - credentialsSecret
+
+                loki:
+                  description: >
+                    Configuration for Grafana Loki. Required when provider is LOKI.
+                    Immutable.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "loki is immutable"
+                    - rule: "(self.authType == 'BasicAuth') == has(self.basicAuth)"
+                      message: "basicAuth must be set if and only if authType is BasicAuth"
+                  properties:
+                    endpoint:
+                      description: >
+                        Base URL of the Loki server (e.g. http://loki.example.com:3100).
+                        Any trailing slash and any trailing /loki/api/v1/push suffix are
+                        stripped by YBA.
+                      type: string
+                      minLength: 1
+                    authType:
+                      description: >
+                        Authentication method used against Loki. Bearer token
+                        authentication is not supported by this provider.
+                      type: string
+                      enum:
+                        - BasicAuth
+                        - NoAuth
+                    organizationID:
+                      description: >
+                        Optional Loki organization/tenant ID, sent as the X-Scope-OrgID
+                        header.
+                      type: string
+                    basicAuth:
+                      description: >
+                        Username and password. Required when authType is BasicAuth, and
+                        must be omitted otherwise.
+                      type: object
+                      properties:
+                        username:
+                          description: Loki username.
+                          type: string
+                          minLength: 1
+                        passwordSecret:
+                          description: Secret holding the password.
+                          type: object
+                          properties:
+                            name:
+                              description: Name of the Secret.
+                              type: string
+                              minLength: 1
+                            namespace:
+                              description: Namespace of the Secret. Defaults to the resource namespace.
+                              type: string
+                            key:
+                              description: Key within the Secret data holding the value.
+                              type: string
+                              minLength: 1
+                          required:
+                            - name
+                            - key
+                      required:
+                        - username
+                        - passwordSecret
+                  required:
+                    - endpoint
+                    - authType
+
+                dynatrace:
+                  description: >
+                    Configuration for Dynatrace. Required when provider is DYNATRACE.
+                    Immutable.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "dynatrace is immutable"
+                  properties:
+                    endpoint:
+                      description: >
+                        Dynatrace environment URL, including scheme and host
+                        (e.g. https://abc12345.live.dynatrace.com). Trailing slashes are
+                        stripped by YBA.
+                      type: string
+                      minLength: 1
+                      x-kubernetes-validations:
+                        - rule: "self.startsWith('http://') || self.startsWith('https://')"
+                          message: "endpoint must include an http:// or https:// scheme"
+                    apiTokenSecret:
+                      description: >
+                        Secret holding the Dynatrace API token, in <id>.<token> form. The
+                        token needs the metrics.ingest, logs.ingest and
+                        openTelemetryTrace.ingest scopes.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                          minLength: 1
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                          minLength: 1
+                      required:
+                        - name
+                        - key
+                  required:
+                    - endpoint
+                    - apiTokenSecret
+
+                s3:
+                  description: >
+                    Configuration for an S3 bucket export target. Required when provider
+                    is S3. Immutable.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "s3 is immutable"
+                  properties:
+                    region:
+                      description: AWS region of the bucket. Required.
+                      type: string
+                      minLength: 1
+                    bucket:
+                      description: Name of the S3 bucket. Required.
+                      type: string
+                      minLength: 1
+                    directoryPrefix:
+                      description: >
+                        Root directory (key prefix) inside the bucket that exported
+                        objects are written under.
+                      type: string
+                      default: yb-logs/
+                    partition:
+                      description: >
+                        Time granularity of the partition directories created under the
+                        prefix.
+                      type: string
+                      enum:
+                        - hour
+                        - minute
+                      default: minute
+                    roleArn:
+                      description: >
+                        Optional ARN of a role the exporter assumes before writing to the
+                        bucket. Must start with 'arn:'.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: "self == '' || self.startsWith('arn:')"
+                          message: "roleArn must start with 'arn:'"
+                    filePrefix:
+                      description: Prefix prepended to the name of every exported object.
+                      type: string
+                      default: yb-otel-
+                    marshaler:
+                      description: Encoding used for the exported objects.
+                      type: string
+                      enum:
+                        - OTLP_JSON
+                        - SUMO_IC
+                      default: OTLP_JSON
+                    disableSSL:
+                      description: Talk to the endpoint over plain HTTP instead of HTTPS.
+                      type: boolean
+                      default: false
+                    accessKeyIdSecret:
+                      description: Secret holding the AWS access key ID.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                          minLength: 1
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                          minLength: 1
+                      required:
+                        - name
+                        - key
+                    secretAccessKeySecret:
+                      description: Secret holding the AWS secret access key.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                          minLength: 1
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                          minLength: 1
+                      required:
+                        - name
+                        - key
+                    forcePathStyle:
+                      description: >
+                        Force path-style addressing (bucket in the path rather than the
+                        host). Needed by most S3-compatible stores.
+                      type: boolean
+                      default: false
+                    endpoint:
+                      description: >
+                        Optional endpoint override, used instead of deriving the endpoint
+                        from region and bucket. https:// is assumed when no scheme is
+                        given.
+                      type: string
+                    includeUniverseAndNodeInPrefix:
+                      description: >
+                        Append the universe UUID and node name to the prefix, e.g.
+                        'yb-logs/<universe-uuid>/<node-name>'.
+                      type: boolean
+                      default: false
+                  required:
+                    - region
+                    - bucket
+                    - accessKeyIdSecret
+                    - secretAccessKeySecret
+
+                otlp:
+                  description: >
+                    Configuration for a generic OpenTelemetry (OTLP) collector endpoint.
+                    Required when provider is OTLP. Immutable.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "otlp is immutable"
+                    - rule: "(self.authType == 'BasicAuth') == has(self.basicAuth)"
+                      message: "basicAuth must be set if and only if authType is BasicAuth"
+                    - rule: "(self.authType == 'BearerToken') == has(self.bearerToken)"
+                      message: "bearerToken must be set if and only if authType is BearerToken"
+                    - rule: "!has(self.logsEndpoint) || self.logsEndpoint == '' || self.protocol == 'HTTP'"
+                      message: "logsEndpoint is only valid when protocol is HTTP"
+                    - rule: "!has(self.metricsEndpoint) || self.metricsEndpoint == '' || self.protocol == 'HTTP'"
+                      message: "metricsEndpoint is only valid when protocol is HTTP"
+                  properties:
+                    endpoint:
+                      description: >
+                        Endpoint of the OTLP receiver. For the HTTP protocol, '/v1/logs'
+                        is appended for logs export.
+                      type: string
+                      minLength: 1
+                    authType:
+                      description: Authentication method used against the OTLP receiver.
+                      type: string
+                      enum:
+                        - BasicAuth
+                        - NoAuth
+                        - BearerToken
+                    basicAuth:
+                      description: >
+                        Username and password. Required when authType is BasicAuth, and
+                        must be omitted otherwise.
+                      type: object
+                      properties:
+                        username:
+                          description: OTLP receiver username.
+                          type: string
+                          minLength: 1
+                        passwordSecret:
+                          description: Secret holding the password.
+                          type: object
+                          properties:
+                            name:
+                              description: Name of the Secret.
+                              type: string
+                              minLength: 1
+                            namespace:
+                              description: Namespace of the Secret. Defaults to the resource namespace.
+                              type: string
+                            key:
+                              description: Key within the Secret data holding the value.
+                              type: string
+                              minLength: 1
+                          required:
+                            - name
+                            - key
+                      required:
+                        - username
+                        - passwordSecret
+                    bearerToken:
+                      description: >
+                        Bearer token credentials. Required when authType is BearerToken,
+                        and must be omitted otherwise.
+                      type: object
+                      properties:
+                        tokenSecret:
+                          description: Secret holding the bearer token.
+                          type: object
+                          properties:
+                            name:
+                              description: Name of the Secret.
+                              type: string
+                              minLength: 1
+                            namespace:
+                              description: Namespace of the Secret. Defaults to the resource namespace.
+                              type: string
+                            key:
+                              description: Key within the Secret data holding the value.
+                              type: string
+                              minLength: 1
+                          required:
+                            - name
+                            - key
+                      required:
+                        - tokenSecret
+                    headers:
+                      description: >
+                        Extra headers sent with every OTLP request. Do not put credentials
+                        here; use basicAuth or bearerToken instead.
+                      type: object
+                      additionalProperties:
+                        type: string
+                    compression:
+                      description: Compression applied to exported payloads.
+                      type: string
+                      enum:
+                        - gzip
+                        - none
+                        - snappy
+                        - zstd
+                      default: gzip
+                    timeoutSeconds:
+                      description: Per-request timeout in seconds. Must be positive.
+                      type: integer
+                      format: int32
+                      default: 5
+                      x-kubernetes-validations:
+                        - rule: self > 0
+                          message: "timeoutSeconds must be positive"
+                    protocol:
+                      description: Wire protocol used to reach the OTLP receiver.
+                      type: string
+                      enum:
+                        - gRPC
+                        - HTTP
+                      default: gRPC
+                    logsEndpoint:
+                      description: >
+                        Target URL for log data (e.g. https://example.com:4318/v1/logs).
+                        When set, endpoint is ignored for logs. Only valid when protocol
+                        is HTTP.
+                      type: string
+                    metricsEndpoint:
+                      description: >
+                        Target URL for metric data (e.g.
+                        https://example.com:4318/v1/metrics). When set, endpoint is
+                        ignored for metrics. Only valid when protocol is HTTP.
+                      type: string
+                    retryOnFailure:
+                      description: >
+                        Optional retry-on-failure overrides for the Otel collector
+                        exporter. Unset members keep the YBA defaults.
+                      type: object
+                      properties:
+                        enabled:
+                          description: Whether retry on failure is enabled.
+                          type: boolean
+                        initialInterval:
+                          description: >
+                            Initial interval between retries, as an Otel collector duration
+                            string (e.g. "30s", "1m"). Maps to initial_interval.
+                          type: string
+                          pattern: '^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h))+$'
+                        maxInterval:
+                          description: >
+                            Maximum interval between retries, as an Otel collector duration
+                            string (e.g. "10m", "1800m"). Maps to max_interval.
+                          type: string
+                          pattern: '^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h))+$'
+                        maxElapsedTime:
+                          description: >
+                            Maximum elapsed time across all retries, as an Otel collector
+                            duration string (e.g. "60m", "1800m"). Maps to max_elapsed_time.
+                          type: string
+                          pattern: '^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h))+$'
+                  required:
+                    - endpoint
+                    - authType
+              required:
+                - provider
+          required:
+            - spec
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
   name: backups.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
@@ -77,20 +963,138 @@ spec:
                     Base backup Custom Resource name. Operator will add an incremental backup
                     to the existing chain of backups at the last.
                   type: string
-                useTablespaces:
-                  description: Include tablespace information in the backup.
-                  type: boolean
-                  default: false
-                useRoles:
-                  description: Backup global YSQL roles.
-                  type: boolean
-                  default: false
-                usePrivileges:
+              required:
+              - keyspace
+              - backupType
+              - storageConfig
+              - universe
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: backupschedules.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: backupschedules
+    singular: backupschedule
+    kind: BackupSchedule
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: Custom resource definition for YugabyteDB backup schedules.
+          type: object
+          properties:
+            status:
+              type: object
+              description: Schedule status for the backup schedule custom resource.
+              properties:
+                nextBackupTime:
+                  description: Timestamp of the next backup in UTC.
+                  type: string
+                previousBackupTime:
+                  description: Time of the previous backup in UTC.
+                  type: string
+                scheduleUUID:
+                  description: Internal UUID of the backup schedule resource.
+                  type: string
+                state:
+                  description: State of schedule
+                  type: string
+
+            spec:
+              type: object
+              x-kubernetes-validations:
+                - rule: self.schedulingFrequency != 0 || self.cronExpression != ''
+                  message: >
+                    "Either 'schedulingFrequency' must be non-zero or
+                    'cronExpression' must be a non-empty string."
+              properties:
+                name:
+                  type: string
+                  description: Optional name of backup schedule for mapping to a YBA object.
+                  x-kubernetes-validations:
+                  - message: name cannot be changed
+                    rule: self == oldSelf
+                backupType:
                   description: >
-                    Backup privileges for roles.
-                    If false, --no-privileges will be added to the backup command.
+                    Type of backup to be taken.
+                    Allowed values are -
+                    YQL_TABLE_TYPE PGSQL_TABLE_TYPE
+                  type: string
+                  enum:
+                    - YQL_TABLE_TYPE
+                    - PGSQL_TABLE_TYPE
+                  x-kubernetes-validations:
+                  - message: backupType cannot be changed
+                    rule: self == oldSelf
+                storageConfig:
+                  description: >
+                    Storage configuration for the backup,
+                    refers to a storageconfig CR name. Should be in the same namespace
+                    as the backupschedule.
+                  type: string
+                  x-kubernetes-validations:
+                  - message: storageConfig cannot be changed
+                    rule: self == oldSelf
+                universe:
+                  description: >
+                    Name of the universe for which backup is to be taken,
+                    refers to a ybuniverse CR name. Should be in the same namespace
+                    as the backupschedule.
+                  type: string
+                  x-kubernetes-validations:
+                  - message: universe cannot be changed
+                    rule: self == oldSelf
+                tableByTableBackup:
+                  description: Boolean indicating if backup is to be taken table by table.
                   type: boolean
-                  default: true
+                  x-kubernetes-validations:
+                  - message: tableByTableBackup cannot be changed
+                    rule: self == oldSelf
+                keyspace:
+                  description: Name of keyspace to be backed up.
+                  type: string
+                  x-kubernetes-validations:
+                  - message: keyspace cannot be changed
+                    rule: self == oldSelf
+                timeBeforeDelete:
+                  description: Time before backup is deleted from storage in milliseconds.
+                  type: integer
+                  minimum: 0
+                  x-kubernetes-validations:
+                  - message: timeBeforeDelete cannot be changed
+                    rule: self == oldSelf
+                schedulingFrequency:
+                  description: Frequency of full backups in milliseconds.
+                  type: integer
+                  minimum: 3600000
+                cronExpression:
+                  description: Frequency of full backups in cron expression.
+                  type: string
+                  default: ''
+                incrementalBackupFrequency:
+                  description: Frequency of incremental backups in milliseconds
+                  type: integer
+                  minimum: 0
+                enablePointInTimeRestore:
+                  description: Enable Point in time restore for backups created with the schedule
+                  type: boolean
+                  default: false
+                  x-kubernetes-validations:
+                  - message: enablePointInTimeRestore cannot be changed
+                    rule: self == oldSelf
               required:
               - keyspace
               - backupType
@@ -725,230 +1729,6 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: restorejobs.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: restorejobs
-    singular: restorejob
-    kind: RestoreJob
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          description: Custom resource definition for YugabyteDB restore job
-          properties:
-            status:
-              type: object
-              description: Restore job status for the restore job custom resource.
-              properties:
-                message:
-                  description: String log message from restore job controller
-                  type: string
-                taskUUID:
-                  description: >
-                    Internal UUID of the task associated with
-                    the restore job resource.
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the restore operation.
-                  type: string
-            spec:
-              type: object
-              properties:
-                actionType:
-                  description: Type of action to be taken. Allowed values - RESTORE
-                  type: string
-                  enum:
-                    - RESTORE
-                universe:
-                  description: >
-                    Name of the universe for which restore is to be taken,
-                    refers to a ybuniverse CR name.
-                  type: string
-                backup:
-                  description: >
-                    Name of the backup to be restored,
-                    refers to a backup CR name.
-                  type: string
-                keyspace:
-                  description: Name of the keyspace to be restored.
-                  type: string
-                useTablespaces:
-                  description: Restore tablespace information from the backup.
-                  type: boolean
-                  default: false
-                useRoles:
-                  description: Restore global YSQL roles from the backup.
-                  type: boolean
-                  default: false
-                usePrivileges:
-                  description: >
-                    Restore privileges for roles.
-                    If false, --no-privileges will be added to the restore command.
-                  type: boolean
-                  default: true
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: backupschedules.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: backupschedules
-    singular: backupschedule
-    kind: BackupSchedule
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: Custom resource definition for YugabyteDB backup schedules.
-          type: object
-          properties:
-            status:
-              type: object
-              description: Schedule status for the backup schedule custom resource.
-              properties:
-                nextBackupTime:
-                  description: Timestamp of the next backup in UTC.
-                  type: string
-                previousBackupTime:
-                  description: Time of the previous backup in UTC.
-                  type: string
-                scheduleUUID:
-                  description: Internal UUID of the backup schedule resource.
-                  type: string
-                state:
-                  description: State of schedule
-                  type: string
-
-            spec:
-              type: object
-              x-kubernetes-validations:
-                - rule: self.schedulingFrequency != 0 || self.cronExpression != ''
-                  message: >
-                    "Either 'schedulingFrequency' must be non-zero or
-                    'cronExpression' must be a non-empty string."
-              properties:
-                name:
-                  type: string
-                  description: Optional name of backup schedule for mapping to a YBA object.
-                  x-kubernetes-validations:
-                  - message: name cannot be changed
-                    rule: self == oldSelf
-                backupType:
-                  description: >
-                    Type of backup to be taken.
-                    Allowed values are -
-                    YQL_TABLE_TYPE PGSQL_TABLE_TYPE
-                  type: string
-                  enum:
-                    - YQL_TABLE_TYPE
-                    - PGSQL_TABLE_TYPE
-                  x-kubernetes-validations:
-                  - message: backupType cannot be changed
-                    rule: self == oldSelf
-                storageConfig:
-                  description: >
-                    Storage configuration for the backup,
-                    refers to a storageconfig CR name. Should be in the same namespace
-                    as the backupschedule.
-                  type: string
-                  x-kubernetes-validations:
-                  - message: storageConfig cannot be changed
-                    rule: self == oldSelf
-                universe:
-                  description: >
-                    Name of the universe for which backup is to be taken,
-                    refers to a ybuniverse CR name. Should be in the same namespace
-                    as the backupschedule.
-                  type: string
-                  x-kubernetes-validations:
-                  - message: universe cannot be changed
-                    rule: self == oldSelf
-                tableByTableBackup:
-                  description: Boolean indicating if backup is to be taken table by table.
-                  type: boolean
-                  x-kubernetes-validations:
-                  - message: tableByTableBackup cannot be changed
-                    rule: self == oldSelf
-                keyspace:
-                  description: Name of keyspace to be backed up.
-                  type: string
-                  x-kubernetes-validations:
-                  - message: keyspace cannot be changed
-                    rule: self == oldSelf
-                timeBeforeDelete:
-                  description: Time before backup is deleted from storage in milliseconds.
-                  type: integer
-                  minimum: 0
-                  x-kubernetes-validations:
-                  - message: timeBeforeDelete cannot be changed
-                    rule: self == oldSelf
-                schedulingFrequency:
-                  description: Frequency of full backups in milliseconds.
-                  type: integer
-                  minimum: 3600000
-                cronExpression:
-                  description: Frequency of full backups in cron expression.
-                  type: string
-                  default: ''
-                incrementalBackupFrequency:
-                  description: Frequency of incremental backups in milliseconds
-                  type: integer
-                  minimum: 0
-                enablePointInTimeRestore:
-                  description: Enable Point in time restore for backups created with the schedule
-                  type: boolean
-                  default: false
-                  x-kubernetes-validations:
-                  - message: enablePointInTimeRestore cannot be changed
-                    rule: self == oldSelf
-                useTablespaces:
-                  description: Include tablespace information in the backup.
-                  type: boolean
-                  default: false
-                useRoles:
-                  description: Backup global YSQL roles.
-                  type: boolean
-                  default: false
-                usePrivileges:
-                  description: >
-                    Backup privileges for roles.
-                    If false, --no-privileges will be added to the backup command.
-                  type: boolean
-                  default: true
-              required:
-              - keyspace
-              - backupType
-              - storageConfig
-              - universe
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
   name: storageconfigs.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
@@ -1103,16 +1883,593 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: support-bundles.operator.yugabyte.io
+  name: kmsconfigs.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
   scope: Namespaced
   names:
-    plural: support-bundles
-    singular: support-bundle
-    kind: SupportBundle
+    plural: kmsconfigs
+    singular: kmsconfig
     shortNames:
-    - sb
+      - ykms
+    kind: KMSConfig
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Provider
+          type: string
+          description: The KMS provider backing this configuration
+          jsonPath: .spec.provider
+        - name: State
+          type: string
+          description: The state of the KMS config
+          jsonPath: .status.state
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: >
+            Custom resource definition for a YugabyteDB Anywhere KMS
+            (encryption at rest) configuration.
+          type: object
+          properties:
+            status:
+              description: KMS config status for the KMS config custom resource.
+              type: object
+              properties:
+                state:
+                  description: State of the KMS config (e.g. Creating, Ready, Error, InUse).
+                  type: string
+                resourceUUID:
+                  description: >
+                    Internal UUID of the KMS config in YBA. Empty until the config
+                    has been created; drives create-vs-edit reconciliation.
+                  type: string
+                taskUUID:
+                  description: Internal UUID of the most recent task associated with the KMS config.
+                  type: string
+                message:
+                  description: Message for the KMS config (validation errors, runtime-flag gating, etc.).
+                  type: string
+            spec:
+              type: object
+              x-kubernetes-validations:
+                - rule: "(self.provider == 'AWS') == has(self.aws)"
+                  message: "aws must be set if and only if provider is AWS"
+                - rule: "(self.provider == 'GCP') == has(self.gcp)"
+                  message: "gcp must be set if and only if provider is GCP"
+                - rule: "(self.provider == 'AZU') == has(self.azure)"
+                  message: "azure must be set if and only if provider is AZU"
+                - rule: "(self.provider == 'OCI') == has(self.oci)"
+                  message: "oci must be set if and only if provider is OCI"
+                - rule: "(self.provider == 'CIPHERTRUST') == has(self.cipherTrust)"
+                  message: "cipherTrust must be set if and only if provider is CIPHERTRUST"
+                - rule: "(self.provider == 'HASHICORP') == has(self.vault)"
+                  message: "vault must be set if and only if provider is HASHICORP"
+              properties:
+                name:
+                  description: Name of the KMS config as registered in YBA. Immutable.
+                  type: string
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "name is immutable"
+                provider:
+                  description: KMS provider backing this configuration. Immutable once set.
+                  type: string
+                  enum:
+                    - AWS
+                    - GCP
+                    - AZU
+                    - OCI
+                    - CIPHERTRUST
+                    - HASHICORP
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "provider is immutable"
+
+                aws:
+                  description: Configuration for AWS KMS. Required when provider is AWS.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: "self.useIAMProfile || (has(self.accessKeyIdSecret) && has(self.secretAccessKeySecret))"
+                      message: "accessKeyIdSecret and secretAccessKeySecret are required unless useIAMProfile is true"
+                  properties:
+                    useIAMProfile:
+                      description: Use the host IAM profile instead of static credentials.
+                      type: boolean
+                      default: false
+                    accessKeyIdSecret:
+                      description: Secret holding the AWS access key ID. Editable (rotatable).
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    secretAccessKeySecret:
+                      description: Secret holding the AWS secret access key. Editable (rotatable).
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    region:
+                      description: AWS region of the KMS key. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "region is immutable"
+                    cmkID:
+                      description: Customer Master Key ID. If empty, YBA creates a CMK. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "cmkID is immutable"
+                    endpoint:
+                      description: Optional custom AWS KMS endpoint. Editable.
+                      type: string
+                    cmkPolicySecret:
+                      description: >
+                        Optional Secret holding a custom CMK policy document (JSON). Applied only
+                        when YBA creates the CMK (i.e. cmkID is not set); ignored once the config
+                        exists. If omitted, the default CMK policy is used.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the policy JSON.
+                          type: string
+                      required:
+                        - name
+                        - key
+                  required:
+                    - region
+
+                gcp:
+                  description: Configuration for GCP KMS. Required when provider is GCP.
+                  type: object
+                  properties:
+                    credentialsSecret:
+                      description: >
+                        Secret holding the GCP service account credentials JSON. Required; the
+                        project ID is read from this JSON. Editable (rotatable).
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the JSON.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    location:
+                      description: GCP KMS location (e.g. global, us-east1). Immutable.
+                      type: string
+                      default: global
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "location is immutable"
+                    keyRingName:
+                      description: Name of the GCP KMS key ring. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyRingName is immutable"
+                    cryptoKeyName:
+                      description: Name of the GCP KMS crypto key. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "cryptoKeyName is immutable"
+                    protectionLevel:
+                      description: Protection level for the crypto key. Immutable.
+                      type: string
+                      enum:
+                        - SOFTWARE
+                        - HSM
+                      default: HSM
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "protectionLevel is immutable"
+                    endpoint:
+                      description: Optional custom GCP KMS endpoint. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "endpoint is immutable"
+                  required:
+                    - credentialsSecret
+                    - keyRingName
+                    - cryptoKeyName
+
+                azure:
+                  description: Configuration for Azure KMS. Required when provider is AZU.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: "self.useManagedIdentity || has(self.clientSecretSecret)"
+                      message: "clientSecretSecret is required unless useManagedIdentity is true"
+                  properties:
+                    useManagedIdentity:
+                      description: >
+                        Authenticate with an Azure managed identity (omit clientSecretSecret)
+                        instead of a service principal. clientID and tenantID are still required.
+                      type: boolean
+                      default: false
+                    clientID:
+                      description: >
+                        Azure client ID (service principal, or the managed identity client ID when
+                        useManagedIdentity is true). Required. Editable.
+                      type: string
+                    clientSecretSecret:
+                      description: Secret holding the Azure client secret. Editable (rotatable).
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    tenantID:
+                      description: Azure Active Directory tenant ID. Required. Editable.
+                      type: string
+                    keyVaultURL:
+                      description: URL of the Azure Key Vault. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyVaultURL is immutable"
+                    keyName:
+                      description: Name of the key within the Key Vault. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyName is immutable"
+                    keyAlgorithm:
+                      description: Key algorithm. Currently only RSA is supported. Immutable.
+                      type: string
+                      enum:
+                        - RSA
+                      default: RSA
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyAlgorithm is immutable"
+                    keySize:
+                      description: Key size in bits. One of 2048, 3072, 4096. Immutable.
+                      type: integer
+                      default: 2048
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keySize is immutable"
+                        - rule: self in [2048, 3072, 4096]
+                          message: "keySize must be one of 2048, 3072, 4096"
+                  required:
+                    - clientID
+                    - tenantID
+                    - keyVaultURL
+                    - keyName
+
+                oci:
+                  description: Configuration for OCI KMS. Required when provider is OCI.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: "self.useInstancePrincipal || (has(self.userOCID) && has(self.tenancyOCID) && has(self.fingerprint) && has(self.privateKeySecret))"
+                      message: "userOCID, tenancyOCID, fingerprint and privateKeySecret are required unless useInstancePrincipal is true"
+                  properties:
+                    useInstancePrincipal:
+                      description: >-
+                        Use the OCI Instance Principal of the YBA host instead of API-key
+                        credentials. The host must belong to a dynamic group with a policy
+                        granting access to the vault and key. Immutable, because the backend
+                        treats the OCI auth type as a non-editable field.
+                      type: boolean
+                      default: false
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "useInstancePrincipal is immutable"
+                    userOCID:
+                      description: OCID of the OCI user. Editable.
+                      type: string
+                    fingerprint:
+                      description: Fingerprint of the API signing key. Editable.
+                      type: string
+                    privateKeySecret:
+                      description: Secret holding the PEM private key. Editable (rotatable).
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the PEM.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    tenancyOCID:
+                      description: OCID of the OCI tenancy. Editable.
+                      type: string
+                    region:
+                      description: OCI region of the vault. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "region is immutable"
+                    compartmentOCID:
+                      description: OCID of the compartment. Editable.
+                      type: string
+                    vaultOCID:
+                      description: OCID of the OCI vault. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "vaultOCID is immutable"
+                    keyName:
+                      description: Name of the key to create or use within the vault. Immutable.
+                      type: string
+                      default: yba-master-key
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyName is immutable"
+                    keyOCID:
+                      description: OCID of an existing key to use. If empty, a key is created. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyOCID is immutable"
+                  required:
+                    - region
+                    - compartmentOCID
+                    - vaultOCID
+
+                cipherTrust:
+                  description: Configuration for CipherTrust KMS. Required when provider is CIPHERTRUST.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: "(self.authType == 'USER_CREDENTIALS') == has(self.userCredentials)"
+                      message: "userCredentials must be set if and only if authType is USER_CREDENTIALS"
+                    - rule: "(self.authType == 'REFRESH_TOKEN') == has(self.refreshTokenSecret)"
+                      message: "refreshTokenSecret must be set if and only if authType is REFRESH_TOKEN"
+                  properties:
+                    managerURL:
+                      description: URL of the CipherTrust Manager. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "managerURL is immutable"
+                    authType:
+                      description: Authentication method used against the CipherTrust Manager. Editable.
+                      type: string
+                      enum:
+                        - USER_CREDENTIALS
+                        - REFRESH_TOKEN
+                    userCredentials:
+                      description: Username and password. Required when authType is USER_CREDENTIALS. Editable.
+                      type: object
+                      properties:
+                        username:
+                          description: CipherTrust Manager username.
+                          type: string
+                        passwordSecret:
+                          description: Secret holding the password.
+                          type: object
+                          properties:
+                            name:
+                              description: Name of the Secret.
+                              type: string
+                            namespace:
+                              description: Namespace of the Secret. Defaults to the resource namespace.
+                              type: string
+                            key:
+                              description: Key within the Secret data holding the value.
+                              type: string
+                          required:
+                            - name
+                            - key
+                      required:
+                        - username
+                        - passwordSecret
+                    refreshTokenSecret:
+                      description: Secret holding the refresh token. Required when authType is REFRESH_TOKEN. Editable.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    keyName:
+                      description: Name of the key to create or use. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyName is immutable"
+                    keyAlgorithm:
+                      description: Key algorithm. Currently only AES is supported. Immutable.
+                      type: string
+                      enum:
+                        - AES
+                      default: AES
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyAlgorithm is immutable"
+                    keySize:
+                      description: Key size in bits. One of 128, 192, 256. Immutable.
+                      type: integer
+                      default: 256
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keySize is immutable"
+                        - rule: self in [128, 192, 256]
+                          message: "keySize must be one of 128, 192, 256"
+                  required:
+                    - managerURL
+                    - authType
+                    - keyName
+
+                vault:
+                  description: Configuration for HashiCorp Vault. Required when provider is HASHICORP.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: "(self.authType == 'TOKEN') == has(self.tokenSecret)"
+                      message: "tokenSecret must be set if and only if authType is TOKEN"
+                    - rule: "(self.authType == 'APPROLE') == has(self.appRole)"
+                      message: "appRole must be set if and only if authType is APPROLE"
+                    - rule: "!has(self.authNamespace) || self.authType == 'APPROLE'"
+                      message: "authNamespace is only valid when authType is APPROLE"
+                  properties:
+                    address:
+                      description: Address of the Vault server. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "address is immutable"
+                    authType:
+                      description: Authentication method used against Vault. Editable.
+                      type: string
+                      enum:
+                        - TOKEN
+                        - APPROLE
+                    tokenSecret:
+                      description: Secret holding the Vault token. Required when authType is TOKEN. Editable.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    appRole:
+                      description: AppRole credentials. Required when authType is APPROLE. Editable.
+                      type: object
+                      properties:
+                        roleID:
+                          description: Vault AppRole role ID.
+                          type: string
+                        secretIdSecret:
+                          description: Secret holding the AppRole secret ID.
+                          type: object
+                          properties:
+                            name:
+                              description: Name of the Secret.
+                              type: string
+                            namespace:
+                              description: Namespace of the Secret. Defaults to the resource namespace.
+                              type: string
+                            key:
+                              description: Key within the Secret data holding the value.
+                              type: string
+                          required:
+                            - name
+                            - key
+                      required:
+                        - roleID
+                        - secretIdSecret
+                    authNamespace:
+                      description: >
+                        Optional Vault namespace used for AppRole authentication. Only valid when
+                        authType is APPROLE. Editable.
+                      type: string
+                    keyName:
+                      description: Name of the transit key in Vault. Immutable.
+                      type: string
+                      default: key_yugabyte
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyName is immutable"
+                    secretEngine:
+                      description: Secret engine type. Fixed to transit. Immutable.
+                      type: string
+                      enum:
+                        - transit
+                      default: transit
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "secretEngine is immutable"
+                    mountPath:
+                      description: >
+                        Mount path of the transit secrets engine, relative to authNamespace when
+                        one is set (the operator prefixes it automatically). Immutable.
+                      type: string
+                      default: transit/
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "mountPath is immutable"
+                  required:
+                    - address
+                    - authType
+              required:
+                - name
+                - provider
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: restorejobs.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: restorejobs
+    singular: restorejob
+    kind: RestoreJob
     categories:
       - all
       - yugabyte
@@ -1124,73 +2481,51 @@ spec:
       storage: true
       schema:
         openAPIV3Schema:
-          description: >
-            Custom resource definition for YugabyteDB support bundle to capture logs,
-            events in case of failures.
           type: object
+          description: Custom resource definition for YugabyteDB restore job
           properties:
             status:
-              description: Support bundle status for the support bundle custom resource.
               type: object
+              description: Restore job status for the restore job custom resource.
               properties:
-                status:
-                  description: >
-                    Status of the support bundle.
-                    Allowed values - generating, ready, failed
+                message:
+                  description: String log message from restore job controller
                   type: string
-                  enum:
-                  - generating
-                  - ready
-                  - failed
-                access:
-                  description: Access details for the generated support bundle to download.
+                taskUUID:
+                  description: >
+                    Internal UUID of the task associated with
+                    the restore job resource.
                   type: string
                 resourceUUID:
-                  description: Internal UUID of the support bundle resource.
+                  description: Internal UUID of the restore operation.
                   type: string
             spec:
               type: object
               properties:
-                universeName:
+                actionType:
+                  description: Type of action to be taken. Allowed values - RESTORE
+                  type: string
+                  enum:
+                    - RESTORE
+                universe:
                   description: >
-                    Name of the universe for which support bundle is to be generated,
+                    Name of the universe for which restore is to be taken,
                     refers to a ybuniverse CR name.
                   type: string
-                collectionTimerange:
-                  description: Time range for which logs and events are to be collected.
-                  type: object
-                  properties:
-                    startDate:
-                      description: Start date for the logs and events collection.
-                      type: string
-                      example: 2022-12-12T13:07:18Z,
-                      format: date-time
-                    endDate:
-                      description: End date for the logs and events collection.
-                      type: string
-                      example: 2022-12-12T13:07:18Z,
-                      format: date-time
-                  required:
-                  - startDate
-                components:
+                backup:
                   description: >
-                    Components for which logs and events are to be collected. If not provided, all
-                    components will be collected.
-                  type: array
-                  items:
-                    type: string
-                    enum:
-                    - UniverseLogs
-                    - ApplicationLogs
-                    - OutputFiles
-                    - ErrorFiles
-                    - CoreFiles
-                    - GFlags
-                    - Instance
-                    - ConsensusMeta
-                    - TabletMeta
-                    - YbcLogs
-                    - K8sInfo
+                    Name of the backup to be restored,
+                    refers to a backup CR name.
+                  type: string
+                kmsConfig:
+                  description: >
+                    Optional. Name of the KMSConfig CR to use when restoring an
+                    encryption-at-rest (EAR) backup, used to decrypt the backup's universe keys.
+                    Required only when the backup is encrypted; leave unset for plaintext backups.
+                  type: string
+                keyspace:
+                  description: Name of the keyspace to be restored.
+                  type: string
 
 
 ---
@@ -1352,6 +2687,33 @@ spec:
                 x-kubernetes-validations:
                 - message: enableClientToNodeEncrypt cannot be changed
                   rule: self == oldSelf
+              encryptionAtRest:
+                description: >
+                  Encryption at rest (EAR) configuration for the universe. Omit to leave EAR off.
+                  Set enabled to false to disable EAR while keeping the KMS config association so it
+                  can be re-enabled later. Changing kmsConfig while enabled triggers a master key
+                  rotation.
+                type: object
+                properties:
+                  kmsConfig:
+                    description: >
+                      Name of the KMSConfig CR (in the same namespace) to associate with the
+                      universe for encryption at rest. Only read while enabled is true: changing it
+                      on a disabled universe has no immediate effect, and takes effect when EAR is
+                      re-enabled. Because disabling EAR keeps the existing universe key, re-enabling
+                      against a kmsConfig other than the one that key was encrypted under performs a
+                      master key rotation.
+                    type: string
+                  enabled:
+                    description: >
+                      Whether encryption at rest is enabled. Defaults to true. Set to false to
+                      disable EAR without removing the kmsConfig association so it can be flipped
+                      back on later. Disabling and changing kmsConfig in the same edit applies the
+                      disable only; the new kmsConfig is applied on re-enable.
+                    type: boolean
+                    default: true
+                required:
+                  - kmsConfig
               rootCA:
                 description: >
                   Specify the name of the rootCA certificate to be used for cert-manager
@@ -1785,6 +3147,691 @@ spec:
                     description: Disk write bytes per second to throttle disk usage during restores
                     type: integer
                     format: int64
+              telemetry:
+                description: >
+                  Telemetry export configuration for the universe. Each section below is one
+                  export type: present means that export is configured, omitted means it is
+                  disabled. Omitting this block entirely, or setting it to an empty object,
+                  configures no exports at all.
+
+                  Applying a telemetry change always performs a rolling helm upgrade of the
+                  master and tserver pods. 
+                type: object
+                properties:
+                  auditLogs:
+                    description: >
+                      YSQL and YCQL audit log export (pgaudit and the YCQL audit logger). Omit
+                      to disable. Changing this section restarts the DB processes, because the
+                      settings are delivered as postgres and tserver flags read at startup.
+                    type: object
+                    properties:
+                      ysqlAuditConfig:
+                        description: >
+                          pgaudit settings for YSQL audit logging. Present means YSQL audit
+                          logging is on; omit the whole object to leave YSQL auditing off.
+                        type: object
+                        properties:
+                          classes:
+                            description: >
+                              YSQL statement classes to audit. Omit to audit none of them
+                              explicitly, which in practice logs nothing until a class is added.
+                            type: array
+                            items:
+                              type: string
+                              enum:
+                                - READ
+                                - WRITE
+                                - FUNCTION
+                                - ROLE
+                                - DDL
+                                - MISC
+                                - MISC_SET
+                          logCatalog:
+                            description: >
+                              Log statements that touch only postgres catalog relations.
+                            type: boolean
+                            default: false
+                          logClient:
+                            description: >
+                              Echo audit records to the client as well as to the log.
+                            type: boolean
+                            default: false
+                          logLevel:
+                            description: >
+                              Postgres log level the audit records are emitted at. For NOTICE,
+                              INFO and the DEBUG levels the log_min_messages flag must also be
+                              lowered to that level, or the records are dropped before they
+                              reach the log (log_min_messages defaults to WARNING).
+                            type: string
+                            enum:
+                              - DEBUG1
+                              - DEBUG2
+                              - DEBUG3
+                              - DEBUG4
+                              - DEBUG5
+                              - INFO
+                              - NOTICE
+                              - WARNING
+                              - LOG
+                          logParameter:
+                            description: Include statement parameters in the audit record.
+                            type: boolean
+                            default: false
+                          logParameterMaxSize:
+                            description: >
+                              Maximum size in bytes of a logged parameter value; longer values
+                              are replaced by a placeholder.
+                            type: integer
+                          logRelation:
+                            description: >
+                              Emit a separate audit record per relation referenced by a
+                              statement, rather than one record per statement.
+                            type: boolean
+                            default: false
+                          logRows:
+                            description: Include the number of rows retrieved or affected.
+                            type: boolean
+                            default: false
+                          logStatement:
+                            description: Include the statement text in the audit record.
+                            type: boolean
+                            default: false
+                          logStatementOnce:
+                            description: >
+                              Log the statement text only with the first record of a statement
+                              rather than repeating it on every record.
+                            type: boolean
+                            default: false
+                          logRetentionDays:
+                            description: >
+                              Days to keep extracted YSQL audit log archives on the node. 0 or
+                              unset disables the dedicated audit-log retention pipeline and
+                              keeps the default size-based postgres log purge behavior.
+                            type: integer
+                            minimum: 0
+                      ycqlAuditConfig:
+                        description: >
+                          YCQL audit logger settings. Present means YCQL audit logging is on;
+                          omit the whole object to leave YCQL auditing off. Categories,
+                          keyspaces and users are filtered by include lists first, then by
+                          exclude lists.
+                        type: object
+                        properties:
+                          includedCategories:
+                            description: Statement categories to audit.
+                            type: array
+                            items:
+                              type: string
+                              enum:
+                                - QUERY
+                                - DML
+                                - DDL
+                                - DCL
+                                - AUTH
+                                - PREPARE
+                                - ERROR
+                                - OTHER
+                          excludedCategories:
+                            description: Statement categories to exclude from auditing.
+                            type: array
+                            items:
+                              type: string
+                              enum:
+                                - QUERY
+                                - DML
+                                - DDL
+                                - DCL
+                                - AUTH
+                                - PREPARE
+                                - ERROR
+                                - OTHER
+                          includedKeyspaces:
+                            description: Keyspaces to audit.
+                            type: array
+                            items:
+                              type: string
+                          excludedKeyspaces:
+                            description: Keyspaces to exclude from auditing.
+                            type: array
+                            items:
+                              type: string
+                          includedUsers:
+                            description: Users whose statements are audited.
+                            type: array
+                            items:
+                              type: string
+                          excludedUsers:
+                            description: Users whose statements are not audited.
+                            type: array
+                            items:
+                              type: string
+                          logLevel:
+                            description: tserver log level the audit records are emitted at.
+                            type: string
+                            enum:
+                              - INFO
+                              - WARNING
+                              - ERROR
+                          logRetentionDays:
+                            description: >
+                              Days to keep gzipped YCQL audit log archives on the node. 0 or
+                              unset disables the dedicated audit-log retention pipeline and
+                              keeps the default size-based tserver log purge behavior.
+                            type: integer
+                            minimum: 0
+                      exporters:
+                        description: >
+                          Audit log export destinations. An empty list means audit logging is
+                          configured on the DB side but nothing is shipped off the node. Audit
+                          exporters deliberately have no batching or memory-limiter knobs: YBA
+                          does not model them for audit logs (unlike every other section here).
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - telemetryProvider
+                          properties:
+                            telemetryProvider:
+                              description: >
+                                Name of the TelemetryProvider CR in this namespace to export to. The
+                                referenced CR must have reached status.state Ready and published its
+                                status.resourceUUID; until then this section is not reconciled.
+                              type: string
+                              minLength: 1
+                            additionalTags:
+                              description: >
+                                Extra key/value tags attached to every record exported through this
+                                exporter, in addition to the tags on the TelemetryProvider itself.
+                              type: object
+                              default: {}
+                              additionalProperties:
+                                type: string
+                  queryLogs:
+                    description: >
+                      YSQL query log export (the postgres statement log). Omit to disable.
+                      Changing this section restarts the DB processes, because the settings are
+                      delivered as postgres flags read at startup.
+                    type: object
+                    properties:
+                      ysqlQueryLogConfig:
+                        description: >
+                          Postgres logging settings for query log export. Present means YSQL
+                          query logging is on; omit the whole object to leave it off.
+                        type: object
+                        properties:
+                          logStatement:
+                            description: Which SQL statements are logged.
+                            type: string
+                            enum:
+                              - ALL
+                              - NONE
+                              - DDL
+                              - MOD
+                            default: NONE
+                          logMinErrorStatement:
+                            description: >
+                              Minimum message level at which the statement that caused an error
+                              is logged alongside it.
+                            type: string
+                            enum:
+                              - ERROR
+                            default: ERROR
+                          logErrorVerbosity:
+                            description: How much detail is written for each logged message.
+                            type: string
+                            enum:
+                              - VERBOSE
+                              - TERSE
+                              - DEFAULT
+                            default: DEFAULT
+                          logDuration:
+                            description: Log the duration of every completed statement.
+                            type: boolean
+                            default: false
+                          debugPrintPlan:
+                            description: >
+                              Log the execution plan of every executed query. Very verbose;
+                              intended for debugging.
+                            type: boolean
+                            default: false
+                          logConnections:
+                            description: >
+                              Log each attempted connection, plus successful authentication and
+                              authorization.
+                            type: boolean
+                            default: false
+                          logDisconnections:
+                            description: >
+                              Log each session termination, including the session duration.
+                            type: boolean
+                            default: false
+                          logMinDurationStatement:
+                            description: >
+                              Log the duration of a completed statement only if it ran for at
+                              least this many milliseconds. -1 disables duration logging, 0
+                              logs every statement.
+                            type: integer
+                            default: -1
+                          logLinePrefix:
+                            description: >
+                              printf-style prefix for each postgres log line, for example
+                              "%m [%p] ". A log_line_prefix set through gFlags takes precedence
+                              over this value.
+                            type: string
+                      exporters:
+                        description: >
+                          Query log export destinations. An empty list means query logging is
+                          configured on the DB side but nothing is shipped off the node.
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - telemetryProvider
+                          properties:
+                            telemetryProvider:
+                              description: >
+                                Name of the TelemetryProvider CR in this namespace to export to. The
+                                referenced CR must have reached status.state Ready and published its
+                                status.resourceUUID; until then this section is not reconciled.
+                              type: string
+                              minLength: 1
+                            additionalTags:
+                              description: >
+                                Extra key/value tags attached to every record exported through this
+                                exporter, in addition to the tags on the TelemetryProvider itself.
+                              type: object
+                              default: {}
+                              additionalProperties:
+                                type: string
+                            sendBatchSize:
+                              description: >
+                                Number of records the collector accumulates before sending a batch.
+                              type: integer
+                              default: 100
+                            sendBatchMaxSize:
+                              description: >
+                                Upper bound on the size of a single batch; larger batches are split.
+                                0 means no limit.
+                              type: integer
+                              default: 1000
+                            sendBatchTimeoutSeconds:
+                              description: >
+                                Longest the collector holds an incomplete batch before sending it.
+                              type: integer
+                              default: 10
+                            memoryLimitMib:
+                              description: >
+                                Soft memory limit in MiB for the collector process. Above it the memory
+                                limiter starts refusing data instead of growing without bound.
+                              type: integer
+                              default: 2048
+                            memoryLimitCheckIntervalSeconds:
+                              description: How often the collector re-checks its memory usage.
+                              type: integer
+                              default: 10
+                  metrics:
+                    description: >
+                      Metrics export. The collector scrapes the listed targets inside the pods
+                      and forwards the samples to the exporters. Omit to disable. Unlike audit
+                      and query logs this does not restart the DB processes.
+                    type: object
+                    properties:
+                      scrapeIntervalSeconds:
+                        description: >
+                          How often the collector scrapes each target. Applied to all scrape
+                          jobs.
+                        type: integer
+                        default: 30
+                      scrapeTimeoutSeconds:
+                        description: >
+                          Per-scrape timeout. Applied to all scrape jobs, and should be kept
+                          below scrapeIntervalSeconds.
+                        type: integer
+                        default: 20
+                      collectionLevel:
+                        description: >
+                          How much of the metric surface is collected. ALL keeps every metric,
+                          NORMAL keeps the standard prioritized set, TABLE_OFF keeps that set
+                          but drops per-table metrics, MINIMAL keeps only a small core
+                          allowlist, and OFF disables metric collection entirely.
+                        type: string
+                        enum:
+                          - ALL
+                          - NORMAL
+                          - TABLE_OFF
+                          - MINIMAL
+                          - "OFF"
+                        default: NORMAL
+                      scrapeConfigTargets:
+                        description: >
+                          Endpoints to scrape. Only pod-local targets exist on Kubernetes, so
+                          the VM-only NODE_EXPORT and NODE_AGENT_EXPORT targets are absent from
+                          this enum on purpose - the collector sidecar cannot reach them from
+                          inside the DB pods, and YBA rejects them for a Kubernetes universe.
+                          When omitted, the operator scrapes all five supported targets.
+                        type: array
+                        items:
+                          type: string
+                          enum:
+                            - MASTER_EXPORT
+                            - TSERVER_EXPORT
+                            - YSQL_EXPORT
+                            - CQL_EXPORT
+                            - OTEL_EXPORT
+                      exporters:
+                        description: >
+                          Metrics export destinations. An empty list means metrics are scraped but
+                          not shipped anywhere.
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - telemetryProvider
+                          properties:
+                            telemetryProvider:
+                              description: >
+                                Name of the TelemetryProvider CR in this namespace to export to. The
+                                referenced CR must have reached status.state Ready and published its
+                                status.resourceUUID; until then this section is not reconciled.
+                              type: string
+                              minLength: 1
+                            additionalTags:
+                              description: >
+                                Extra key/value tags attached to every record exported through this
+                                exporter, in addition to the tags on the TelemetryProvider itself.
+                              type: object
+                              default: {}
+                              additionalProperties:
+                                type: string
+                            metricsPrefix:
+                              description: >
+                                Prefix prepended to every exported metric name, for example "ybdb.".
+                                Empty means the metric names are exported unchanged.
+                              type: string
+                              default: ""
+                            sendBatchSize:
+                              description: >
+                                Number of records the collector accumulates before sending a batch.
+                              type: integer
+                              default: 100
+                            sendBatchMaxSize:
+                              description: >
+                                Upper bound on the size of a single batch; larger batches are split.
+                                0 means no limit.
+                              type: integer
+                              default: 1000
+                            sendBatchTimeoutSeconds:
+                              description: >
+                                Longest the collector holds an incomplete batch before sending it.
+                              type: integer
+                              default: 10
+                            memoryLimitMib:
+                              description: >
+                                Soft memory limit in MiB for the collector process. Above it the memory
+                                limiter starts refusing data instead of growing without bound.
+                              type: integer
+                              default: 2048
+                            memoryLimitCheckIntervalSeconds:
+                              description: How often the collector re-checks its memory usage.
+                              type: integer
+                              default: 10
+                  masterLogs:
+                    description: >
+                      yb-master glog export. Omit to disable. Does not restart the DB
+                      processes.
+                    type: object
+                    properties:
+                      minLevel:
+                        description: >
+                          Minimum glog severity to export; lines below this level are dropped.
+                        type: string
+                        enum:
+                          - INFO
+                          - WARNING
+                          - ERROR
+                          - FATAL
+                        default: INFO
+                      noiseSampleDropRatio:
+                        description: >
+                          Fraction (0.0-1.0) of known high-volume, low-value yb-master log
+                          lines to sample away. Defaults to 0.99, dropping 99% of them; set to
+                          0.0 to export all of them.
+                        type: number
+                        minimum: 0
+                        maximum: 1
+                        default: 0.99
+                      exporters:
+                        description: >
+                          yb-master log export destinations. An empty list exports nothing.
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - telemetryProvider
+                          properties:
+                            telemetryProvider:
+                              description: >
+                                Name of the TelemetryProvider CR in this namespace to export to. The
+                                referenced CR must have reached status.state Ready and published its
+                                status.resourceUUID; until then this section is not reconciled.
+                              type: string
+                              minLength: 1
+                            additionalTags:
+                              description: >
+                                Extra key/value tags attached to every record exported through this
+                                exporter, in addition to the tags on the TelemetryProvider itself.
+                              type: object
+                              default: {}
+                              additionalProperties:
+                                type: string
+                            sendBatchSize:
+                              description: >
+                                Number of records the collector accumulates before sending a batch.
+                              type: integer
+                              default: 100
+                            sendBatchMaxSize:
+                              description: >
+                                Upper bound on the size of a single batch; larger batches are split.
+                                0 means no limit.
+                              type: integer
+                              default: 1000
+                            sendBatchTimeoutSeconds:
+                              description: >
+                                Longest the collector holds an incomplete batch before sending it.
+                              type: integer
+                              default: 10
+                            memoryLimitMib:
+                              description: >
+                                Soft memory limit in MiB for the collector process. Above it the memory
+                                limiter starts refusing data instead of growing without bound.
+                              type: integer
+                              default: 2048
+                            memoryLimitCheckIntervalSeconds:
+                              description: How often the collector re-checks its memory usage.
+                              type: integer
+                              default: 10
+                  tserverLogs:
+                    description: >
+                      yb-tserver glog export. Omit to disable. Does not restart the DB
+                      processes.
+                    type: object
+                    properties:
+                      minLevel:
+                        description: >
+                          Minimum glog severity to export; lines below this level are dropped.
+                          Defaults to WARNING rather than INFO because yb-tserver INFO output
+                          is very high volume. There is no noiseSampleDropRatio here: the
+                          tserver noise-sampling tiers are fixed in the collector config.
+                        type: string
+                        enum:
+                          - INFO
+                          - WARNING
+                          - ERROR
+                          - FATAL
+                        default: WARNING
+                      exporters:
+                        description: >
+                          yb-tserver log export destinations. An empty list exports nothing.
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - telemetryProvider
+                          properties:
+                            telemetryProvider:
+                              description: >
+                                Name of the TelemetryProvider CR in this namespace to export to. The
+                                referenced CR must have reached status.state Ready and published its
+                                status.resourceUUID; until then this section is not reconciled.
+                              type: string
+                              minLength: 1
+                            additionalTags:
+                              description: >
+                                Extra key/value tags attached to every record exported through this
+                                exporter, in addition to the tags on the TelemetryProvider itself.
+                              type: object
+                              default: {}
+                              additionalProperties:
+                                type: string
+                            sendBatchSize:
+                              description: >
+                                Number of records the collector accumulates before sending a batch.
+                              type: integer
+                              default: 100
+                            sendBatchMaxSize:
+                              description: >
+                                Upper bound on the size of a single batch; larger batches are split.
+                                0 means no limit.
+                              type: integer
+                              default: 1000
+                            sendBatchTimeoutSeconds:
+                              description: >
+                                Longest the collector holds an incomplete batch before sending it.
+                              type: integer
+                              default: 10
+                            memoryLimitMib:
+                              description: >
+                                Soft memory limit in MiB for the collector process. Above it the memory
+                                limiter starts refusing data instead of growing without bound.
+                              type: integer
+                              default: 2048
+                            memoryLimitCheckIntervalSeconds:
+                              description: How often the collector re-checks its memory usage.
+                              type: integer
+                              default: 10
+                  ysqlConnMgrLogs:
+                    description: >
+                      YSQL Connection Manager log export. Omit to disable. A plain file tail
+                      with no severity filter, and no DB process restart.
+                    type: object
+                    properties:
+                      exporters:
+                        description: >
+                          YSQL Connection Manager log export destinations. An empty list exports
+                          nothing.
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - telemetryProvider
+                          properties:
+                            telemetryProvider:
+                              description: >
+                                Name of the TelemetryProvider CR in this namespace to export to. The
+                                referenced CR must have reached status.state Ready and published its
+                                status.resourceUUID; until then this section is not reconciled.
+                              type: string
+                              minLength: 1
+                            additionalTags:
+                              description: >
+                                Extra key/value tags attached to every record exported through this
+                                exporter, in addition to the tags on the TelemetryProvider itself.
+                              type: object
+                              default: {}
+                              additionalProperties:
+                                type: string
+                            sendBatchSize:
+                              description: >
+                                Number of records the collector accumulates before sending a batch.
+                              type: integer
+                              default: 100
+                            sendBatchMaxSize:
+                              description: >
+                                Upper bound on the size of a single batch; larger batches are split.
+                                0 means no limit.
+                              type: integer
+                              default: 1000
+                            sendBatchTimeoutSeconds:
+                              description: >
+                                Longest the collector holds an incomplete batch before sending it.
+                              type: integer
+                              default: 10
+                            memoryLimitMib:
+                              description: >
+                                Soft memory limit in MiB for the collector process. Above it the memory
+                                limiter starts refusing data instead of growing without bound.
+                              type: integer
+                              default: 2048
+                            memoryLimitCheckIntervalSeconds:
+                              description: How often the collector re-checks its memory usage.
+                              type: integer
+                              default: 10
+                  controllerLogs:
+                    description: >
+                      YB-Controller (backup agent sidecar) log export. Omit to disable. A
+                      plain file tail with no severity filter, and no DB process restart.
+                    type: object
+                    properties:
+                      exporters:
+                        description: >
+                          YB-Controller log export destinations. An empty list exports nothing.
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - telemetryProvider
+                          properties:
+                            telemetryProvider:
+                              description: >
+                                Name of the TelemetryProvider CR in this namespace to export to. The
+                                referenced CR must have reached status.state Ready and published its
+                                status.resourceUUID; until then this section is not reconciled.
+                              type: string
+                              minLength: 1
+                            additionalTags:
+                              description: >
+                                Extra key/value tags attached to every record exported through this
+                                exporter, in addition to the tags on the TelemetryProvider itself.
+                              type: object
+                              default: {}
+                              additionalProperties:
+                                type: string
+                            sendBatchSize:
+                              description: >
+                                Number of records the collector accumulates before sending a batch.
+                              type: integer
+                              default: 100
+                            sendBatchMaxSize:
+                              description: >
+                                Upper bound on the size of a single batch; larger batches are split.
+                                0 means no limit.
+                              type: integer
+                              default: 1000
+                            sendBatchTimeoutSeconds:
+                              description: >
+                                Longest the collector holds an incomplete batch before sending it.
+                              type: integer
+                              default: 10
+                            memoryLimitMib:
+                              description: >
+                                Soft memory limit in MiB for the collector process. Above it the memory
+                                limiter starts refusing data instead of growing without bound.
+                              type: integer
+                              default: 2048
+                            memoryLimitCheckIntervalSeconds:
+                              description: How often the collector re-checks its memory usage.
+                              type: integer
+                              default: 10
               kubernetesOverrides:
                 description: >
                   Kubernetes overrides for the universe.
@@ -2934,14 +4981,16 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: ybcertificates.operator.yugabyte.io
+  name: universekeyrotations.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
   scope: Namespaced
   names:
-    plural: ybcertificates
-    singular: ybcertificate
-    kind: YBCertificate
+    plural: universekeyrotations
+    singular: universekeyrotation
+    shortNames:
+      - ukr
+    kind: UniverseKeyRotation
     categories:
       - all
       - yugabyte
@@ -2949,74 +4998,70 @@ spec:
     - name: v1alpha1
       subresources:
         status: {}
+      additionalPrinterColumns:
+        - name: Universe
+          type: string
+          description: The universe whose universe key is rotated
+          jsonPath: .spec.universe
+        - name: State
+          type: string
+          description: The state of the universe key rotation
+          jsonPath: .status.state
+        - name: Retries
+          type: integer
+          description: Number of times the rotation has been retried after a failure
+          jsonPath: .status.retryCount
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
       served: true
       storage: true
       schema:
         openAPIV3Schema:
           description: >
-            Custom resource definition for YugabyteDB certificate management configuration.
+            Custom resource definition for a YugabyteDB Anywhere universe (data) key rotation. Each
+            resource represents a single imperative rotation, so listing the resources for a
+            universe gives the rotation history.
           type: object
           properties:
             status:
-              description: >
-                Certificate management status for the YBCertificate custom resource.
+              description: Universe key rotation status for the custom resource.
               type: object
               properties:
-                message:
-                  description: String log message from certificate controller.
-                  type: string
-                success:
+                state:
                   description: >
-                    Boolean indicating if the certificate configuration was successfully created.
-                  type: boolean
-                resourceUUID:
-                  description: Internal UUID of the certificate configuration resource.
+                    State of the rotation (e.g. Pending, Running, Retrying, Succeeded, Failed).
+                  type: string
+                message:
+                  description: Message for the rotation (failure reason, progress, etc.).
+                  type: string
+                taskUUID:
+                  description: Internal UUID of the task associated with the rotation.
+                  type: string
+                retryCount:
+                  description: >
+                    Number of times the rotation has been retried after a failure. The rotation is
+                    marked Failed once this reaches the retry limit.
+                  type: integer
+                requestedAt:
+                  description: Timestamp when the rotation was requested.
+                  type: string
+                completedAt:
+                  description: Timestamp when the rotation completed.
                   type: string
             spec:
               type: object
-              description: >
-                Specification for the YBCertificate resource.
-                Required fields: certType, certificateSecretRef
-              required:
-                - certType
-                - certificateSecretRef
+              description: Universe key rotation specification.
               properties:
-                certType:
-                  description:
-                    Type of certificate configuration to be created.
-                    Allowed values - SELF_SIGNED, K8S_CERT_MANAGER
+                universe:
+                  description: >
+                    Name of the universe whose universe key is to be rotated. Refers to a
+                    ybuniverse CR name. Immutable.
                   type: string
-                  enum:
-                    - SELF_SIGNED
-                    - K8S_CERT_MANAGER
                   x-kubernetes-validations:
-                    - rule: "self in ['SELF_SIGNED', 'K8S_CERT_MANAGER']"
-                      message: "certType must be either SELF_SIGNED or K8S_CERT_MANAGER"
-
-                # Certificate secret reference (common for both types)
-                certificateSecretRef:
-                  description: |
-                    Secret reference containing certificate and key content.
-                    For SELF_SIGNED: secret must contain both 'ca.crt' and 'ca.key'
-                    For K8S_CERT_MANAGER: secret must contain 'ca.crt'
-                    Recommended to use type: "tls" for better Kubernetes integration
-                  type: object
-                  required:
-                    - name
-                  properties:
-                    name:
-                      type: string
-                      description: Name of the secret (required)
-                      x-kubernetes-validations:
-                        - rule: "self.size() > 0"
-                          message: "name cannot be empty"
-                    namespace:
-                      type: string
-                      description: |
-                        Namespace of the secret (optional, defaults to the namespace
-                        where the YBCertificate is created)
-                      x-kubernetes-validations:
-                        - rule: "self.size() > 0"
-                          message: "name cannot be empty"
+                    - rule: self == oldSelf
+                      message: "universe is immutable"
+              required:
+                - universe
 
 
