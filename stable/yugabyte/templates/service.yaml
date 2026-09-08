@@ -390,10 +390,8 @@ spec:
                 - >
                   mkdir -p /mnt/disk0/cores;
                   mkdir -p /mnt/disk0/yb-data/scripts;
-                  if [ ! -f /mnt/disk0/yb-data/scripts/log_cleanup.sh ]; then
-                    if [ -f /home/yugabyte/bin/log_cleanup.sh ]; then
-                      cp /home/yugabyte/bin/log_cleanup.sh /mnt/disk0/yb-data/scripts;
-                    fi;
+                  if [ -f /home/yugabyte/bin/log_cleanup.sh ]; then
+                    cp -f /home/yugabyte/bin/log_cleanup.sh /mnt/disk0/yb-data/scripts;
                   fi
         {{- if (and (not $root.Values.storage.ephemeral) (not $service.skipHealthChecks)) }}
         {{- if $root.Values.livenessProbe.enabled }}
