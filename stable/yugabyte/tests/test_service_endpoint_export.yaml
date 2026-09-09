@@ -1,0 +1,105 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/quintush/helm-unittest/master/schema/helm-testsuite.json
+suite: serviceEndpoints ServiceExport
+templates:
+- templates/service-endpoints.yaml
+tests:
+- it: no ServiceExport is created by default
+  release:
+    name: yb-demo
+  asserts:
+  - hasDocuments:
+      count: 3
+
+- it: creates a ServiceExport only for the endpoints which opt in
+  release:
+    name: yb-demo
+  set:
+    serviceEndpoints:
+    - name: "yb-master-ui"
+      type: LoadBalancer
+      scope: "AZ"
+      app: "yb-master"
+      exportService: true
+      ports:
+        http-ui: "7000"
+    - name: "yql-service"
+      type: LoadBalancer
+      scope: "AZ"
+      app: "yb-tserver"
+      exportService: false
+      ports:
+        tcp-yql-port: "9042"
+  asserts:
+  - hasDocuments:
+      count: 3
+  - documentIndex: 1
+    isKind:
+      of: ServiceExport
+  - documentIndex: 1
+    equal:
+      path: apiVersion
+      value: multicluster.x-k8s.io/v1alpha1
+  - documentIndex: 1
+    equal:
+      path: metadata.name
+      value: yb-master-ui
+  - documentIndex: 1
+    equal:
+      path: metadata.labels.serviceName
+      value: yb-master-ui
+  - documentIndex: 1
+    equal:
+      path: metadata.labels.scope
+      value: AZ
+
+- it: honours multicluster.mcsApiVersion and the new naming style
+  release:
+    name: yb-demo
+  set:
+    oldNamingStyle: false
+    multicluster.mcsApiVersion: net.gke.io/v1
+    serviceEndpoints:
+    - name: "yb-master-ui"
+      type: LoadBalancer
+      scope: "AZ"
+      app: "yb-master"
+      exportService: true
+      ports:
+        http-ui: "7000"
+  asserts:
+  - hasDocuments:
+      count: 2
+  - documentIndex: 1
+    equal:
+      path: apiVersion
+      value: net.gke.io/v1
+  - documentIndex: 1
+    equal:
+      path: metadata.name
+      value: yb-demo-yugabyte-yb-master-ui
+
+- it: keeps the namespaced ServiceExport on uninstall
+  release:
+    name: yb-demo
+  set:
+    oldNamingStyle: false
+    serviceEndpoints:
+    - name: "yb-tserver-service"
+      type: ClusterIP
+      scope: "Namespaced"
+      app: "yb-tserver"
+      exportService: true
+      ports:
+        tcp-ysql-port: "5433"
+  asserts:
+  - documentIndex: 1
+    isKind:
+      of: ServiceExport
+  - documentIndex: 1
+    equal:
+      path: metadata.annotations["helm.sh/resource-policy"]
+      value: keep
+  - documentIndex: 1
+    equal:
+      path: metadata.name
+      value: namespaced-yb-tserver-service

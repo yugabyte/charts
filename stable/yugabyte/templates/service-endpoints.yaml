@@ -84,6 +84,34 @@ spec:
   {{ $key }}: {{ $value | quote }}
   {{- end }}
 ---
+{{- /* Export this endpoint service to the ClusterSet (KEP-1645) */}}
+{{- if $endpoint.exportService }}
+apiVersion: {{ $root.Values.multicluster.mcsApiVersion }}
+kind: ServiceExport
+metadata:
+  name: {{ $serviceName | quote }}
+  namespace: "{{ $root.Release.Namespace }}"
+  {{- if eq $scope "Namespaced" }}
+  annotations:
+    # Keep resource for namespaced services
+    "helm.sh/resource-policy": keep
+  {{- end }}
+  labels:
+    # scope is "Namespaced" or "AZ"
+    scope: {{ $scope }}
+    serviceName: {{ $endpoint.name }}
+    service-type: "endpoint"
+    {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
+    {{- $exportLabels := include "yugabyte.labels" $root | fromYaml }}
+    # For Namespaced service, remove zone and release name filter
+    {{- if eq $scope "Namespaced" }}
+    {{- $exportLabels = omit $exportLabels "yugabyte.io/zone" "release" }}
+    {{- end }}
+    {{- range $key,$value := $exportLabels }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+---
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
