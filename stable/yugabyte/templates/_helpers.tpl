@@ -37,7 +37,9 @@ component: {{ .Values.Component | quote }}
 {{- else }}
 {{- $filteredLabels = omit $filteredLabels "heritage" "release" "chart" "component" "app" "app.kubernetes.io/name" }}
 {{- end }}
+{{- if $filteredLabels }}
 {{ toYaml $filteredLabels }}
+{{- end }}
 {{- end }}
 {{- end }}
 
