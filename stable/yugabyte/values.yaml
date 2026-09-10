@@ -358,6 +358,12 @@ serviceEndpoints:
     loadBalancerIP: ""
     ports:
       http-ui: "7000"
+    ## Set to true to create a ServiceExport (KEP-1645) for this
+    ## service, making it reachable from the other clusters of the
+    ## ClusterSet. Requires the multi-cluster services API to be
+    ## available in the cluster. The apiVersion of the ServiceExport is
+    ## controlled by multicluster.mcsApiVersion.
+    exportService: false
     extraArgs: {}
 
   - name: "yb-tserver-service"
@@ -374,6 +380,12 @@ serviceEndpoints:
       tcp-yql-port: "9042"
       tcp-yedis-port: "6379"
       tcp-ysql-port: "5433"
+    ## Set to true to create a ServiceExport (KEP-1645) for this
+    ## service, making it reachable from the other clusters of the
+    ## ClusterSet. Requires the multi-cluster services API to be
+    ## available in the cluster. The apiVersion of the ServiceExport is
+    ## controlled by multicluster.mcsApiVersion.
+    exportService: false
     extraArgs: {}
 
   - name: "yugabyted-ui-service"
@@ -389,6 +401,12 @@ serviceEndpoints:
     sessionAffinity: ClientIP
     ports:
       yugabyted-ui: "15433"
+    ## Set to true to create a ServiceExport (KEP-1645) for this
+    ## service, making it reachable from the other clusters of the
+    ## ClusterSet. Requires the multi-cluster services API to be
+    ## available in the cluster. The apiVersion of the ServiceExport is
+    ## controlled by multicluster.mcsApiVersion.
+    exportService: false
     extraArgs: {}
 
 Services:
