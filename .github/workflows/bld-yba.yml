@@ -1,0 +1,19 @@
+name: "bld-charts"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review ]
+    paths-ignore:
+      - 'README.md'
+
+# Can be skipped if PR is draft or the commit message contains [skip ci] or [ci skip]
+jobs:
+  charts-itest:
+    if: github.event.pull_request.draft == false
+    runs-on: ybchghr
+    steps:
+      - name: Build Trigger
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ybbld "$PR_NUMBER" "$PR_SHA" CHARTS-ITEST
