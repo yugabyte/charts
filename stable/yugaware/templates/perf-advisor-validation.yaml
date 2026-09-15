@@ -66,4 +66,32 @@
 {{- if not .Values.yugaware.service.enabled }}
   {{- fail (printf "\n\nPerf Advisor is enabled, requires yugaware.service.enabled to be true") }}
 {{- end }}
+
+{{- /*
+  Node placement is repeated for the same reason the database settings are: this chart's
+  nodeSelector, tolerations and zoneAffinity reach the YugabyteDB Anywhere pod only, and the
+  sub-chart takes its own under perf-advisor-chart - the same three keys in the same form, so
+  a zoneAffinity there is a list of zone names and the sub-chart expands it exactly as this
+  chart does. perfAdvisor.spec still counts, for a placement that needs something those three
+  cannot express.
+
+  Setting placement here and leaving the sub-chart's empty is the one case worth failing on: it
+  is silent, and on a tainted node pool it leaves Perf Advisor unschedulable rather than merely
+  misplaced. Anything non-empty passes - scheduling Perf Advisor somewhere else on purpose is a
+  legitimate choice, it just has to be stated.
+*/}}
+{{- $paPlaced := list }}
+{{- range $key := (list "nodeSelector" "tolerations" "zoneAffinity") }}
+  {{- if index $paRoot $key }}{{- $paPlaced = append $paPlaced $key }}{{- end }}
+{{- end }}
+{{- if (($paRoot.perfAdvisor) | default dict).spec }}{{- $paPlaced = append $paPlaced "perfAdvisor.spec" }}{{- end }}
+{{- if not $paPlaced }}
+  {{- $placed := list }}
+  {{- if .Values.nodeSelector }}{{- $placed = append $placed "nodeSelector" }}{{- end }}
+  {{- if .Values.tolerations }}{{- $placed = append $placed "tolerations" }}{{- end }}
+  {{- if .Values.zoneAffinity }}{{- $placed = append $placed "zoneAffinity" }}{{- end }}
+  {{- if $placed }}
+    {{- fail (printf "\n\n%s set for YugabyteDB Anywhere, but no placement is set under perf-advisor-chart.\nThat places the Perf Advisor pod; this chart cannot pass its own placement down, because Helm resolves values before templates render.\nMirror it with perf-advisor-chart.nodeSelector, perf-advisor-chart.tolerations and perf-advisor-chart.zoneAffinity - the same values in the same form as above - set them to the placement you do want, or disable Perf Advisor with perf-advisor-chart.yugaware.enabled=false.\n" (join ", " $placed)) }}
+  {{- end }}
+{{- end }}
 {{- end }}
