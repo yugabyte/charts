@@ -396,7 +396,7 @@ sidecarVolumes:
 sidecars: []
 
 ## Following two controls for placement of pod - nodeSelector and AZ affinity.
-## Note: Remember to also provide a yugaware.StorageClass that has a olumeBindingMode of
+## Note: Remember to also provide a yugaware.StorageClass that has a volumeBindingMode of
 ## WaitForFirstConsumer so that the PVC is created in the right topology visible to this pod.
 ## See https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
 ## eg.
@@ -404,19 +404,16 @@ sidecars: []
 ##   topology.kubernetes.io/region: us-west1
 nodeSelector: {}
 
-## Affinity to a particular zone for the pod.
+## Affinity to a particular zone for the pod. This is a plain list of zone names, not a
+## nodeAffinity structure - the templates build the nodeAffinity around it, matching each name
+## against both failure-domain.beta.kubernetes.io/zone and topology.kubernetes.io/zone so the
+## deprecated and current label spellings are both covered.
 ## See https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity
 ## eg.
-## nodeAffinity:
-##   requiredDuringSchedulingIgnoredDuringExecution:
-##     nodeSelectorTerms:
-##       - matchExpressions:
-##         - key: failure-domain.beta.kubernetes.io/zone
-##           operator: In
-##           values:
-##           - us-west1-a
-##           - us-west1-b
-zoneAffinity: {}
+## zoneAffinity:
+##   - us-west1-a
+##   - us-west1-b
+zoneAffinity: []
 
 ## The tolerations that the pod should have.
 ## See https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
@@ -604,6 +601,13 @@ hooks:
 ##   * useYugabyteDB: true             -> set postgres.external.user here to yugabytedb.user
 ##   * prometheus.enabled: false above -> set prometheus.external.url here
 ##
+## Node placement is the same story. nodeSelector, tolerations and zoneAffinity above apply to
+## the YugabyteDB Anywhere pod only; the Perf Advisor pod is scheduled independently and has to
+## be told separately, through perfAdvisor.spec below. On a cluster where YugabyteDB Anywhere is
+## pinned to a labelled node pool this matters twice over: without a matching nodeSelector Perf
+## Advisor lands wherever the scheduler puts it, and if that pool is tainted, without a matching
+## toleration it does not schedule at all.
+##
 ## templates/perf-advisor-validation.yaml checks the two copies agree and fails the render
 ## with the exact value to fix if they drift apart, so a database change made in one place
 ## but not the other cannot silently point Perf Advisor at the wrong server.
@@ -638,7 +642,47 @@ perf-advisor-chart:
       ## the node already has this image and does not pull a second postgres.
       tag: '14.23'
     perfAdvisor:
-      tag: '1.4.0-b12'
+      tag: '1.5.0-b8'
+
+  perfAdvisor:
+    ## Lower than the sub-chart's own default of 2 CPU / 4Gi, which is sized for a standalone
+    ## Perf Advisor with a node to itself. Here it shares one with YugabyteDB Anywhere, its
+    ## postgres and its prometheus, and the scheduler fits pods on requests rather than limits -
+    ## so the sub-chart default would take 2 cores out of the node whether Perf Advisor used them
+    ## or not, which is enough to leave the release unschedulable on a node sized for YBA alone.
+    ## Limits are unchanged, so the burst ceiling is the same; only the reservation drops.
+    resources:
+      limits:
+        cpu: "2"
+        memory: 4Gi
+      requests:
+        cpu: "100m"
+        memory: 512Mi
+
+  ## Node placement for the Perf Advisor pod. Same three values in the same form as the
+  ## chart-level nodeSelector, tolerations and zoneAffinity above - zoneAffinity is a plain
+  ## list of zone names, which the sub-chart expands into the same two-term nodeAffinity this
+  ## chart builds (both the deprecated and the current zone label spellings).
+  ##
+  ## They have to be repeated because Helm resolves values before templates render, so this
+  ## chart cannot pass its own placement down to a sub-chart. perf-advisor-validation.yaml
+  ## fails the render if placement is set above and nothing is set here, so the two cannot
+  ## silently drift. Deliberately scheduling Perf Advisor somewhere else is fine - state that
+  ## placement here and the check passes.
+  ##
+  ## eg.
+  ## nodeSelector:
+  ##   topology.kubernetes.io/region: us-west1
+  ## tolerations:
+  ##   - key: dedicated
+  ##     operator: Exists
+  ##     effect: NoSchedule
+  ## zoneAffinity:
+  ##   - us-west1-a
+  ##   - us-west1-b
+  nodeSelector: {}
+  tolerations: []
+  zoneAffinity: []
 
   postgres:
     ## Must mirror the postgres block above - see the note on this section. Empty host/port
