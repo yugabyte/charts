@@ -2,6 +2,9 @@
 suite: fips enable and disable
 templates:
 - templates/statefulset.yaml
+- templates/configs.yaml
+- templates/keystore.yaml
+- templates/fips-validation.yaml
 tests:
 - it: FIPS enabled
   set:
@@ -9,16 +12,121 @@ tests:
       fips:
         enabled: true
   asserts:
-  - contains: 
+  - template: templates/statefulset.yaml
+    contains:
       path: spec.template.spec.containers[?(@.name == "yugaware")].args
       content: "-Dorg.bouncycastle.fips.approved_only=true"
+
 - it: FIPS disabled
   set:
     yugaware:
       fips:
         enabled: false
   asserts:
-  - contains: 
+  - template: templates/statefulset.yaml
+    contains:
       path: spec.template.spec.containers[?(@.name == "yugaware")].args
       content: "-Dorg.bouncycastle.fips.approved_only=true"
     not: true
+
+# The keystore is BCFKS whenever TLS is on, FIPS or not: ssl-config parses PEM itself and
+# re-wraps it outside the validated provider, which approved-only mode rejects, and using one
+# format everywhere keeps the two modes on the same path.
+- it: TLS serves from a BCFKS keystore built by an init container
+  set:
+    tls:
+      enabled: true
+  asserts:
+  - template: templates/configs.yaml
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-yugaware-app-config
+    matchRegex:
+      path: data["application.docker.conf"]
+      pattern: 'type = BCFKS'
+  - template: templates/configs.yaml
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-yugaware-app-config
+    matchRegex:
+      path: data["application.docker.conf"]
+      pattern: 'path = /opt/keystore/server\.bcfks'
+  - template: templates/configs.yaml
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-yugaware-app-config
+    matchRegex:
+      path: data["application.docker.conf"]
+      pattern: 'type = PEM'
+    not: true
+  - template: templates/statefulset.yaml
+    equal:
+      path: spec.template.spec.initContainers[?(@.name == "build-keystore")].volumeMounts[1].mountPath
+      value: /opt/keystore
+  - template: templates/keystore.yaml
+    hasDocuments:
+      count: 1
+
+- it: no TLS means no keystore to build
+  set:
+    tls:
+      enabled: false
+    yugaware:
+      fips:
+        enabled: true
+  asserts:
+  - template: templates/keystore.yaml
+    hasDocuments:
+      count: 0
+
+# cert-manager supplies tls.crt/tls.key rather than a concatenated server.pem, and that branch
+# is inside the init container script rather than the keystore type.
+- it: cert-manager also serves from BCFKS
+  set:
+    tls:
+      enabled: true
+      certManager:
+        enabled: true
+  asserts:
+  - template: templates/configs.yaml
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-yugaware-app-config
+    matchRegex:
+      path: data["application.docker.conf"]
+      pattern: 'type = BCFKS'
+  - template: templates/keystore.yaml
+    matchRegex:
+      path: data["build-keystore.sh"]
+      pattern: 'CERT=/opt/certs/tls.crt'
+
+# The database password has to clear the validated module's 112-bit minimum, because the
+# PostgreSQL driver derives its SCRAM key through it. Only a password given in values can be
+# checked here - the generated one lives in a Secret that helm unittest cannot look up.
+- it: a short external database password is rejected in FIPS mode
+  template: templates/fips-validation.yaml
+  set:
+    yugaware.fips.enabled: true
+    postgres.external.host: db.example.com
+    postgres.external.pass: short
+  asserts:
+  - failedTemplate:
+      errorPattern: 'postgres\.external\.pass is 5 bytes, but FIPS mode needs at least 14'
+
+- it: a long enough external database password is accepted in FIPS mode
+  template: templates/fips-validation.yaml
+  set:
+    yugaware.fips.enabled: true
+    postgres.external.host: db.example.com
+    postgres.external.pass: a-long-enough-password
+  asserts:
+  - notFailedTemplate: {}
+
+- it: the database password is not checked with FIPS mode off
+  template: templates/fips-validation.yaml
+  set:
+    yugaware.fips.enabled: false
+    postgres.external.host: db.example.com
+    postgres.external.pass: short
+  asserts:
+  - notFailedTemplate: {}

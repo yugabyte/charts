@@ -71,17 +71,18 @@ data:
 
     {{- if .Values.tls.enabled }}
     https.port = 9443
-    {{- if .Values.tls.certManager.enabled }}
+    # BCFKS in every mode, not only under FIPS. "PEM" and "PEMCFG" are not JCE keystore types -
+    # ssl-config parses those files itself and re-wraps them in a SunJSSE keystore, which never
+    # reaches the validated module and is rejected outright in approved-only mode. Serving from
+    # BCFKS throughout means one keystore format to reason about instead of one per mode, and it
+    # is opened by the BouncyCastleFipsProvider that MainModule registers either way. The
+    # build-keystore init container produces it from the same certificates that were mounted
+    # before.
     play.server.https.keyStore {
-      path = /opt/cert-config/cert-manager.pemcfg
-      type = PEMCFG
+      path = /opt/keystore/server.bcfks
+      type = BCFKS
+      password = ${YBA_KEYSTORE_PASSWORD}
     }
-    {{- else }}
-    play.server.https.keyStore {
-      path = /opt/certs/server.pem
-      type = PEM
-    }
-    {{- end }}
     {{- end }}
 
     yb {

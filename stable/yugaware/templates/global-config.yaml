@@ -14,6 +14,11 @@ metadata:
 {{ include "yugaware.commonLabels" . | indent 4 }}
 {{- end }}
 data:
+  {{- if .Values.tls.enabled }}
+  # Protects the BCFKS keystore the build-keystore init container builds. Generated once and
+  # kept, so the keystore password does not change under a running deployment on upgrade.
+  keystore_password: {{ include "getOrGeneratePasswordConfigMapToSecret" (dict "Namespace" .Release.Namespace "Name" (printf "%s%s" .Release.Name "-yugaware-global-config") "Key" "keystore_password" "Length" 16) | quote }}
+  {{- end }}
   {{- if .Values.postgres.external.host }}
   postgres_db: {{ .Values.postgres.external.dbname | b64enc | quote }}
   postgres_user: {{ .Values.postgres.external.user | b64enc | quote }}
@@ -22,7 +27,11 @@ data:
   {{- else }}
   postgres_db: {{ .Values.useYugabyteDB | ternary .Values.yugabytedb.dbname .Values.postgres.dbname | b64enc | quote }}
   postgres_user: {{ .Values.useYugabyteDB | ternary .Values.yugabytedb.user .Values.postgres.user | b64enc | quote }}
-  postgres_password: {{ include "getOrGeneratePasswordConfigMapToSecret" (dict "Namespace" .Release.Namespace "Name" (printf "%s%s" .Release.Name "-yugaware-global-config") "Key" "postgres_password") | quote }}
+  # 16 rather than the helper's default of 8: in FIPS mode the PostgreSQL driver derives its
+  # SCRAM key with PBKDF2 through the validated module, which refuses a password under 14 bytes.
+  # Generated once and kept, so this does not change under a running deployment on upgrade -
+  # which is why templates/fips-validation.yaml still has to check what an older install holds.
+  postgres_password: {{ include "getOrGeneratePasswordConfigMapToSecret" (dict "Namespace" .Release.Namespace "Name" (printf "%s%s" .Release.Name "-yugaware-global-config") "Key" "postgres_password" "Length" 16) | quote }}
   postgres_host: {{ (eq .Values.ip_version_support "v6_only" | ternary "[::1]" "127.0.0.1") | b64enc | quote }}
   {{- end }}
   app_secret: {{ randAlphaNum 64 | b64enc | b64enc | quote }}

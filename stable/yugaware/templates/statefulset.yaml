@@ -139,6 +139,18 @@ spec:
               - key: init-prometheus.sh
                 path: init-prometheus.sh
         {{- end }}
+        {{- if .Values.tls.enabled }}
+        # The mounted cert secrets are read-only, so the generated keystore needs a writable
+        # volume of its own. Rebuilt on every pod start, so it does not need to be persisted.
+        - name: yugaware-keystore
+          emptyDir: {}
+        - name: keystore-script
+          configMap:
+            name: {{ .Release.Name }}-yugaware-keystore
+            items:
+              - key: build-keystore.sh
+                path: build-keystore.sh
+        {{- end }}
         {{- if (.Values.tls.enabled) }}
         {{- if .Values.tls.certManager.enabled }}
         - name: {{ .Release.Name }}-yugaware-tls-cert
@@ -204,6 +216,41 @@ spec:
       dnsPolicy: {{ . | quote }}
       {{- end }}
       initContainers:
+        {{- if .Values.tls.enabled }}
+        # Converts the mounted certificate into the BCFKS keystore Play serves from. Runs whenever
+        # TLS is on, not only under FIPS, so there is one keystore format in play either way.
+        - image: {{ include "full_yugaware_image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          name: build-keystore
+          {{- if .Values.containerSecurityContext.enabled }}
+          {{- include "getSecurityContext" . | indent 10 }}
+          {{- end }}
+          command:
+            - 'bash'
+            - '-c'
+            - |
+              /bin/bash /keystore/build-keystore.sh;
+          env:
+            - name: KEYSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: keystore_password
+          volumeMounts:
+          - name: keystore-script
+            mountPath: /keystore
+          - name: yugaware-keystore
+            mountPath: /opt/keystore
+          {{- if .Values.tls.certManager.enabled }}
+          - name: {{ .Release.Name }}-yugaware-tls-cert
+            mountPath: /opt/certs/
+            readOnly: true
+          {{- else }}
+          - name: {{ .Release.Name }}-yugaware-tls-pem
+            mountPath: /opt/certs/
+            readOnly: true
+          {{- end }}
+        {{- end }}
         {{- if eq (include "checkInitPermissionsRequired" .) "true" }}
         # Fix on-disk permissions (e.g. pem files, provision scripts) for every
         # non-root deployment (general non-root or OCP).
@@ -541,6 +588,13 @@ spec:
                   fieldPath: metadata.namespace
             - name: PVC_NAME
               value: {{ .Release.Name }}-yugaware-storage
+          {{- if .Values.tls.enabled }}
+            - name: YBA_KEYSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: keystore_password
+          {{- end }}
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -653,6 +707,11 @@ spec:
             mountPath: /prometheus_data
             subPath: prometheus_data
           {{- end }}
+        {{- if .Values.tls.enabled }}
+          - name: yugaware-keystore
+            mountPath: /opt/keystore
+            readOnly: true
+        {{- end }}
         {{- if (.Values.tls.enabled) }}
           {{- if .Values.tls.certManager.enabled }}
           - name: {{  .Release.Name }}-yugaware-tls-cert

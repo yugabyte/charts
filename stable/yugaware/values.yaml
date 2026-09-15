@@ -135,6 +135,13 @@ yugaware:
 
   fips:
     # Enable FIPS mode for YugabyteDB Anywhere.
+    #
+    # Requires a database password of at least 14 bytes: the PostgreSQL driver derives its SCRAM
+    # key with PBKDF2 through the validated module, which refuses anything shorter, so a shorter
+    # password stops both YugabyteDB Anywhere and Perf Advisor reaching the database at all. A
+    # fresh install generates 16; an install created before that keeps its 8-byte one across
+    # upgrades, and templates/fips-validation.yaml fails the render rather than letting the pods
+    # crash-loop.
     enabled: false
 
   # Create an initial user for YugabyteDB Anywhere. A user is required for YBA workflows.
@@ -630,6 +637,12 @@ perf-advisor-chart:
   yugaware:
     enabled: true
 
+  ## Must mirror yugaware.fips.enabled above. Helm resolves values before templates render, so
+  ## this chart cannot pass its own setting down - templates/perf-advisor-validation.yaml fails
+  ## the render if the two disagree.
+  fips:
+    enabled: false
+
   ## The sub-chart defaults to a 'perfadvisorserviceaccount' ServiceAccount and a
   ## 'perfadvisorsecret' pull secret, neither of which exists in this release. Empty means
   ## the namespace default ServiceAccount; the pull secret tracks image.pullSecret above.
@@ -642,7 +655,7 @@ perf-advisor-chart:
       ## the node already has this image and does not pull a second postgres.
       tag: '14.23'
     perfAdvisor:
-      tag: '1.5.0-b8'
+      tag: '1.5.0-b9'
 
   perfAdvisor:
     ## Lower than the sub-chart's own default of 2 CPU / 4Gi, which is sized for a standalone

@@ -93,5 +93,15 @@
   {{- if $placed }}
     {{- fail (printf "\n\n%s set for YugabyteDB Anywhere, but no placement is set under perf-advisor-chart.\nThat places the Perf Advisor pod; this chart cannot pass its own placement down, because Helm resolves values before templates render.\nMirror it with perf-advisor-chart.nodeSelector, perf-advisor-chart.tolerations and perf-advisor-chart.zoneAffinity - the same values in the same form as above - set them to the placement you do want, or disable Perf Advisor with perf-advisor-chart.yugaware.enabled=false.\n" (join ", " $placed)) }}
   {{- end }}
+  {{- end }}
+
+{{- /*
+  FIPS mode is a property of the deployment, not of one component: running Perf Advisor outside
+  approved-only mode while YugabyteDB Anywhere is inside it leaves the deployment only partly
+  compliant, and nothing at runtime would report it.
+*/}}
+{{- $paFips := (($paRoot.fips) | default dict).enabled | default false }}
+{{- if ne (toString $paFips) (toString .Values.yugaware.fips.enabled) }}
+  {{- fail (printf "\n\nperf-advisor-chart.fips.enabled is %v but yugaware.fips.enabled is %v.\nFIPS mode has to be on for both or neither.\n%s\n" $paFips .Values.yugaware.fips.enabled $fix) }}
 {{- end }}
 {{- end }}
