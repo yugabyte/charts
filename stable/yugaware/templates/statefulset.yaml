@@ -63,6 +63,18 @@ spec:
         {{- if .Values.securityContext.additionalSettings }}
         {{- toYaml .Values.securityContext.additionalSettings | nindent 8 }}
         {{- end }}
+      {{- else if not .Values.ocpCompatibility.enabled }}
+      # securityContext is disabled, but the hardened image now defaults to a non-root
+      # user (uid 10001). On upgrade from an older root deployment the data on the
+      # persistent volume is still root-owned, so apply fsGroup to give the non-root
+      # process group access to it. Only fsGroup is set -- runAsUser/runAsNonRoot are
+      # left to the image default so an image that still defaults to root keeps working.
+      # OCP is excluded (the SCC assigns fsGroup).
+      securityContext:
+        fsGroup: {{ .Values.securityContext.fsGroup | default 10001 }}
+        {{- if (semverCompare ">=1.20-x" .Capabilities.KubeVersion.Version) }}
+        fsGroupChangePolicy: {{ .Values.securityContext.fsGroupChangePolicy }}
+        {{- end }}
       {{- end }}
       {{- if .Values.nodeSelector }}
       nodeSelector:
