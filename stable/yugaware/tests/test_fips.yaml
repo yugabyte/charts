@@ -29,6 +29,40 @@ tests:
       content: "-Dorg.bouncycastle.fips.approved_only=true"
     not: true
 
+# BouncyCastle dlopen()s the native libraries it unpacks, so they cannot go to a noexec /tmp.
+# Needed in both modes: the keystore is BCFKS either way.
+- it: the platform points BouncyCastle's native libraries at a writable volume, FIPS or not
+  set:
+    yugaware:
+      fips:
+        enabled: false
+  asserts:
+  - template: templates/statefulset.yaml
+    contains:
+      path: spec.template.spec.containers[?(@.name == "yugaware")].args
+      content: "-Dorg.bouncycastle.native.loader.install_dir=/opt/yugabyte/yugaware/data/bcnative"
+
+- it: so does the platform in FIPS mode
+  set:
+    yugaware:
+      fips:
+        enabled: true
+  asserts:
+  - template: templates/statefulset.yaml
+    contains:
+      path: spec.template.spec.containers[?(@.name == "yugaware")].args
+      content: "-Dorg.bouncycastle.native.loader.install_dir=/opt/yugabyte/yugaware/data/bcnative"
+
+- it: and so does the keytool run that builds the keystore
+  set:
+    tls:
+      enabled: true
+  asserts:
+  - template: templates/keystore.yaml
+    matchRegex:
+      path: data["build-keystore.sh"]
+      pattern: '-J-Dorg\.bouncycastle\.native\.loader\.install_dir="\$\{BC_NATIVE_DIR\}"'
+
 # The keystore is BCFKS whenever TLS is on, FIPS or not: ssl-config parses PEM itself and
 # re-wraps it outside the validated provider, which approved-only mode rejects, and using one
 # format everywhere keeps the two modes on the same path.

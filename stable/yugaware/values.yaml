@@ -655,7 +655,7 @@ perf-advisor-chart:
       ## the node already has this image and does not pull a second postgres.
       tag: '14.23'
     perfAdvisor:
-      tag: '1.6.0-b1'
+      tag: '1.6.0-b7'
 
   perfAdvisor:
     ## Lower than the sub-chart's own default of 2 CPU / 4Gi, which is sized for a standalone

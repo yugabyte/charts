@@ -565,6 +565,9 @@ spec:
             {{- if .Values.yugaware.fips.enabled }}
             "-Dorg.bouncycastle.fips.approved_only=true",
             {{- end }}
+            # install_dir: BouncyCastle dlopen()s the native libraries it unpacks, so they
+            # cannot go to a noexec /tmp. Both modes - the keystore is BCFKS either way.
+            "-Dorg.bouncycastle.native.loader.install_dir=/opt/yugabyte/yugaware/data/bcnative",
             "-Dconfig.file=/data/application.docker.conf"
             ]
           env:
