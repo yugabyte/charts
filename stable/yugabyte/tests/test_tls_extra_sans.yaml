@@ -1,0 +1,87 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/quintush/helm-unittest/master/schema/helm-testsuite.json
+suite: tls.extraSANs
+templates:
+- templates/certificates.yaml
+tests:
+- it: adds no extra SANs by default
+  release:
+    name: yb-demo
+  set:
+    tls.enabled: true
+    tls.certManager.enabled: true
+    oldNamingStyle: false
+    replicas.master: 1
+    replicas.tserver: 1
+  asserts:
+  - documentIndex: 4
+    equal:
+      path: spec.dnsNames
+      value:
+      - yb-demo-yugabyte-yb-tserver-0.yb-demo-yugabyte-yb-tservers.NAMESPACE.svc.cluster.local
+      - yb-demo-yugabyte-yb-tservers.NAMESPACE.svc.cluster.local
+  - documentIndex: 4
+    equal:
+      path: spec.ipAddresses
+      value: []
+
+- it: adds user supplied DNS and IP SANs to every node certificate
+  release:
+    name: yb-demo
+  set:
+    tls.enabled: true
+    tls.certManager.enabled: true
+    oldNamingStyle: false
+    replicas.master: 1
+    replicas.tserver: 1
+    tls.extraSANs.dnsNames:
+    - "db.internal.example.com"
+    tls.extraSANs.ipAddresses:
+    - "10.20.30.40"
+  asserts:
+  - documentIndex: 3
+    contains:
+      path: spec.dnsNames
+      content: db.internal.example.com
+  - documentIndex: 4
+    contains:
+      path: spec.dnsNames
+      content: db.internal.example.com
+  - documentIndex: 4
+    equal:
+      path: spec.ipAddresses
+      value:
+      - "10.20.30.40"
+
+- it: renders the release context in a SAN
+  release:
+    name: yb-demo
+  set:
+    tls.enabled: true
+    tls.certManager.enabled: true
+    oldNamingStyle: false
+    replicas.master: 1
+    replicas.tserver: 1
+    tls.extraSANs.dnsNames:
+    - "yb.{{ .Release.Namespace }}.example.com"
+  asserts:
+  - documentIndex: 4
+    contains:
+      path: spec.dnsNames
+      content: yb.NAMESPACE.example.com
+
+- it: resolves chart helpers in a SAN, so an endpoint Service can be named
+  release:
+    name: yb-demo
+  set:
+    tls.enabled: true
+    tls.certManager.enabled: true
+    oldNamingStyle: false
+    replicas.master: 1
+    replicas.tserver: 1
+    tls.extraSANs.dnsNames:
+    - '{{ include "yugabyte.fullname" . }}-yb-tserver-service.{{ .Release.Namespace }}.svc.{{ .Values.domainName }}'
+  asserts:
+  - documentIndex: 4
+    contains:
+      path: spec.dnsNames
+      content: yb-demo-yugabyte-yb-tserver-service.NAMESPACE.svc.cluster.local

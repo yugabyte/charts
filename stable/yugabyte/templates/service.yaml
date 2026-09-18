@@ -78,7 +78,9 @@ data:
   {{- $dns1 = printf "*.%s.svc.%s" $root.Release.Namespace $root.Values.domainName }}
 {{- end -}}
 {{- $rootCA := buildCustomCert $root.Values.tls.rootCA.cert $root.Values.tls.rootCA.key -}}
-{{- $server := genSignedCert $node ( default nil ) (list $node $dns1 $dns2 ) 3650 $rootCA }}
+{{- $extraDns := include "yugabyte.extraDnsSANs" (dict "root" $root) | splitList "\n" | compact -}}
+{{- $extraIps := $root.Values.tls.extraSANs.ipAddresses | default list -}}
+{{- $server := genSignedCert $node $extraIps (concat (list $node $dns1 $dns2) $extraDns) 3650 $rootCA }}
   node.{{$node}}.crt: {{ $server.Cert | b64enc }}
   node.{{$node}}.key: {{ $server.Key | b64enc }}
 {{- else }}
