@@ -142,8 +142,11 @@ spec:
   - {{$node}}
   {{- end }}
   - {{ printf "%s-%s.%s.svc.%s" (include "yugabyte.fullname" $root) $service.name $root.Release.Namespace $root.Values.domainName }}
+  {{- range $san := (include "yugabyte.extraDnsSANs" (dict "root" $root) | splitList "\n" | compact) }}
+  - {{ $san | quote }}
+  {{- end }}
   uris: []
-  ipAddresses: []
+  ipAddresses: {{ $root.Values.tls.extraSANs.ipAddresses | default list | toJson }}
   {{- if $root.Values.tls.certManager.certificates.commonNameRequired }}
   commonName: {{ include "yugabyte.commonNameWithSuffix" (dict "commonName" ($root.Values.oldNamingStyle | ternary $service.name (printf "%s-%s" (include "yugabyte.fullname" $root) $service.name)) "root" $root) | quote }}
   {{- end }}

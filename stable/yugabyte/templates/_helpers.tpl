@@ -825,3 +825,19 @@ useMoveOp: {{ $useMoveOp }}
 stsIndexSuffix: {{ $stsIndexSuffix | quote }}
 currentReplicas: {{ $currentReplicas }}
 {{- end -}}
+
+{{/*
+Extra DNS SANs to add to a node's server certificate, one name per line.
+
+These cover names clients may use that the Pod and headless Service names do
+not, such as the in-cluster DNS of an endpoint Service. Each entry is rendered
+with tpl, so it may reference the release.
+
+Usage: include "yugabyte.extraDnsSANs" (dict "root" $root)
+*/}}
+{{- define "yugabyte.extraDnsSANs" -}}
+  {{- $root := .root -}}
+  {{- range $san := $root.Values.tls.extraSANs.dnsNames -}}
+    {{- printf "%s\n" (tpl $san $root) -}}
+  {{- end -}}
+{{- end -}}
