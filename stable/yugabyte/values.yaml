@@ -191,6 +191,23 @@ tls:
       # If commonNameSuffix is specified, it will be used as the suffix for the commonName for the certificate.
       commonNameSuffix: ""
 
+  ## Additional Subject Alternative Names added to every node server certificate,
+  ## on top of the Pod and headless Service names the chart already computes.
+  ## Applies to both the cert-manager and the Helm-generated certificate paths.
+  ## Ignored when tls.nodeCert is supplied, since those certs are not generated here.
+  extraSANs:
+    ## Extra DNS SANs. Each entry is rendered with `tpl`, so it may reference
+    ## the release, for example:
+    ##   - "yb.{{ .Release.Namespace }}.example.com"
+    ## Chart helpers are available too, which is the reliable way to name an
+    ## endpoint Service clients connect through:
+    ##   - '{{ include "yugabyte.fullname" . }}-yb-tserver-service.{{ .Release.Namespace }}.svc.{{ .Values.domainName }}'
+    ## Prefer a stable name you control over a cloud-generated load balancer
+    ## hostname, which changes when the load balancer is recreated.
+    dnsNames: []
+    ## Extra IP SANs, for example a statically reserved load balancer IP.
+    ipAddresses: []
+
   ## When certManager.enabled=false, rootCA.cert and rootCA.key are used to generate TLS certs.
   ## When certManager.enabled=true and boostrapSelfsigned=true, rootCA is ignored.
   ## When certManager.enabled=true and bootstrapSelfsigned=false, only rootCA.cert is used
