@@ -287,6 +287,9 @@ spec:
           {{ end -}}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/bin/bash", "/ybdb_prerun/ybdb-prerun.sh"]
+          {{- if .Values.containerSecurityContext.enabled }}
+          {{- include "getSecurityContext" . | indent 10 }}
+          {{- end }}
           env:
           - name: YBDB_DATA
             value: /var/lib/ybdb
