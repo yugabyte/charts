@@ -11,6 +11,10 @@ kind: ClusterIssuer
 metadata:
   name: {{ $root.Release.Name }}-yugaware-cluster-issuer
   labels:
+    app: {{ template "yugaware.name" . }}
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 {{- if .Values.commonLabels }}
 {{ include "yugaware.commonLabels" . | indent 4 }}
 {{- end }}
@@ -24,6 +28,10 @@ metadata:
   name: {{ $root.Release.Name }}-yugaware-issuer
   namespace: {{ $root.Release.Namespace }}
   labels:
+    app: {{ template "yugaware.name" . }}
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 {{- if .Values.commonLabels }}
 {{ include "yugaware.commonLabels" . | indent 4 }}
 {{- end }}
@@ -37,6 +45,14 @@ kind: Certificate
 metadata:
   name: {{ $root.Release.Name }}-yugaware-ui-root-ca
   namespace: {{ $root.Release.Namespace }}
+  labels:
+    app: {{ template "yugaware.name" . }}
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 spec:
   isCA: true
   commonName: Yugaware self signed CA
@@ -72,6 +88,10 @@ metadata:
   name: {{ $root.Release.Name }}-yugaware-ca-issuer
   namespace: {{ $root.Release.Namespace }}
   labels:
+    app: {{ template "yugaware.name" . }}
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
 {{- if .Values.commonLabels }}
 {{ include "yugaware.commonLabels" . | indent 4 }}
 {{- end }}
@@ -86,6 +106,14 @@ kind: Certificate
 metadata:
   name: {{ $root.Release.Name }}-yugaware-ui-tls
   namespace: {{ $root.Release.Namespace }}
+  labels:
+    app: {{ template "yugaware.name" . }}
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
 spec:
   isCA: false
   commonName: {{ $tls.hostname }}
