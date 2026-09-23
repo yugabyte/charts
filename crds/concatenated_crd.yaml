@@ -2,14 +2,14 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: ybcertificates.operator.yugabyte.io
+  name: backups.operator.yugabyte.io
 spec:
   group: operator.yugabyte.io
   scope: Namespaced
   names:
-    plural: ybcertificates
-    singular: ybcertificate
-    kind: YBCertificate
+    plural: backups
+    singular: backup
+    kind: Backup
     categories:
       - all
       - yugabyte
@@ -21,71 +21,1641 @@ spec:
       storage: true
       schema:
         openAPIV3Schema:
+          description: Custom resource definition for YugabyteDB backups.
+          type: object
+          properties:
+            status:
+              type: object
+              description: Backup status for the backup custom resource.
+              properties:
+                message:
+                  description: String log message from backup controller
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the backup resource.
+                  type: string
+                taskUUID:
+                  description: Internal UUID of the task associated with the backup resource.
+                  type: string
+            spec:
+              type: object
+              properties:
+                backupType:
+                  description: >
+                    Type of backup to be taken.
+                    Allowed values are -
+                    YQL_TABLE_TYPE REDIS_TABLE_TYPE PGSQL_TABLE_TYPE TRANSACTION_STATUS_TABLE_TYPE
+                  type: string
+                  enum:
+                    - YQL_TABLE_TYPE
+                    - PGSQL_TABLE_TYPE
+                sse:
+                  description: Server side encryption for the backup.
+                  type: boolean
+                storageConfig:
+                  description: >
+                    Storage configuration for the backup,
+                    should contain name of storage config object
+                  type: string
+                universe:
+                  description: >
+                    Name of the universe for which backup is to be taken,
+                    refers to a ybuniverse CR name.
+                  type: string
+                tableByTableBackup:
+                  description: Boolean indicating if backup is to be taken table by table.
+                  type: boolean
+                keyspace:
+                  description: >
+                    Name of the YSQL database or YCQL keyspace to back up.
+                    Omit to back up all databases (YSQL) or all keyspaces (YCQL)
+                    of backupType. A named value backs up that one database/keyspace only.
+                  type: string
+                timeBeforeDelete:
+                  description: Time before backup is deleted from storage in milliseconds.
+                  type: integer
+                  minimum: 0
+                incrementalBackupBase:
+                  description: >
+                    Base backup Custom Resource name. Operator will add an incremental backup
+                    to the existing chain of backups at the last.
+                  type: string
+              required:
+              - backupType
+              - storageConfig
+              - universe
+
+
+---
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: drconfigs.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: drconfigs
+    singular: drconfig
+    kind: DrConfig
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: Custom resource definition for YugabyteDB DR config.
+          type: object
+          properties:
+            status:
+              type: object
+              description: Dr config status for the Dr config custom resource.
+              properties:
+                message:
+                  description: String log message from dr config controller
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the dr config resource.
+                  type: string
+                taskUUID:
+                  description: Internal UUID of the task associated with the dr config.
+                  type: string
+            spec:
+              type: object
+              x-kubernetes-validations:
+                - rule: self.sourceUniverse != self.targetUniverse
+                  message: "The source and target universes cannot be the same"
+                # Allow changes only for:
+                # 1. No change (normal case)
+                # 2. Switchover: source becomes target AND target becomes source
+                # 3. Failover: source becomes old target AND target becomes empty string
+                # 4. Restart/Change replica: source stays the same, target changes (including from empty to new value)
+                - rule: >
+                    (oldSelf.sourceUniverse == self.sourceUniverse && oldSelf.targetUniverse == self.targetUniverse) ||
+                    (self.sourceUniverse == oldSelf.targetUniverse && self.targetUniverse == oldSelf.sourceUniverse) ||
+                    (self.sourceUniverse == oldSelf.targetUniverse && self.targetUniverse == '') ||
+                    (self.sourceUniverse == oldSelf.sourceUniverse && self.targetUniverse != oldSelf.targetUniverse && self.targetUniverse != '')
+                  message: "sourceUniverse and targetUniverse can only be changed for switchover (swap), failover (target becomes source, target cleared), or restart/change replica (source unchanged, target changed)"
+              properties:
+                sourceUniverse:
+                  description: >
+                    Name of the source universe for which DrConfig needs to be setup.
+                    During switchover, this swaps with targetUniverse.
+                    During failover, this should be set to the old targetUniverse value.
+                  type: string
+                targetUniverse:
+                  description: >
+                    Name of the target universe for which DrConfig needs to be setup.
+                    During switchover, this swaps with sourceUniverse.
+                    Set to empty string to trigger failover operation.
+                    Can be changed to a new universe for restart after failover or to change replica.
+                  type: string
+                databases:
+                  description: >
+                    The list of databases for which replication needs to happen between the
+                    source and target universes
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  x-kubernetes-validations:
+                    - rule: self.all(db, size(db) > 0)
+                      message: "Database names cannot be empty"
+                name:
+                  description: Name of the DR config
+                  type: string
+                storageConfig:
+                  description: >
+                    Storage configuration for the backup,
+                    should contain name of storage config object
+                  type: string
+                paused:
+                  description: >
+                    Controls the active state of the DR config.
+                    Set to true to pause replication, set to false to resume.
+                    Default is false (active/running).
+                  type: boolean
+                  default: false
+              required:
+              - sourceUniverse
+              - targetUniverse
+              - databases
+              - name
+              - storageConfig
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: kmsconfigs.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: kmsconfigs
+    singular: kmsconfig
+    shortNames:
+      - ykms
+    kind: KMSConfig
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Provider
+          type: string
+          description: The KMS provider backing this configuration
+          jsonPath: .spec.provider
+        - name: State
+          type: string
+          description: The state of the KMS config
+          jsonPath: .status.state
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
           description: >
-            Custom resource definition for YugabyteDB certificate management configuration.
+            Custom resource definition for a YugabyteDB Anywhere KMS
+            (encryption at rest) configuration.
+          type: object
+          properties:
+            status:
+              description: KMS config status for the KMS config custom resource.
+              type: object
+              properties:
+                state:
+                  description: State of the KMS config (e.g. Creating, Ready, Error, InUse).
+                  type: string
+                resourceUUID:
+                  description: >
+                    Internal UUID of the KMS config in YBA. Empty until the config
+                    has been created; drives create-vs-edit reconciliation.
+                  type: string
+                taskUUID:
+                  description: Internal UUID of the most recent task associated with the KMS config.
+                  type: string
+                message:
+                  description: Message for the KMS config (validation errors, runtime-flag gating, etc.).
+                  type: string
+            spec:
+              type: object
+              x-kubernetes-validations:
+                - rule: "(self.provider == 'AWS') == has(self.aws)"
+                  message: "aws must be set if and only if provider is AWS"
+                - rule: "(self.provider == 'GCP') == has(self.gcp)"
+                  message: "gcp must be set if and only if provider is GCP"
+                - rule: "(self.provider == 'AZU') == has(self.azure)"
+                  message: "azure must be set if and only if provider is AZU"
+                - rule: "(self.provider == 'OCI') == has(self.oci)"
+                  message: "oci must be set if and only if provider is OCI"
+                - rule: "(self.provider == 'CIPHERTRUST') == has(self.cipherTrust)"
+                  message: "cipherTrust must be set if and only if provider is CIPHERTRUST"
+                - rule: "(self.provider == 'HASHICORP') == has(self.vault)"
+                  message: "vault must be set if and only if provider is HASHICORP"
+              properties:
+                name:
+                  description: Name of the KMS config as registered in YBA. Immutable.
+                  type: string
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "name is immutable"
+                provider:
+                  description: KMS provider backing this configuration. Immutable once set.
+                  type: string
+                  enum:
+                    - AWS
+                    - GCP
+                    - AZU
+                    - OCI
+                    - CIPHERTRUST
+                    - HASHICORP
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "provider is immutable"
+
+                aws:
+                  description: Configuration for AWS KMS. Required when provider is AWS.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: "self.useIAMProfile || (has(self.accessKeyIdSecret) && has(self.secretAccessKeySecret))"
+                      message: "accessKeyIdSecret and secretAccessKeySecret are required unless useIAMProfile is true"
+                  properties:
+                    useIAMProfile:
+                      description: Use the host IAM profile instead of static credentials.
+                      type: boolean
+                      default: false
+                    accessKeyIdSecret:
+                      description: Secret holding the AWS access key ID. Editable (rotatable).
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    secretAccessKeySecret:
+                      description: Secret holding the AWS secret access key. Editable (rotatable).
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    region:
+                      description: AWS region of the KMS key. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "region is immutable"
+                    cmkID:
+                      description: Customer Master Key ID. If empty, YBA creates a CMK. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "cmkID is immutable"
+                    endpoint:
+                      description: Optional custom AWS KMS endpoint. Editable.
+                      type: string
+                    cmkPolicySecret:
+                      description: >
+                        Optional Secret holding a custom CMK policy document (JSON). Applied only
+                        when YBA creates the CMK (i.e. cmkID is not set); ignored once the config
+                        exists. If omitted, the default CMK policy is used.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the policy JSON.
+                          type: string
+                      required:
+                        - name
+                        - key
+                  required:
+                    - region
+
+                gcp:
+                  description: Configuration for GCP KMS. Required when provider is GCP.
+                  type: object
+                  properties:
+                    credentialsSecret:
+                      description: >
+                        Secret holding the GCP service account credentials JSON. Required; the
+                        project ID is read from this JSON. Editable (rotatable).
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the JSON.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    location:
+                      description: GCP KMS location (e.g. global, us-east1). Immutable.
+                      type: string
+                      default: global
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "location is immutable"
+                    keyRingName:
+                      description: Name of the GCP KMS key ring. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyRingName is immutable"
+                    cryptoKeyName:
+                      description: Name of the GCP KMS crypto key. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "cryptoKeyName is immutable"
+                    protectionLevel:
+                      description: Protection level for the crypto key. Immutable.
+                      type: string
+                      enum:
+                        - SOFTWARE
+                        - HSM
+                      default: HSM
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "protectionLevel is immutable"
+                    endpoint:
+                      description: Optional custom GCP KMS endpoint. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "endpoint is immutable"
+                  required:
+                    - credentialsSecret
+                    - keyRingName
+                    - cryptoKeyName
+
+                azure:
+                  description: Configuration for Azure KMS. Required when provider is AZU.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: "self.useManagedIdentity || has(self.clientSecretSecret)"
+                      message: "clientSecretSecret is required unless useManagedIdentity is true"
+                  properties:
+                    useManagedIdentity:
+                      description: >
+                        Authenticate with an Azure managed identity (omit clientSecretSecret)
+                        instead of a service principal. clientID and tenantID are still required.
+                      type: boolean
+                      default: false
+                    clientID:
+                      description: >
+                        Azure client ID (service principal, or the managed identity client ID when
+                        useManagedIdentity is true). Required. Editable.
+                      type: string
+                    clientSecretSecret:
+                      description: Secret holding the Azure client secret. Editable (rotatable).
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    tenantID:
+                      description: Azure Active Directory tenant ID. Required. Editable.
+                      type: string
+                    keyVaultURL:
+                      description: URL of the Azure Key Vault. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyVaultURL is immutable"
+                    keyName:
+                      description: Name of the key within the Key Vault. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyName is immutable"
+                    keyAlgorithm:
+                      description: Key algorithm. Currently only RSA is supported. Immutable.
+                      type: string
+                      enum:
+                        - RSA
+                      default: RSA
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyAlgorithm is immutable"
+                    keySize:
+                      description: Key size in bits. One of 2048, 3072, 4096. Immutable.
+                      type: integer
+                      default: 2048
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keySize is immutable"
+                        - rule: self in [2048, 3072, 4096]
+                          message: "keySize must be one of 2048, 3072, 4096"
+                  required:
+                    - clientID
+                    - tenantID
+                    - keyVaultURL
+                    - keyName
+
+                oci:
+                  description: Configuration for OCI KMS. Required when provider is OCI.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: "self.useInstancePrincipal || (has(self.userOCID) && has(self.tenancyOCID) && has(self.fingerprint) && has(self.privateKeySecret))"
+                      message: "userOCID, tenancyOCID, fingerprint and privateKeySecret are required unless useInstancePrincipal is true"
+                  properties:
+                    useInstancePrincipal:
+                      description: >-
+                        Use the OCI Instance Principal of the YBA host instead of API-key
+                        credentials. The host must belong to a dynamic group with a policy
+                        granting access to the vault and key. Immutable, because the backend
+                        treats the OCI auth type as a non-editable field.
+                      type: boolean
+                      default: false
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "useInstancePrincipal is immutable"
+                    userOCID:
+                      description: OCID of the OCI user. Editable.
+                      type: string
+                    fingerprint:
+                      description: Fingerprint of the API signing key. Editable.
+                      type: string
+                    privateKeySecret:
+                      description: Secret holding the PEM private key. Editable (rotatable).
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the PEM.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    tenancyOCID:
+                      description: OCID of the OCI tenancy. Editable.
+                      type: string
+                    region:
+                      description: OCI region of the vault. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "region is immutable"
+                    compartmentOCID:
+                      description: OCID of the compartment. Editable.
+                      type: string
+                    vaultOCID:
+                      description: OCID of the OCI vault. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "vaultOCID is immutable"
+                    keyName:
+                      description: Name of the key to create or use within the vault. Immutable.
+                      type: string
+                      default: yba-master-key
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyName is immutable"
+                    keyOCID:
+                      description: OCID of an existing key to use. If empty, a key is created. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyOCID is immutable"
+                  required:
+                    - region
+                    - compartmentOCID
+                    - vaultOCID
+
+                cipherTrust:
+                  description: Configuration for CipherTrust KMS. Required when provider is CIPHERTRUST.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: "(self.authType == 'USER_CREDENTIALS') == has(self.userCredentials)"
+                      message: "userCredentials must be set if and only if authType is USER_CREDENTIALS"
+                    - rule: "(self.authType == 'REFRESH_TOKEN') == has(self.refreshTokenSecret)"
+                      message: "refreshTokenSecret must be set if and only if authType is REFRESH_TOKEN"
+                  properties:
+                    managerURL:
+                      description: URL of the CipherTrust Manager. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "managerURL is immutable"
+                    authType:
+                      description: Authentication method used against the CipherTrust Manager. Editable.
+                      type: string
+                      enum:
+                        - USER_CREDENTIALS
+                        - REFRESH_TOKEN
+                    userCredentials:
+                      description: Username and password. Required when authType is USER_CREDENTIALS. Editable.
+                      type: object
+                      properties:
+                        username:
+                          description: CipherTrust Manager username.
+                          type: string
+                        passwordSecret:
+                          description: Secret holding the password.
+                          type: object
+                          properties:
+                            name:
+                              description: Name of the Secret.
+                              type: string
+                            namespace:
+                              description: Namespace of the Secret. Defaults to the resource namespace.
+                              type: string
+                            key:
+                              description: Key within the Secret data holding the value.
+                              type: string
+                          required:
+                            - name
+                            - key
+                      required:
+                        - username
+                        - passwordSecret
+                    refreshTokenSecret:
+                      description: Secret holding the refresh token. Required when authType is REFRESH_TOKEN. Editable.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    keyName:
+                      description: Name of the key to create or use. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyName is immutable"
+                    keyAlgorithm:
+                      description: Key algorithm. Currently only AES is supported. Immutable.
+                      type: string
+                      enum:
+                        - AES
+                      default: AES
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyAlgorithm is immutable"
+                    keySize:
+                      description: Key size in bits. One of 128, 192, 256. Immutable.
+                      type: integer
+                      default: 256
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keySize is immutable"
+                        - rule: self in [128, 192, 256]
+                          message: "keySize must be one of 128, 192, 256"
+                  required:
+                    - managerURL
+                    - authType
+                    - keyName
+
+                vault:
+                  description: Configuration for HashiCorp Vault. Required when provider is HASHICORP.
+                  type: object
+                  x-kubernetes-validations:
+                    - rule: "(self.authType == 'TOKEN') == has(self.tokenSecret)"
+                      message: "tokenSecret must be set if and only if authType is TOKEN"
+                    - rule: "(self.authType == 'APPROLE') == has(self.appRole)"
+                      message: "appRole must be set if and only if authType is APPROLE"
+                    - rule: "!has(self.authNamespace) || self.authType == 'APPROLE'"
+                      message: "authNamespace is only valid when authType is APPROLE"
+                  properties:
+                    address:
+                      description: Address of the Vault server. Immutable.
+                      type: string
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "address is immutable"
+                    authType:
+                      description: Authentication method used against Vault. Editable.
+                      type: string
+                      enum:
+                        - TOKEN
+                        - APPROLE
+                    tokenSecret:
+                      description: Secret holding the Vault token. Required when authType is TOKEN. Editable.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the Secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the Secret. Defaults to the resource namespace.
+                          type: string
+                        key:
+                          description: Key within the Secret data holding the value.
+                          type: string
+                      required:
+                        - name
+                        - key
+                    appRole:
+                      description: AppRole credentials. Required when authType is APPROLE. Editable.
+                      type: object
+                      properties:
+                        roleID:
+                          description: Vault AppRole role ID.
+                          type: string
+                        secretIdSecret:
+                          description: Secret holding the AppRole secret ID.
+                          type: object
+                          properties:
+                            name:
+                              description: Name of the Secret.
+                              type: string
+                            namespace:
+                              description: Namespace of the Secret. Defaults to the resource namespace.
+                              type: string
+                            key:
+                              description: Key within the Secret data holding the value.
+                              type: string
+                          required:
+                            - name
+                            - key
+                      required:
+                        - roleID
+                        - secretIdSecret
+                    authNamespace:
+                      description: >
+                        Optional Vault namespace used for AppRole authentication. Only valid when
+                        authType is APPROLE. Editable.
+                      type: string
+                    keyName:
+                      description: Name of the transit key in Vault. Immutable.
+                      type: string
+                      default: key_yugabyte
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "keyName is immutable"
+                    secretEngine:
+                      description: Secret engine type. Fixed to transit. Immutable.
+                      type: string
+                      enum:
+                        - transit
+                      default: transit
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "secretEngine is immutable"
+                    mountPath:
+                      description: >
+                        Mount path of the transit secrets engine, relative to authNamespace when
+                        one is set (the operator prefixes it automatically). Immutable.
+                      type: string
+                      default: transit/
+                      x-kubernetes-validations:
+                        - rule: self == oldSelf
+                          message: "mountPath is immutable"
+                  required:
+                    - address
+                    - authType
+              required:
+                - name
+                - provider
+
+
+---
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: pitrconfigs.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: pitrconfigs
+    singular: pitrconfig
+    kind: PitrConfig
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: Custom resource definition for PITR config.
+          type: object
+          properties:
+            status:
+              type: object
+              description: PITR config status for the PITR config custom resource.
+              properties:
+                message:
+                  description: String log message from PITR config controller
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the PITR config resource.
+                  type: string
+                taskUUID:
+                  description: Internal UUID of the task associated with the PITR config.
+                  type: string
+            spec:
+              type: object
+              description: PITR configuration spec
+              x-kubernetes-validations:
+                - message: retentionPeriodInSeconds must be greater than intervalInSeconds
+                  rule: self.retentionPeriodInSeconds > self.intervalInSeconds
+              properties:
+                universe:
+                  description: >
+                    Name of the universe for which PitrConfig needs to be setup
+                  type: string
+                  x-kubernetes-validations:
+                  - message: universe cannot be changed
+                    rule: self == oldSelf
+                name:
+                  description: Name of the PITR config
+                  type: string
+                tableType:
+                  description: The table type for which PITR has to be configured
+                  type: string
+                  enum:
+                    - YSQL
+                    - YCQL
+                database:
+                  description: The database for which PITR has to be configured
+                  type: string
+                intervalInSeconds:
+                  description: The schedule interval of the PITR snapshot
+                  type: integer
+                  minimum: 0
+                  default: 86400
+                retentionPeriodInSeconds:
+                  description: The retention period of the PITR snapshot
+                  type: integer
+                  minimum: 0
+                  default: 604800
+              required:
+              - universe
+              - name
+              - tableType
+              - database
+
+
+---
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: pitrrestores.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: pitrrestores
+    singular: pitrrestore
+    kind: PitrRestore
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: Custom resource definition for YugabyteDB PITR restore job
+          properties:
+            status:
+              type: object
+              description: PITR restore status for the PITR restore custom resource.
+              properties:
+                message:
+                  description: String log message from PITR restore controller
+                  type: string
+                taskUUID:
+                  description: >
+                    Internal UUID of the task associated with
+                    the PITR restore resource.
+                  type: string
+            spec:
+              type: object
+              description: PITR restore specification
+              properties:
+                universe:
+                  description: >
+                    Name of the universe on which PITR restore is to be performed,
+                    refers to a ybuniverse CR name.
+                  type: string
+                  x-kubernetes-validations:
+                    - message: universe cannot be changed
+                      rule: self == oldSelf
+                pitrConfig:
+                  description: >
+                    Name of the PITR config to use for restore,
+                    refers to a pitrconfig CR name.
+                  type: string
+                  x-kubernetes-validations:
+                    - message: pitrConfig cannot be changed
+                      rule: self == oldSelf
+                restoreTime:
+                  description: >
+                    The point-in-time to restore to, specified in ISO 8601 / RFC 3339 format.
+                    UTC time with 'Z' suffix is recommended (e.g., "2024-02-09T15:30:00Z").
+                    Timezone offsets are also supported (e.g., "2024-02-09T10:30:00-05:00").
+                    Must be within the PITR config's retention window.
+                  type: string
+                  format: date-time
+                  x-kubernetes-validations:
+                    - message: restoreTime cannot be changed
+                      rule: self == oldSelf
+              required:
+                - universe
+                - pitrConfig
+                - restoreTime
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: ybproviders.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: ybproviders
+    singular: ybprovider
+    shortNames:
+      - yp
+    kind: YBProvider
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+      - name: State
+        type: string
+        description: The state of the provider
+        jsonPath: .status.state
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: Custom resource definition for YugabyteDB Kubernetes provider configuration.
           type: object
           properties:
             status:
               description: >
-                Certificate management status for the YBCertificate custom resource.
+                Provider configuration status for the provider configuration custom resource.
               type: object
               properties:
-                message:
-                  description: String log message from certificate controller.
-                  type: string
-                success:
+                state:
                   description: >
-                    Boolean indicating if the certificate configuration was successfully created.
-                  type: boolean
+                    State of the provider configuration.
+                  type: string
                 resourceUUID:
-                  description: Internal UUID of the certificate configuration resource.
+                  description: Internal UUID of the provider configuration resource.
+                  type: string
+                message:
+                  description: >
+                    Message for the provider configuration.
                   type: string
             spec:
               type: object
-              description: >
-                Specification for the YBCertificate resource.
-                Required fields: certType, certificateSecretRef
-              required:
-                - certType
-                - certificateSecretRef
               properties:
-                certType:
-                  description:
-                    Type of certificate configuration to be created.
-                    Allowed values - SELF_SIGNED, K8S_CERT_MANAGER
+                cloudInfo:
+                  description: >
+                    Cloud information for the provider configuration.
+                  type: object
+                  properties:
+                    kubernetesProvider:
+                      description:
+                        Type of provider configuration to be created.
+                        Allowed values - gke, eks, aks, openshift, custom
+                      type: string
+                      enum:
+                        - gke
+                        - eks
+                        - aks
+                        - openshift
+                        - custom
+                      x-kubernetes-validations:
+                      - message: Config type cannot be changed
+                        rule: self == oldSelf
+                    kubernetesImageRegistry:
+                      description: >
+                        Kubernetes image registry to be used for the provider configuration.
+                        This is used to pull the YugabyteDB operator image.
+                      type: string
+                    kubeConfigSecret:
+                      description: >
+                        Secret containing kubeconfig for the region.
+                        Will use in-cluster credentials if empty.
+                      type: object
+                      properties:
+                        name:
+                          description: Name of the kubeconfig secret.
+                          type: string
+                        namespace:
+                          description: Namespace of the kubeconfig secret.
+                          type: string
+                regions:
+                  description: >
+                    List of regions to be used for the provider configuration.
+                  type: array
+                  minItems: 1
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - code
+                  items:
+                    type: object
+                    required:
+                      - code
+                      - zones
+                    properties:
+                      code:
+                        description: >
+                          Code of the region to be used for the provider configuration.
+                          This is a short code like us-west1, us-east1, etc.
+                        type: string
+                      zones:
+                        description: >
+                          List of zones to be used for the provider configuration in the region.
+                        type: array
+                        minItems: 1
+                        x-kubernetes-list-type: map
+                        x-kubernetes-list-map-keys:
+                          - code
+                        items:
+                          type: object
+                          required:
+                            - code
+                          properties:
+                            code:
+                              description:  >
+                                Code of the zone to be used for the provider configuration.
+                                This is a short code like us-west1-a, us-east1-b, etc.
+                              type: string
+                            cloudInfo:
+                              description: >
+                                Cloud information for the zone.
+                              type: object
+                              x-kubernetes-validations:
+                              - rule: "!has(self.certManagerIssuerKind) || has(self.certManagerIssuerName)"
+                                message: >
+                                  If 'certManagerIssuerKind' is specified,
+                                  'certManagerIssuerName' must also be specified.
+                              properties:
+                                kubeNamespace:
+                                  description: >
+                                    Name of the Kubernetes namespace where universe nodes
+                                    are to be deployed.
+                                  type: string
+                                kubeDomain:
+                                  description: >
+                                    Domain Name for the Kubernetes cluster.
+                                  type: string
+                                kubePodAddressTemplate:
+                                  description: >
+                                    Template for forming the FQDN for a pod.
+                                    Useful to set in a multi-cluster k8s.
+                                  type: string
+                                kubernetesStorageClass:
+                                  description: >
+                                    Name of the StorageClass used for Volumes in this zone.
+                                  type: string
+                                kubeConfigSecret:
+                                  description: >
+                                    Secret containing kubeconfig for the region.
+                                    Will use in-cluster credentials if empty.
+                                  type: object
+                                  properties:
+                                    name:
+                                      description: Name of the kubeconfig secret.
+                                      type: string
+                                    namespace:
+                                      description: Namespace of the kubeconfig secret.
+                                      type: string
+                                overrides:
+                                  description: >
+                                    Kubernetes overrides for the provider.
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                certManagerIssuerKind:
+                                  description: >
+                                    Kind of the cert-manager issuer.
+                                  type: string
+                                certManagerIssuerName:
+                                  description: Name of the cert-manager issuer.
+                                  type: string
+                                certManagerIssuerGroup:
+                                  description: >
+                                    Group of the cert-manager issuer.
+                                    This is used to identify the issuer kind.
+                                  type: string
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: releases.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: releases
+    singular: release
+    kind: Release
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Version
+          type: string
+          description: The state of the universe
+          jsonPath: .spec.config.version
+        - name: Status
+          type: string
+          description: The state of the universe
+          jsonPath: .status.message
+        - name: Downloaded
+          type: string
+          description: The Software version of the Universe
+          jsonPath: .status.success
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: >
+            Custom resource definition for YugabyteDB release, describes a release.
+          properties:
+            status:
+              description: Release status on the cluster.
+              type: object
+              properties:
+                message:
+                  description: String log message from release controller
+                  type: string
+                success:
+                  description: >
+                    Boolean indicating if the release was successfully
+                    downloaded and usable
+                  type: boolean
+                resourceUUID:
+                  description: Internal UUID of the release resource.
+                  type: string
+            spec:
+              type: object
+              description: Release object specification.
+              properties:
+                config:
+                  description: Release download configration, we support GCS, S3 and HTTP.
+                  type: object
+                  properties:
+                    version:
+                      description: >
+                        Version of the release chart to use.
+                        Refer to the release charts at charts.yugabyte.com
+                      type: string
+                    downloadConfig:
+                      description: >
+                        Download configugration,
+                        we support GCS, S3 and HTTP as download sources for now.
+                      type: object
+                      x-kubernetes-validations:
+                        - rule: >-
+                            (has(self.s3) && has(self.s3.paths) && has(self.s3.paths.x86_64) ? 1 : 0) +
+                            (has(self.gcs) && has(self.gcs.paths) && has(self.gcs.paths.x86_64) ? 1 : 0) +
+                            (has(self.http) && has(self.http.paths) && has(self.http.paths.x86_64) ? 1 : 0) == 1
+                          message: "Exactly one x86_64 path must be specified across s3, gcs, and http"
+                        - rule: >-
+                            (has(self.s3) && has(self.s3.paths) && has(self.s3.paths.helmChart) ? 1 : 0) +
+                            (has(self.gcs) && has(self.gcs.paths) && has(self.gcs.paths.helmChart) ? 1 : 0) +
+                            (has(self.http) && has(self.http.paths) && has(self.http.paths.helmChart) ? 1 : 0) == 1
+                          message: "Exactly one helmChart path must be specified across s3, gcs, and http"
+                      properties:
+                        s3:
+                          description: S3 download configuration
+                          type: object
+                          properties:
+                            accessKeyId:
+                              description: S3 access key
+                              type: string
+                            secretAccessKey:
+                              description: S3 secret key. Deprecated, use secretAccessKeySecret
+                              type: string
+                            secretAccessKeySecret:
+                              description: S3 secret key secret. Overrides secretAccessKey
+                              type: object
+                              properties:
+                                name:
+                                  description: Name of the secret
+                                  type: string
+                                namespace:
+                                  description: Namespace of the secret
+                                  type: string
+                              required:
+                              - name
+                            paths:
+                              description: S3 paths to download the release from
+                              type: object
+                              properties:
+                                x86_64:
+                                  type: string
+                                  description: Optional Path to x86_64 package
+                                x86_64_checksum:
+                                  type: string
+                                  description: Checksum for x86_64 package
+                                helmChart:
+                                  type: string
+                                  description: Required Path to the Helm chart package
+                                helmChartChecksum:
+                                  description: Optional checksum for Helm chart package
+                                  type: string
+                        gcs:
+                          type: object
+                          properties:
+                            paths:
+                              type: object
+                              properties:
+                                x86_64:
+                                  type: string
+                                  description: Optional Path to x86_64 package
+                                x86_64_checksum:
+                                  type: string
+                                  description: Optional Checksum for x86_64 package
+                                helmChart:
+                                  type: string
+                                  description: Path to the Helm chart package
+                                helmChartChecksum:
+                                  type: string
+                                  description: Optional checksum for Helm chart package
+                            credentialsJson:
+                              type: string
+                              description: |
+                                GCS service key JSON. Deprecated, use credentialsJsonSecret instead.
+                            credentialsJsonSecret:
+                              type: object
+                              properties:
+                                name:
+                                  description: Name of the secret
+                                  type: string
+                                namespace:
+                                  description: Namespace of the secret
+                                  type: string
+                              required:
+                              - name
+                        http:
+                          type: object
+                          properties:
+                            paths:
+                              type: object
+                              properties:
+                                x86_64:
+                                  type: string
+                                  description: Optional Path to x86_64 package
+                                x86_64_checksum:
+                                  type: string
+                                  description: Optional Checksum for x86_64 package
+                                helmChart:
+                                  type: string
+                                  description: Path to the Helm chart package
+                                helmChartChecksum:
+                                  type: string
+                                  description: Optional checksum for Helm chart package
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: restorejobs.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: restorejobs
+    singular: restorejob
+    kind: RestoreJob
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: Custom resource definition for YugabyteDB restore job
+          properties:
+            status:
+              type: object
+              description: Restore job status for the restore job custom resource.
+              properties:
+                message:
+                  description: String log message from restore job controller
+                  type: string
+                taskUUID:
+                  description: >
+                    Internal UUID of the task associated with
+                    the restore job resource.
+                  type: string
+                resourceUUID:
+                  description: Internal UUID of the restore operation.
+                  type: string
+            spec:
+              type: object
+              properties:
+                actionType:
+                  description: Type of action to be taken. Allowed values - RESTORE
                   type: string
                   enum:
-                    - SELF_SIGNED
-                    - K8S_CERT_MANAGER
-                  x-kubernetes-validations:
-                    - rule: "self in ['SELF_SIGNED', 'K8S_CERT_MANAGER']"
-                      message: "certType must be either SELF_SIGNED or K8S_CERT_MANAGER"
+                    - RESTORE
+                universe:
+                  description: >
+                    Name of the universe for which restore is to be taken,
+                    refers to a ybuniverse CR name.
+                  type: string
+                backup:
+                  description: >
+                    Name of the backup to be restored,
+                    refers to a backup CR name.
+                  type: string
+                kmsConfig:
+                  description: >
+                    Optional. Name of the KMSConfig CR to use when restoring an
+                    encryption-at-rest (EAR) backup, used to decrypt the backup's universe keys.
+                    Required only when the backup is encrypted; leave unset for plaintext backups.
+                  type: string
+                keyspace:
+                  description: >
+                    Destination YSQL database or YCQL keyspace name.
+                    Omit to restore each backup piece to its original name.
+                    Setting this field is a rename and is only valid when the
+                    backup contains a single keyspace.
+                  type: string
 
-                # Certificate secret reference (common for both types)
-                certificateSecretRef:
-                  description: |
-                    Secret reference containing certificate and key content.
-                    For SELF_SIGNED: secret must contain both 'ca.crt' and 'ca.key'
-                    For K8S_CERT_MANAGER: secret must contain 'ca.crt'
-                    Recommended to use type: "tls" for better Kubernetes integration
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: backupschedules.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: backupschedules
+    singular: backupschedule
+    kind: BackupSchedule
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: Custom resource definition for YugabyteDB backup schedules.
+          type: object
+          properties:
+            status:
+              type: object
+              description: Schedule status for the backup schedule custom resource.
+              properties:
+                nextBackupTime:
+                  description: Timestamp of the next backup in UTC.
+                  type: string
+                previousBackupTime:
+                  description: Time of the previous backup in UTC.
+                  type: string
+                scheduleUUID:
+                  description: Internal UUID of the backup schedule resource.
+                  type: string
+                state:
+                  description: State of schedule
+                  type: string
+
+            spec:
+              type: object
+              x-kubernetes-validations:
+                - rule: self.schedulingFrequency != 0 || self.cronExpression != ''
+                  message: >
+                    "Either 'schedulingFrequency' must be non-zero or
+                    'cronExpression' must be a non-empty string."
+                # Field-level self == oldSelf is skipped when keyspace is absent
+                # (Kubernetes CEL does not evaluate rules on missing fields), so
+                # omit==omit is allowed. This spec-level rule forbids toggling
+                # between unset and set (omit cannot later gain a name, and a
+                # named keyspace cannot later be cleared).
+                - rule: has(self.keyspace) == has(oldSelf.keyspace)
+                  message: keyspace cannot be changed between unset and set
+              properties:
+                name:
+                  type: string
+                  description: Optional name of backup schedule for mapping to a YBA object.
+                  x-kubernetes-validations:
+                  - message: name cannot be changed
+                    rule: self == oldSelf
+                backupType:
+                  description: >
+                    Type of backup to be taken.
+                    Allowed values are -
+                    YQL_TABLE_TYPE PGSQL_TABLE_TYPE
+                  type: string
+                  enum:
+                    - YQL_TABLE_TYPE
+                    - PGSQL_TABLE_TYPE
+                  x-kubernetes-validations:
+                  - message: backupType cannot be changed
+                    rule: self == oldSelf
+                storageConfig:
+                  description: >
+                    Storage configuration for the backup,
+                    refers to a storageconfig CR name. Should be in the same namespace
+                    as the backupschedule.
+                  type: string
+                  x-kubernetes-validations:
+                  - message: storageConfig cannot be changed
+                    rule: self == oldSelf
+                universe:
+                  description: >
+                    Name of the universe for which backup is to be taken,
+                    refers to a ybuniverse CR name. Should be in the same namespace
+                    as the backupschedule.
+                  type: string
+                  x-kubernetes-validations:
+                  - message: universe cannot be changed
+                    rule: self == oldSelf
+                tableByTableBackup:
+                  description: Boolean indicating if backup is to be taken table by table.
+                  type: boolean
+                  x-kubernetes-validations:
+                  - message: tableByTableBackup cannot be changed
+                    rule: self == oldSelf
+                keyspace:
+                  description: >
+                    Name of the YSQL database or YCQL keyspace to back up.
+                    Omit to back up all databases (YSQL) or all keyspaces (YCQL)
+                    of backupType. A named value backs up that one database/keyspace only.
+                    Immutable: omit must stay omit, and a named value cannot change.
+                  type: string
+                  x-kubernetes-validations:
+                  - message: keyspace cannot be changed
+                    rule: self == oldSelf
+                timeBeforeDelete:
+                  description: Time before backup is deleted from storage in milliseconds.
+                  type: integer
+                  minimum: 0
+                  x-kubernetes-validations:
+                  - message: timeBeforeDelete cannot be changed
+                    rule: self == oldSelf
+                schedulingFrequency:
+                  description: Frequency of full backups in milliseconds.
+                  type: integer
+                  minimum: 3600000
+                cronExpression:
+                  description: Frequency of full backups in cron expression.
+                  type: string
+                  default: ''
+                incrementalBackupFrequency:
+                  description: Frequency of incremental backups in milliseconds
+                  type: integer
+                  minimum: 0
+                enablePointInTimeRestore:
+                  description: Enable Point in time restore for backups created with the schedule
+                  type: boolean
+                  default: false
+                  x-kubernetes-validations:
+                  - message: enablePointInTimeRestore cannot be changed
+                    rule: self == oldSelf
+              required:
+              - backupType
+              - storageConfig
+              - universe
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: storageconfigs.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: storageconfigs
+    singular: storageconfig
+    kind: StorageConfig
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: Custom resource definition for YugabyteDB backup storage configuration.
+          type: object
+          properties:
+            status:
+              description: >
+                Storage configuration status for the storage configuration custom resource.
+              type: object
+              properties:
+                message:
+                  description: String log message from storage configuration controller.
+                  type: string
+                success:
+                  description: >
+                    Boolean indicating if the storage configuration was successfully created.
+                  type: boolean
+                resourceUUID:
+                  description: Internal UUID of the storage configuration resource.
+                  type: string
+            spec:
+              type: object
+              properties:
+                config_type:
+                  description:
+                    Type of storage configuration to be created.
+                    Allowed values - STORAGE_S3, STORAGE_NFS, STORAGE_GCS, STORAGE_AZ
+                  type: string
+                  enum:
+                    - STORAGE_S3
+                    - STORAGE_NFS
+                    - STORAGE_GCS
+                    - STORAGE_AZ
+                  x-kubernetes-validations:
+                  - message: Config type cannot be changed
+                    rule: self == oldSelf
+                name:
+                  type: string
+                  description: Optional name of storage config for mapping to a YBA object.
+                  x-kubernetes-validations:
+                  - message: name cannot be changed
+                    rule: self == oldSelf
+                data:
                   type: object
+                  description: Data object to create storage configuration.
+                  properties:
+                    AWS_ACCESS_KEY_ID:
+                      description: AWS access key id for the S3 storage configuration.
+                      type: string
+                    AWS_SECRET_ACCESS_KEY:
+                      description: |
+                        AWS secret access key for the S3 storage configuration. Deprecated, use
+                        aws_secret_access_key_secret instead
+                      type: string
+                    USE_IAM:
+                      description: Use IAM for storage account access. Valid for S3/GCS/AZ.
+                      type: boolean
+                    BACKUP_LOCATION:
+                      description: Backup location for the storage configuration.
+                      type: string
+                      x-kubernetes-validations:
+                      - message: BACKUP_LOCATION cannot be changed
+                        rule: self == oldSelf
+                    GCS_CREDENTIALS_JSON:
+                      description: |
+                        GCS credentials JSON for the GCS storage configuration. Deprecated, use
+                        gcs_credentials_json_secret instead
+                      type: string
+                    AZURE_STORAGE_SAS_TOKEN:
+                      description: |
+                        Azure SAS token for the Azure storage configuration. Deprecated, use
+                        azure_storage_sas_token_secret instead
+                      type: string
+                    AWS_HOST_BASE:
+                      description: |
+                        Host of S3 bucket configuration. Valid for S3 compatible storages.
+                      type: string
+                    PATH_STYLE_ACCESS:
+                      description: |
+                        Use path style access for S3 bucket configuration. Valid for S3 compatible
+                        storages.
+                      type: boolean
+                    SIGNING_REGION:
+                      description: |
+                        Signing region to be used for S3 clients when accessing storage bucket. Use
+                        for S3 compatible storages / private S3 endpoints.
+                      type: string
                   required:
-                    - name
+                  - BACKUP_LOCATION
+                awsSecretAccessKeySecret:
+                  type: object
+                  description: |
+                    Name of the secret containing AWS_SECRET_ACCESS_KEY for the S3 storage
+                    configuration. The secret will take precedence over data.AWS_SECRET_ACCESS_KEY
                   properties:
                     name:
                       type: string
-                      description: Name of the secret (required)
-                      x-kubernetes-validations:
-                        - rule: "self.size() > 0"
-                          message: "name cannot be empty"
+                      description: Name of the secret
                     namespace:
                       type: string
-                      description: |
-                        Namespace of the secret (optional, defaults to the namespace
-                        where the YBCertificate is created)
-                      x-kubernetes-validations:
-                        - rule: "self.size() > 0"
-                          message: "name cannot be empty"
+                      description: Namespace of the secret
+                  required:
+                  - name
+                gcsCredentialsJsonSecret:
+                  type: object
+                  description: |
+                    Name of the secret containing GCS_CREDENTIALS_JSON for the GCS storage
+                    configuration. The secret will take precedence over data.GCS_CREDENTIALS_JSON
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the secret
+                    namespace:
+                      type: string
+                      description: Namespace of the secret
+                  required:
+                  - name
+                azureStorageSasTokenSecret:
+                  type: object
+                  description: |
+                    Name of the secret containing AZURE_STORAGE_SAS_TOKEN for the Azure storage
+                    configuration. The secret will take precedence over data.AZURE_STORAGE_SAS_TOKEN
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the secret
+                    namespace:
+                      type: string
+                      description: Namespace of the secret
+                  required:
+                  - name
 
 
 ---
@@ -882,1650 +2452,6 @@ spec:
                 - provider
           required:
             - spec
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: backups.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: backups
-    singular: backup
-    kind: Backup
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: Custom resource definition for YugabyteDB backups.
-          type: object
-          properties:
-            status:
-              type: object
-              description: Backup status for the backup custom resource.
-              properties:
-                message:
-                  description: String log message from backup controller
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the backup resource.
-                  type: string
-                taskUUID:
-                  description: Internal UUID of the task associated with the backup resource.
-                  type: string
-            spec:
-              type: object
-              properties:
-                backupType:
-                  description: >
-                    Type of backup to be taken.
-                    Allowed values are -
-                    YQL_TABLE_TYPE REDIS_TABLE_TYPE PGSQL_TABLE_TYPE TRANSACTION_STATUS_TABLE_TYPE
-                  type: string
-                  enum:
-                    - YQL_TABLE_TYPE
-                    - PGSQL_TABLE_TYPE
-                sse:
-                  description: Server side encryption for the backup.
-                  type: boolean
-                storageConfig:
-                  description: >
-                    Storage configuration for the backup,
-                    should contain name of storage config object
-                  type: string
-                universe:
-                  description: >
-                    Name of the universe for which backup is to be taken,
-                    refers to a ybuniverse CR name.
-                  type: string
-                tableByTableBackup:
-                  description: Boolean indicating if backup is to be taken table by table.
-                  type: boolean
-                keyspace:
-                  description: Name of keyspace to be backed up.
-                  type: string
-                timeBeforeDelete:
-                  description: Time before backup is deleted from storage in milliseconds.
-                  type: integer
-                  minimum: 0
-                incrementalBackupBase:
-                  description: >
-                    Base backup Custom Resource name. Operator will add an incremental backup
-                    to the existing chain of backups at the last.
-                  type: string
-              required:
-              - keyspace
-              - backupType
-              - storageConfig
-              - universe
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: backupschedules.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: backupschedules
-    singular: backupschedule
-    kind: BackupSchedule
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: Custom resource definition for YugabyteDB backup schedules.
-          type: object
-          properties:
-            status:
-              type: object
-              description: Schedule status for the backup schedule custom resource.
-              properties:
-                nextBackupTime:
-                  description: Timestamp of the next backup in UTC.
-                  type: string
-                previousBackupTime:
-                  description: Time of the previous backup in UTC.
-                  type: string
-                scheduleUUID:
-                  description: Internal UUID of the backup schedule resource.
-                  type: string
-                state:
-                  description: State of schedule
-                  type: string
-
-            spec:
-              type: object
-              x-kubernetes-validations:
-                - rule: self.schedulingFrequency != 0 || self.cronExpression != ''
-                  message: >
-                    "Either 'schedulingFrequency' must be non-zero or
-                    'cronExpression' must be a non-empty string."
-              properties:
-                name:
-                  type: string
-                  description: Optional name of backup schedule for mapping to a YBA object.
-                  x-kubernetes-validations:
-                  - message: name cannot be changed
-                    rule: self == oldSelf
-                backupType:
-                  description: >
-                    Type of backup to be taken.
-                    Allowed values are -
-                    YQL_TABLE_TYPE PGSQL_TABLE_TYPE
-                  type: string
-                  enum:
-                    - YQL_TABLE_TYPE
-                    - PGSQL_TABLE_TYPE
-                  x-kubernetes-validations:
-                  - message: backupType cannot be changed
-                    rule: self == oldSelf
-                storageConfig:
-                  description: >
-                    Storage configuration for the backup,
-                    refers to a storageconfig CR name. Should be in the same namespace
-                    as the backupschedule.
-                  type: string
-                  x-kubernetes-validations:
-                  - message: storageConfig cannot be changed
-                    rule: self == oldSelf
-                universe:
-                  description: >
-                    Name of the universe for which backup is to be taken,
-                    refers to a ybuniverse CR name. Should be in the same namespace
-                    as the backupschedule.
-                  type: string
-                  x-kubernetes-validations:
-                  - message: universe cannot be changed
-                    rule: self == oldSelf
-                tableByTableBackup:
-                  description: Boolean indicating if backup is to be taken table by table.
-                  type: boolean
-                  x-kubernetes-validations:
-                  - message: tableByTableBackup cannot be changed
-                    rule: self == oldSelf
-                keyspace:
-                  description: Name of keyspace to be backed up.
-                  type: string
-                  x-kubernetes-validations:
-                  - message: keyspace cannot be changed
-                    rule: self == oldSelf
-                timeBeforeDelete:
-                  description: Time before backup is deleted from storage in milliseconds.
-                  type: integer
-                  minimum: 0
-                  x-kubernetes-validations:
-                  - message: timeBeforeDelete cannot be changed
-                    rule: self == oldSelf
-                schedulingFrequency:
-                  description: Frequency of full backups in milliseconds.
-                  type: integer
-                  minimum: 3600000
-                cronExpression:
-                  description: Frequency of full backups in cron expression.
-                  type: string
-                  default: ''
-                incrementalBackupFrequency:
-                  description: Frequency of incremental backups in milliseconds
-                  type: integer
-                  minimum: 0
-                enablePointInTimeRestore:
-                  description: Enable Point in time restore for backups created with the schedule
-                  type: boolean
-                  default: false
-                  x-kubernetes-validations:
-                  - message: enablePointInTimeRestore cannot be changed
-                    rule: self == oldSelf
-              required:
-              - keyspace
-              - backupType
-              - storageConfig
-              - universe
-
-
----
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: drconfigs.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: drconfigs
-    singular: drconfig
-    kind: DrConfig
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: Custom resource definition for YugabyteDB DR config.
-          type: object
-          properties:
-            status:
-              type: object
-              description: Dr config status for the Dr config custom resource.
-              properties:
-                message:
-                  description: String log message from dr config controller
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the dr config resource.
-                  type: string
-                taskUUID:
-                  description: Internal UUID of the task associated with the dr config.
-                  type: string
-            spec:
-              type: object
-              x-kubernetes-validations:
-                - rule: self.sourceUniverse != self.targetUniverse
-                  message: "The source and target universes cannot be the same"
-                # Allow changes only for:
-                # 1. No change (normal case)
-                # 2. Switchover: source becomes target AND target becomes source
-                # 3. Failover: source becomes old target AND target becomes empty string
-                # 4. Restart/Change replica: source stays the same, target changes (including from empty to new value)
-                - rule: >
-                    (oldSelf.sourceUniverse == self.sourceUniverse && oldSelf.targetUniverse == self.targetUniverse) ||
-                    (self.sourceUniverse == oldSelf.targetUniverse && self.targetUniverse == oldSelf.sourceUniverse) ||
-                    (self.sourceUniverse == oldSelf.targetUniverse && self.targetUniverse == '') ||
-                    (self.sourceUniverse == oldSelf.sourceUniverse && self.targetUniverse != oldSelf.targetUniverse && self.targetUniverse != '')
-                  message: "sourceUniverse and targetUniverse can only be changed for switchover (swap), failover (target becomes source, target cleared), or restart/change replica (source unchanged, target changed)"
-              properties:
-                sourceUniverse:
-                  description: >
-                    Name of the source universe for which DrConfig needs to be setup.
-                    During switchover, this swaps with targetUniverse.
-                    During failover, this should be set to the old targetUniverse value.
-                  type: string
-                targetUniverse:
-                  description: >
-                    Name of the target universe for which DrConfig needs to be setup.
-                    During switchover, this swaps with sourceUniverse.
-                    Set to empty string to trigger failover operation.
-                    Can be changed to a new universe for restart after failover or to change replica.
-                  type: string
-                databases:
-                  description: >
-                    The list of databases for which replication needs to happen between the
-                    source and target universes
-                  type: array
-                  items:
-                    type: string
-                  minItems: 1
-                  x-kubernetes-validations:
-                    - rule: self.all(db, size(db) > 0)
-                      message: "Database names cannot be empty"
-                name:
-                  description: Name of the DR config
-                  type: string
-                storageConfig:
-                  description: >
-                    Storage configuration for the backup,
-                    should contain name of storage config object
-                  type: string
-                paused:
-                  description: >
-                    Controls the active state of the DR config.
-                    Set to true to pause replication, set to false to resume.
-                    Default is false (active/running).
-                  type: boolean
-                  default: false
-              required:
-              - sourceUniverse
-              - targetUniverse
-              - databases
-              - name
-              - storageConfig
-
-
----
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: pitrconfigs.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: pitrconfigs
-    singular: pitrconfig
-    kind: PitrConfig
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: Custom resource definition for PITR config.
-          type: object
-          properties:
-            status:
-              type: object
-              description: PITR config status for the PITR config custom resource.
-              properties:
-                message:
-                  description: String log message from PITR config controller
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the PITR config resource.
-                  type: string
-                taskUUID:
-                  description: Internal UUID of the task associated with the PITR config.
-                  type: string
-            spec:
-              type: object
-              description: PITR configuration spec
-              x-kubernetes-validations:
-                - message: retentionPeriodInSeconds must be greater than intervalInSeconds
-                  rule: self.retentionPeriodInSeconds > self.intervalInSeconds
-              properties:
-                universe:
-                  description: >
-                    Name of the universe for which PitrConfig needs to be setup
-                  type: string
-                  x-kubernetes-validations:
-                  - message: universe cannot be changed
-                    rule: self == oldSelf
-                name:
-                  description: Name of the PITR config
-                  type: string
-                tableType:
-                  description: The table type for which PITR has to be configured
-                  type: string
-                  enum:
-                    - YSQL
-                    - YCQL
-                database:
-                  description: The database for which PITR has to be configured
-                  type: string
-                intervalInSeconds:
-                  description: The schedule interval of the PITR snapshot
-                  type: integer
-                  minimum: 0
-                  default: 86400
-                retentionPeriodInSeconds:
-                  description: The retention period of the PITR snapshot
-                  type: integer
-                  minimum: 0
-                  default: 604800
-              required:
-              - universe
-              - name
-              - tableType
-              - database
-
-
----
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: pitrrestores.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: pitrrestores
-    singular: pitrrestore
-    kind: PitrRestore
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          description: Custom resource definition for YugabyteDB PITR restore job
-          properties:
-            status:
-              type: object
-              description: PITR restore status for the PITR restore custom resource.
-              properties:
-                message:
-                  description: String log message from PITR restore controller
-                  type: string
-                taskUUID:
-                  description: >
-                    Internal UUID of the task associated with
-                    the PITR restore resource.
-                  type: string
-            spec:
-              type: object
-              description: PITR restore specification
-              properties:
-                universe:
-                  description: >
-                    Name of the universe on which PITR restore is to be performed,
-                    refers to a ybuniverse CR name.
-                  type: string
-                  x-kubernetes-validations:
-                    - message: universe cannot be changed
-                      rule: self == oldSelf
-                pitrConfig:
-                  description: >
-                    Name of the PITR config to use for restore,
-                    refers to a pitrconfig CR name.
-                  type: string
-                  x-kubernetes-validations:
-                    - message: pitrConfig cannot be changed
-                      rule: self == oldSelf
-                restoreTime:
-                  description: >
-                    The point-in-time to restore to, specified in ISO 8601 / RFC 3339 format.
-                    UTC time with 'Z' suffix is recommended (e.g., "2024-02-09T15:30:00Z").
-                    Timezone offsets are also supported (e.g., "2024-02-09T10:30:00-05:00").
-                    Must be within the PITR config's retention window.
-                  type: string
-                  format: date-time
-                  x-kubernetes-validations:
-                    - message: restoreTime cannot be changed
-                      rule: self == oldSelf
-              required:
-                - universe
-                - pitrConfig
-                - restoreTime
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: ybproviders.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: ybproviders
-    singular: ybprovider
-    shortNames:
-      - yp
-    kind: YBProvider
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      additionalPrinterColumns:
-      - name: State
-        type: string
-        description: The state of the provider
-        jsonPath: .status.state
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: Custom resource definition for YugabyteDB Kubernetes provider configuration.
-          type: object
-          properties:
-            status:
-              description: >
-                Provider configuration status for the provider configuration custom resource.
-              type: object
-              properties:
-                state:
-                  description: >
-                    State of the provider configuration.
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the provider configuration resource.
-                  type: string
-                message:
-                  description: >
-                    Message for the provider configuration.
-                  type: string
-            spec:
-              type: object
-              properties:
-                cloudInfo:
-                  description: >
-                    Cloud information for the provider configuration.
-                  type: object
-                  properties:
-                    kubernetesProvider:
-                      description:
-                        Type of provider configuration to be created.
-                        Allowed values - gke, eks, aks, openshift, custom
-                      type: string
-                      enum:
-                        - gke
-                        - eks
-                        - aks
-                        - openshift
-                        - custom
-                      x-kubernetes-validations:
-                      - message: Config type cannot be changed
-                        rule: self == oldSelf
-                    kubernetesImageRegistry:
-                      description: >
-                        Kubernetes image registry to be used for the provider configuration.
-                        This is used to pull the YugabyteDB operator image.
-                      type: string
-                    kubeConfigSecret:
-                      description: >
-                        Secret containing kubeconfig for the region.
-                        Will use in-cluster credentials if empty.
-                      type: object
-                      properties:
-                        name:
-                          description: Name of the kubeconfig secret.
-                          type: string
-                        namespace:
-                          description: Namespace of the kubeconfig secret.
-                          type: string
-                regions:
-                  description: >
-                    List of regions to be used for the provider configuration.
-                  type: array
-                  minItems: 1
-                  x-kubernetes-list-type: map
-                  x-kubernetes-list-map-keys:
-                    - code
-                  items:
-                    type: object
-                    required:
-                      - code
-                      - zones
-                    properties:
-                      code:
-                        description: >
-                          Code of the region to be used for the provider configuration.
-                          This is a short code like us-west1, us-east1, etc.
-                        type: string
-                      zones:
-                        description: >
-                          List of zones to be used for the provider configuration in the region.
-                        type: array
-                        minItems: 1
-                        x-kubernetes-list-type: map
-                        x-kubernetes-list-map-keys:
-                          - code
-                        items:
-                          type: object
-                          required:
-                            - code
-                          properties:
-                            code:
-                              description:  >
-                                Code of the zone to be used for the provider configuration.
-                                This is a short code like us-west1-a, us-east1-b, etc.
-                              type: string
-                            cloudInfo:
-                              description: >
-                                Cloud information for the zone.
-                              type: object
-                              x-kubernetes-validations:
-                              - rule: "!has(self.certManagerIssuerKind) || has(self.certManagerIssuerName)"
-                                message: >
-                                  If 'certManagerIssuerKind' is specified,
-                                  'certManagerIssuerName' must also be specified.
-                              properties:
-                                kubeNamespace:
-                                  description: >
-                                    Name of the Kubernetes namespace where universe nodes
-                                    are to be deployed.
-                                  type: string
-                                kubeDomain:
-                                  description: >
-                                    Domain Name for the Kubernetes cluster.
-                                  type: string
-                                kubePodAddressTemplate:
-                                  description: >
-                                    Template for forming the FQDN for a pod.
-                                    Useful to set in a multi-cluster k8s.
-                                  type: string
-                                kubernetesStorageClass:
-                                  description: >
-                                    Name of the StorageClass used for Volumes in this zone.
-                                  type: string
-                                kubeConfigSecret:
-                                  description: >
-                                    Secret containing kubeconfig for the region.
-                                    Will use in-cluster credentials if empty.
-                                  type: object
-                                  properties:
-                                    name:
-                                      description: Name of the kubeconfig secret.
-                                      type: string
-                                    namespace:
-                                      description: Namespace of the kubeconfig secret.
-                                      type: string
-                                overrides:
-                                  description: >
-                                    Kubernetes overrides for the provider.
-                                  type: object
-                                  x-kubernetes-preserve-unknown-fields: true
-                                certManagerIssuerKind:
-                                  description: >
-                                    Kind of the cert-manager issuer.
-                                  type: string
-                                certManagerIssuerName:
-                                  description: Name of the cert-manager issuer.
-                                  type: string
-                                certManagerIssuerGroup:
-                                  description: >
-                                    Group of the cert-manager issuer.
-                                    This is used to identify the issuer kind.
-                                  type: string
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: releases.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: releases
-    singular: release
-    kind: Release
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      additionalPrinterColumns:
-        - name: Version
-          type: string
-          description: The state of the universe
-          jsonPath: .spec.config.version
-        - name: Status
-          type: string
-          description: The state of the universe
-          jsonPath: .status.message
-        - name: Downloaded
-          type: string
-          description: The Software version of the Universe
-          jsonPath: .status.success
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          description: >
-            Custom resource definition for YugabyteDB release, describes a release.
-          properties:
-            status:
-              description: Release status on the cluster.
-              type: object
-              properties:
-                message:
-                  description: String log message from release controller
-                  type: string
-                success:
-                  description: >
-                    Boolean indicating if the release was successfully
-                    downloaded and usable
-                  type: boolean
-                resourceUUID:
-                  description: Internal UUID of the release resource.
-                  type: string
-            spec:
-              type: object
-              description: Release object specification.
-              properties:
-                config:
-                  description: Release download configration, we support GCS, S3 and HTTP.
-                  type: object
-                  properties:
-                    version:
-                      description: >
-                        Version of the release chart to use.
-                        Refer to the release charts at charts.yugabyte.com
-                      type: string
-                    downloadConfig:
-                      description: >
-                        Download configugration,
-                        we support GCS, S3 and HTTP as download sources for now.
-                      type: object
-                      x-kubernetes-validations:
-                        - rule: >-
-                            (has(self.s3) && has(self.s3.paths) && has(self.s3.paths.x86_64) ? 1 : 0) +
-                            (has(self.gcs) && has(self.gcs.paths) && has(self.gcs.paths.x86_64) ? 1 : 0) +
-                            (has(self.http) && has(self.http.paths) && has(self.http.paths.x86_64) ? 1 : 0) == 1
-                          message: "Exactly one x86_64 path must be specified across s3, gcs, and http"
-                        - rule: >-
-                            (has(self.s3) && has(self.s3.paths) && has(self.s3.paths.helmChart) ? 1 : 0) +
-                            (has(self.gcs) && has(self.gcs.paths) && has(self.gcs.paths.helmChart) ? 1 : 0) +
-                            (has(self.http) && has(self.http.paths) && has(self.http.paths.helmChart) ? 1 : 0) == 1
-                          message: "Exactly one helmChart path must be specified across s3, gcs, and http"
-                      properties:
-                        s3:
-                          description: S3 download configuration
-                          type: object
-                          properties:
-                            accessKeyId:
-                              description: S3 access key
-                              type: string
-                            secretAccessKey:
-                              description: S3 secret key. Deprecated, use secretAccessKeySecret
-                              type: string
-                            secretAccessKeySecret:
-                              description: S3 secret key secret. Overrides secretAccessKey
-                              type: object
-                              properties:
-                                name:
-                                  description: Name of the secret
-                                  type: string
-                                namespace:
-                                  description: Namespace of the secret
-                                  type: string
-                              required:
-                              - name
-                            paths:
-                              description: S3 paths to download the release from
-                              type: object
-                              properties:
-                                x86_64:
-                                  type: string
-                                  description: Optional Path to x86_64 package
-                                x86_64_checksum:
-                                  type: string
-                                  description: Checksum for x86_64 package
-                                helmChart:
-                                  type: string
-                                  description: Required Path to the Helm chart package
-                                helmChartChecksum:
-                                  description: Optional checksum for Helm chart package
-                                  type: string
-                        gcs:
-                          type: object
-                          properties:
-                            paths:
-                              type: object
-                              properties:
-                                x86_64:
-                                  type: string
-                                  description: Optional Path to x86_64 package
-                                x86_64_checksum:
-                                  type: string
-                                  description: Optional Checksum for x86_64 package
-                                helmChart:
-                                  type: string
-                                  description: Path to the Helm chart package
-                                helmChartChecksum:
-                                  type: string
-                                  description: Optional checksum for Helm chart package
-                            credentialsJson:
-                              type: string
-                              description: |
-                                GCS service key JSON. Deprecated, use credentialsJsonSecret instead.
-                            credentialsJsonSecret:
-                              type: object
-                              properties:
-                                name:
-                                  description: Name of the secret
-                                  type: string
-                                namespace:
-                                  description: Namespace of the secret
-                                  type: string
-                              required:
-                              - name
-                        http:
-                          type: object
-                          properties:
-                            paths:
-                              type: object
-                              properties:
-                                x86_64:
-                                  type: string
-                                  description: Optional Path to x86_64 package
-                                x86_64_checksum:
-                                  type: string
-                                  description: Optional Checksum for x86_64 package
-                                helmChart:
-                                  type: string
-                                  description: Path to the Helm chart package
-                                helmChartChecksum:
-                                  type: string
-                                  description: Optional checksum for Helm chart package
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: storageconfigs.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: storageconfigs
-    singular: storageconfig
-    kind: StorageConfig
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: Custom resource definition for YugabyteDB backup storage configuration.
-          type: object
-          properties:
-            status:
-              description: >
-                Storage configuration status for the storage configuration custom resource.
-              type: object
-              properties:
-                message:
-                  description: String log message from storage configuration controller.
-                  type: string
-                success:
-                  description: >
-                    Boolean indicating if the storage configuration was successfully created.
-                  type: boolean
-                resourceUUID:
-                  description: Internal UUID of the storage configuration resource.
-                  type: string
-            spec:
-              type: object
-              properties:
-                config_type:
-                  description:
-                    Type of storage configuration to be created.
-                    Allowed values - STORAGE_S3, STORAGE_NFS, STORAGE_GCS, STORAGE_AZ
-                  type: string
-                  enum:
-                    - STORAGE_S3
-                    - STORAGE_NFS
-                    - STORAGE_GCS
-                    - STORAGE_AZ
-                  x-kubernetes-validations:
-                  - message: Config type cannot be changed
-                    rule: self == oldSelf
-                name:
-                  type: string
-                  description: Optional name of storage config for mapping to a YBA object.
-                  x-kubernetes-validations:
-                  - message: name cannot be changed
-                    rule: self == oldSelf
-                data:
-                  type: object
-                  description: Data object to create storage configuration.
-                  properties:
-                    AWS_ACCESS_KEY_ID:
-                      description: AWS access key id for the S3 storage configuration.
-                      type: string
-                    AWS_SECRET_ACCESS_KEY:
-                      description: |
-                        AWS secret access key for the S3 storage configuration. Deprecated, use
-                        aws_secret_access_key_secret instead
-                      type: string
-                    USE_IAM:
-                      description: Use IAM for storage account access. Valid for S3/GCS/AZ.
-                      type: boolean
-                    BACKUP_LOCATION:
-                      description: Backup location for the storage configuration.
-                      type: string
-                      x-kubernetes-validations:
-                      - message: BACKUP_LOCATION cannot be changed
-                        rule: self == oldSelf
-                    GCS_CREDENTIALS_JSON:
-                      description: |
-                        GCS credentials JSON for the GCS storage configuration. Deprecated, use
-                        gcs_credentials_json_secret instead
-                      type: string
-                    AZURE_STORAGE_SAS_TOKEN:
-                      description: |
-                        Azure SAS token for the Azure storage configuration. Deprecated, use
-                        azure_storage_sas_token_secret instead
-                      type: string
-                    AWS_HOST_BASE:
-                      description: |
-                        Host of S3 bucket configuration. Valid for S3 compatible storages.
-                      type: string
-                    PATH_STYLE_ACCESS:
-                      description: |
-                        Use path style access for S3 bucket configuration. Valid for S3 compatible
-                        storages.
-                      type: boolean
-                    SIGNING_REGION:
-                      description: |
-                        Signing region to be used for S3 clients when accessing storage bucket. Use
-                        for S3 compatible storages / private S3 endpoints.
-                      type: string
-                  required:
-                  - BACKUP_LOCATION
-                awsSecretAccessKeySecret:
-                  type: object
-                  description: |
-                    Name of the secret containing AWS_SECRET_ACCESS_KEY for the S3 storage
-                    configuration. The secret will take precedence over data.AWS_SECRET_ACCESS_KEY
-                  properties:
-                    name:
-                      type: string
-                      description: Name of the secret
-                    namespace:
-                      type: string
-                      description: Namespace of the secret
-                  required:
-                  - name
-                gcsCredentialsJsonSecret:
-                  type: object
-                  description: |
-                    Name of the secret containing GCS_CREDENTIALS_JSON for the GCS storage
-                    configuration. The secret will take precedence over data.GCS_CREDENTIALS_JSON
-                  properties:
-                    name:
-                      type: string
-                      description: Name of the secret
-                    namespace:
-                      type: string
-                      description: Namespace of the secret
-                  required:
-                  - name
-                azureStorageSasTokenSecret:
-                  type: object
-                  description: |
-                    Name of the secret containing AZURE_STORAGE_SAS_TOKEN for the Azure storage
-                    configuration. The secret will take precedence over data.AZURE_STORAGE_SAS_TOKEN
-                  properties:
-                    name:
-                      type: string
-                      description: Name of the secret
-                    namespace:
-                      type: string
-                      description: Namespace of the secret
-                  required:
-                  - name
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: kmsconfigs.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: kmsconfigs
-    singular: kmsconfig
-    shortNames:
-      - ykms
-    kind: KMSConfig
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      additionalPrinterColumns:
-        - name: Provider
-          type: string
-          description: The KMS provider backing this configuration
-          jsonPath: .spec.provider
-        - name: State
-          type: string
-          description: The state of the KMS config
-          jsonPath: .status.state
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          description: >
-            Custom resource definition for a YugabyteDB Anywhere KMS
-            (encryption at rest) configuration.
-          type: object
-          properties:
-            status:
-              description: KMS config status for the KMS config custom resource.
-              type: object
-              properties:
-                state:
-                  description: State of the KMS config (e.g. Creating, Ready, Error, InUse).
-                  type: string
-                resourceUUID:
-                  description: >
-                    Internal UUID of the KMS config in YBA. Empty until the config
-                    has been created; drives create-vs-edit reconciliation.
-                  type: string
-                taskUUID:
-                  description: Internal UUID of the most recent task associated with the KMS config.
-                  type: string
-                message:
-                  description: Message for the KMS config (validation errors, runtime-flag gating, etc.).
-                  type: string
-            spec:
-              type: object
-              x-kubernetes-validations:
-                - rule: "(self.provider == 'AWS') == has(self.aws)"
-                  message: "aws must be set if and only if provider is AWS"
-                - rule: "(self.provider == 'GCP') == has(self.gcp)"
-                  message: "gcp must be set if and only if provider is GCP"
-                - rule: "(self.provider == 'AZU') == has(self.azure)"
-                  message: "azure must be set if and only if provider is AZU"
-                - rule: "(self.provider == 'OCI') == has(self.oci)"
-                  message: "oci must be set if and only if provider is OCI"
-                - rule: "(self.provider == 'CIPHERTRUST') == has(self.cipherTrust)"
-                  message: "cipherTrust must be set if and only if provider is CIPHERTRUST"
-                - rule: "(self.provider == 'HASHICORP') == has(self.vault)"
-                  message: "vault must be set if and only if provider is HASHICORP"
-              properties:
-                name:
-                  description: Name of the KMS config as registered in YBA. Immutable.
-                  type: string
-                  x-kubernetes-validations:
-                    - rule: self == oldSelf
-                      message: "name is immutable"
-                provider:
-                  description: KMS provider backing this configuration. Immutable once set.
-                  type: string
-                  enum:
-                    - AWS
-                    - GCP
-                    - AZU
-                    - OCI
-                    - CIPHERTRUST
-                    - HASHICORP
-                  x-kubernetes-validations:
-                    - rule: self == oldSelf
-                      message: "provider is immutable"
-
-                aws:
-                  description: Configuration for AWS KMS. Required when provider is AWS.
-                  type: object
-                  x-kubernetes-validations:
-                    - rule: "self.useIAMProfile || (has(self.accessKeyIdSecret) && has(self.secretAccessKeySecret))"
-                      message: "accessKeyIdSecret and secretAccessKeySecret are required unless useIAMProfile is true"
-                  properties:
-                    useIAMProfile:
-                      description: Use the host IAM profile instead of static credentials.
-                      type: boolean
-                      default: false
-                    accessKeyIdSecret:
-                      description: Secret holding the AWS access key ID. Editable (rotatable).
-                      type: object
-                      properties:
-                        name:
-                          description: Name of the Secret.
-                          type: string
-                        namespace:
-                          description: Namespace of the Secret. Defaults to the resource namespace.
-                          type: string
-                        key:
-                          description: Key within the Secret data holding the value.
-                          type: string
-                      required:
-                        - name
-                        - key
-                    secretAccessKeySecret:
-                      description: Secret holding the AWS secret access key. Editable (rotatable).
-                      type: object
-                      properties:
-                        name:
-                          description: Name of the Secret.
-                          type: string
-                        namespace:
-                          description: Namespace of the Secret. Defaults to the resource namespace.
-                          type: string
-                        key:
-                          description: Key within the Secret data holding the value.
-                          type: string
-                      required:
-                        - name
-                        - key
-                    region:
-                      description: AWS region of the KMS key. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "region is immutable"
-                    cmkID:
-                      description: Customer Master Key ID. If empty, YBA creates a CMK. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "cmkID is immutable"
-                    endpoint:
-                      description: Optional custom AWS KMS endpoint. Editable.
-                      type: string
-                    cmkPolicySecret:
-                      description: >
-                        Optional Secret holding a custom CMK policy document (JSON). Applied only
-                        when YBA creates the CMK (i.e. cmkID is not set); ignored once the config
-                        exists. If omitted, the default CMK policy is used.
-                      type: object
-                      properties:
-                        name:
-                          description: Name of the Secret.
-                          type: string
-                        namespace:
-                          description: Namespace of the Secret. Defaults to the resource namespace.
-                          type: string
-                        key:
-                          description: Key within the Secret data holding the policy JSON.
-                          type: string
-                      required:
-                        - name
-                        - key
-                  required:
-                    - region
-
-                gcp:
-                  description: Configuration for GCP KMS. Required when provider is GCP.
-                  type: object
-                  properties:
-                    credentialsSecret:
-                      description: >
-                        Secret holding the GCP service account credentials JSON. Required; the
-                        project ID is read from this JSON. Editable (rotatable).
-                      type: object
-                      properties:
-                        name:
-                          description: Name of the Secret.
-                          type: string
-                        namespace:
-                          description: Namespace of the Secret. Defaults to the resource namespace.
-                          type: string
-                        key:
-                          description: Key within the Secret data holding the JSON.
-                          type: string
-                      required:
-                        - name
-                        - key
-                    location:
-                      description: GCP KMS location (e.g. global, us-east1). Immutable.
-                      type: string
-                      default: global
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "location is immutable"
-                    keyRingName:
-                      description: Name of the GCP KMS key ring. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "keyRingName is immutable"
-                    cryptoKeyName:
-                      description: Name of the GCP KMS crypto key. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "cryptoKeyName is immutable"
-                    protectionLevel:
-                      description: Protection level for the crypto key. Immutable.
-                      type: string
-                      enum:
-                        - SOFTWARE
-                        - HSM
-                      default: HSM
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "protectionLevel is immutable"
-                    endpoint:
-                      description: Optional custom GCP KMS endpoint. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "endpoint is immutable"
-                  required:
-                    - credentialsSecret
-                    - keyRingName
-                    - cryptoKeyName
-
-                azure:
-                  description: Configuration for Azure KMS. Required when provider is AZU.
-                  type: object
-                  x-kubernetes-validations:
-                    - rule: "self.useManagedIdentity || has(self.clientSecretSecret)"
-                      message: "clientSecretSecret is required unless useManagedIdentity is true"
-                  properties:
-                    useManagedIdentity:
-                      description: >
-                        Authenticate with an Azure managed identity (omit clientSecretSecret)
-                        instead of a service principal. clientID and tenantID are still required.
-                      type: boolean
-                      default: false
-                    clientID:
-                      description: >
-                        Azure client ID (service principal, or the managed identity client ID when
-                        useManagedIdentity is true). Required. Editable.
-                      type: string
-                    clientSecretSecret:
-                      description: Secret holding the Azure client secret. Editable (rotatable).
-                      type: object
-                      properties:
-                        name:
-                          description: Name of the Secret.
-                          type: string
-                        namespace:
-                          description: Namespace of the Secret. Defaults to the resource namespace.
-                          type: string
-                        key:
-                          description: Key within the Secret data holding the value.
-                          type: string
-                      required:
-                        - name
-                        - key
-                    tenantID:
-                      description: Azure Active Directory tenant ID. Required. Editable.
-                      type: string
-                    keyVaultURL:
-                      description: URL of the Azure Key Vault. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "keyVaultURL is immutable"
-                    keyName:
-                      description: Name of the key within the Key Vault. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "keyName is immutable"
-                    keyAlgorithm:
-                      description: Key algorithm. Currently only RSA is supported. Immutable.
-                      type: string
-                      enum:
-                        - RSA
-                      default: RSA
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "keyAlgorithm is immutable"
-                    keySize:
-                      description: Key size in bits. One of 2048, 3072, 4096. Immutable.
-                      type: integer
-                      default: 2048
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "keySize is immutable"
-                        - rule: self in [2048, 3072, 4096]
-                          message: "keySize must be one of 2048, 3072, 4096"
-                  required:
-                    - clientID
-                    - tenantID
-                    - keyVaultURL
-                    - keyName
-
-                oci:
-                  description: Configuration for OCI KMS. Required when provider is OCI.
-                  type: object
-                  x-kubernetes-validations:
-                    - rule: "self.useInstancePrincipal || (has(self.userOCID) && has(self.tenancyOCID) && has(self.fingerprint) && has(self.privateKeySecret))"
-                      message: "userOCID, tenancyOCID, fingerprint and privateKeySecret are required unless useInstancePrincipal is true"
-                  properties:
-                    useInstancePrincipal:
-                      description: >-
-                        Use the OCI Instance Principal of the YBA host instead of API-key
-                        credentials. The host must belong to a dynamic group with a policy
-                        granting access to the vault and key. Immutable, because the backend
-                        treats the OCI auth type as a non-editable field.
-                      type: boolean
-                      default: false
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "useInstancePrincipal is immutable"
-                    userOCID:
-                      description: OCID of the OCI user. Editable.
-                      type: string
-                    fingerprint:
-                      description: Fingerprint of the API signing key. Editable.
-                      type: string
-                    privateKeySecret:
-                      description: Secret holding the PEM private key. Editable (rotatable).
-                      type: object
-                      properties:
-                        name:
-                          description: Name of the Secret.
-                          type: string
-                        namespace:
-                          description: Namespace of the Secret. Defaults to the resource namespace.
-                          type: string
-                        key:
-                          description: Key within the Secret data holding the PEM.
-                          type: string
-                      required:
-                        - name
-                        - key
-                    tenancyOCID:
-                      description: OCID of the OCI tenancy. Editable.
-                      type: string
-                    region:
-                      description: OCI region of the vault. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "region is immutable"
-                    compartmentOCID:
-                      description: OCID of the compartment. Editable.
-                      type: string
-                    vaultOCID:
-                      description: OCID of the OCI vault. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "vaultOCID is immutable"
-                    keyName:
-                      description: Name of the key to create or use within the vault. Immutable.
-                      type: string
-                      default: yba-master-key
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "keyName is immutable"
-                    keyOCID:
-                      description: OCID of an existing key to use. If empty, a key is created. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "keyOCID is immutable"
-                  required:
-                    - region
-                    - compartmentOCID
-                    - vaultOCID
-
-                cipherTrust:
-                  description: Configuration for CipherTrust KMS. Required when provider is CIPHERTRUST.
-                  type: object
-                  x-kubernetes-validations:
-                    - rule: "(self.authType == 'USER_CREDENTIALS') == has(self.userCredentials)"
-                      message: "userCredentials must be set if and only if authType is USER_CREDENTIALS"
-                    - rule: "(self.authType == 'REFRESH_TOKEN') == has(self.refreshTokenSecret)"
-                      message: "refreshTokenSecret must be set if and only if authType is REFRESH_TOKEN"
-                  properties:
-                    managerURL:
-                      description: URL of the CipherTrust Manager. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "managerURL is immutable"
-                    authType:
-                      description: Authentication method used against the CipherTrust Manager. Editable.
-                      type: string
-                      enum:
-                        - USER_CREDENTIALS
-                        - REFRESH_TOKEN
-                    userCredentials:
-                      description: Username and password. Required when authType is USER_CREDENTIALS. Editable.
-                      type: object
-                      properties:
-                        username:
-                          description: CipherTrust Manager username.
-                          type: string
-                        passwordSecret:
-                          description: Secret holding the password.
-                          type: object
-                          properties:
-                            name:
-                              description: Name of the Secret.
-                              type: string
-                            namespace:
-                              description: Namespace of the Secret. Defaults to the resource namespace.
-                              type: string
-                            key:
-                              description: Key within the Secret data holding the value.
-                              type: string
-                          required:
-                            - name
-                            - key
-                      required:
-                        - username
-                        - passwordSecret
-                    refreshTokenSecret:
-                      description: Secret holding the refresh token. Required when authType is REFRESH_TOKEN. Editable.
-                      type: object
-                      properties:
-                        name:
-                          description: Name of the Secret.
-                          type: string
-                        namespace:
-                          description: Namespace of the Secret. Defaults to the resource namespace.
-                          type: string
-                        key:
-                          description: Key within the Secret data holding the value.
-                          type: string
-                      required:
-                        - name
-                        - key
-                    keyName:
-                      description: Name of the key to create or use. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "keyName is immutable"
-                    keyAlgorithm:
-                      description: Key algorithm. Currently only AES is supported. Immutable.
-                      type: string
-                      enum:
-                        - AES
-                      default: AES
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "keyAlgorithm is immutable"
-                    keySize:
-                      description: Key size in bits. One of 128, 192, 256. Immutable.
-                      type: integer
-                      default: 256
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "keySize is immutable"
-                        - rule: self in [128, 192, 256]
-                          message: "keySize must be one of 128, 192, 256"
-                  required:
-                    - managerURL
-                    - authType
-                    - keyName
-
-                vault:
-                  description: Configuration for HashiCorp Vault. Required when provider is HASHICORP.
-                  type: object
-                  x-kubernetes-validations:
-                    - rule: "(self.authType == 'TOKEN') == has(self.tokenSecret)"
-                      message: "tokenSecret must be set if and only if authType is TOKEN"
-                    - rule: "(self.authType == 'APPROLE') == has(self.appRole)"
-                      message: "appRole must be set if and only if authType is APPROLE"
-                    - rule: "!has(self.authNamespace) || self.authType == 'APPROLE'"
-                      message: "authNamespace is only valid when authType is APPROLE"
-                  properties:
-                    address:
-                      description: Address of the Vault server. Immutable.
-                      type: string
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "address is immutable"
-                    authType:
-                      description: Authentication method used against Vault. Editable.
-                      type: string
-                      enum:
-                        - TOKEN
-                        - APPROLE
-                    tokenSecret:
-                      description: Secret holding the Vault token. Required when authType is TOKEN. Editable.
-                      type: object
-                      properties:
-                        name:
-                          description: Name of the Secret.
-                          type: string
-                        namespace:
-                          description: Namespace of the Secret. Defaults to the resource namespace.
-                          type: string
-                        key:
-                          description: Key within the Secret data holding the value.
-                          type: string
-                      required:
-                        - name
-                        - key
-                    appRole:
-                      description: AppRole credentials. Required when authType is APPROLE. Editable.
-                      type: object
-                      properties:
-                        roleID:
-                          description: Vault AppRole role ID.
-                          type: string
-                        secretIdSecret:
-                          description: Secret holding the AppRole secret ID.
-                          type: object
-                          properties:
-                            name:
-                              description: Name of the Secret.
-                              type: string
-                            namespace:
-                              description: Namespace of the Secret. Defaults to the resource namespace.
-                              type: string
-                            key:
-                              description: Key within the Secret data holding the value.
-                              type: string
-                          required:
-                            - name
-                            - key
-                      required:
-                        - roleID
-                        - secretIdSecret
-                    authNamespace:
-                      description: >
-                        Optional Vault namespace used for AppRole authentication. Only valid when
-                        authType is APPROLE. Editable.
-                      type: string
-                    keyName:
-                      description: Name of the transit key in Vault. Immutable.
-                      type: string
-                      default: key_yugabyte
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "keyName is immutable"
-                    secretEngine:
-                      description: Secret engine type. Fixed to transit. Immutable.
-                      type: string
-                      enum:
-                        - transit
-                      default: transit
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "secretEngine is immutable"
-                    mountPath:
-                      description: >
-                        Mount path of the transit secrets engine, relative to authNamespace when
-                        one is set (the operator prefixes it automatically). Immutable.
-                      type: string
-                      default: transit/
-                      x-kubernetes-validations:
-                        - rule: self == oldSelf
-                          message: "mountPath is immutable"
-                  required:
-                    - address
-                    - authType
-              required:
-                - name
-                - provider
-
-
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: restorejobs.operator.yugabyte.io
-spec:
-  group: operator.yugabyte.io
-  scope: Namespaced
-  names:
-    plural: restorejobs
-    singular: restorejob
-    kind: RestoreJob
-    categories:
-      - all
-      - yugabyte
-  versions:
-    - name: v1alpha1
-      subresources:
-        status: {}
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          description: Custom resource definition for YugabyteDB restore job
-          properties:
-            status:
-              type: object
-              description: Restore job status for the restore job custom resource.
-              properties:
-                message:
-                  description: String log message from restore job controller
-                  type: string
-                taskUUID:
-                  description: >
-                    Internal UUID of the task associated with
-                    the restore job resource.
-                  type: string
-                resourceUUID:
-                  description: Internal UUID of the restore operation.
-                  type: string
-            spec:
-              type: object
-              properties:
-                actionType:
-                  description: Type of action to be taken. Allowed values - RESTORE
-                  type: string
-                  enum:
-                    - RESTORE
-                universe:
-                  description: >
-                    Name of the universe for which restore is to be taken,
-                    refers to a ybuniverse CR name.
-                  type: string
-                backup:
-                  description: >
-                    Name of the backup to be restored,
-                    refers to a backup CR name.
-                  type: string
-                kmsConfig:
-                  description: >
-                    Optional. Name of the KMSConfig CR to use when restoring an
-                    encryption-at-rest (EAR) backup, used to decrypt the backup's universe keys.
-                    Required only when the backup is encrypted; leave unset for plaintext backups.
-                  type: string
-                keyspace:
-                  description: Name of the keyspace to be restored.
-                  type: string
 
 
 ---
@@ -4369,6 +4295,7 @@ spec:
                         type: array
                         items:
                           type: object
+                          x-kubernetes-preserve-unknown-fields: true
                           properties:
                             name:
                               type: string
@@ -4381,6 +4308,7 @@ spec:
                         type: array
                         items:
                           type: object
+                          x-kubernetes-preserve-unknown-fields: true
                           properties:
                             name:
                               type: string
@@ -4875,6 +4803,7 @@ spec:
                         type: array
                         items:
                           type: object
+                          x-kubernetes-preserve-unknown-fields: true
                           properties:
                             name:
                               type: string
@@ -4887,6 +4816,7 @@ spec:
                         type: array
                         items:
                           type: object
+                          x-kubernetes-preserve-unknown-fields: true
                           properties:
                             name:
                               type: string
@@ -5063,5 +4993,95 @@ spec:
                       message: "universe is immutable"
               required:
                 - universe
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: ybcertificates.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: ybcertificates
+    singular: ybcertificate
+    kind: YBCertificate
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: >
+            Custom resource definition for YugabyteDB certificate management configuration.
+          type: object
+          properties:
+            status:
+              description: >
+                Certificate management status for the YBCertificate custom resource.
+              type: object
+              properties:
+                message:
+                  description: String log message from certificate controller.
+                  type: string
+                success:
+                  description: >
+                    Boolean indicating if the certificate configuration was successfully created.
+                  type: boolean
+                resourceUUID:
+                  description: Internal UUID of the certificate configuration resource.
+                  type: string
+            spec:
+              type: object
+              description: >
+                Specification for the YBCertificate resource.
+                Required fields: certType, certificateSecretRef
+              required:
+                - certType
+                - certificateSecretRef
+              properties:
+                certType:
+                  description:
+                    Type of certificate configuration to be created.
+                    Allowed values - SELF_SIGNED, K8S_CERT_MANAGER
+                  type: string
+                  enum:
+                    - SELF_SIGNED
+                    - K8S_CERT_MANAGER
+                  x-kubernetes-validations:
+                    - rule: "self in ['SELF_SIGNED', 'K8S_CERT_MANAGER']"
+                      message: "certType must be either SELF_SIGNED or K8S_CERT_MANAGER"
+
+                # Certificate secret reference (common for both types)
+                certificateSecretRef:
+                  description: |
+                    Secret reference containing certificate and key content.
+                    For SELF_SIGNED: secret must contain both 'ca.crt' and 'ca.key'
+                    For K8S_CERT_MANAGER: secret must contain 'ca.crt'
+                    Recommended to use type: "tls" for better Kubernetes integration
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the secret (required)
+                      x-kubernetes-validations:
+                        - rule: "self.size() > 0"
+                          message: "name cannot be empty"
+                    namespace:
+                      type: string
+                      description: |
+                        Namespace of the secret (optional, defaults to the namespace
+                        where the YBCertificate is created)
+                      x-kubernetes-validations:
+                        - rule: "self.size() > 0"
+                          message: "name cannot be empty"
 
 
