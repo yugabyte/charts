@@ -104,4 +104,25 @@
 {{- if ne (toString $paFips) (toString .Values.yugaware.fips.enabled) }}
   {{- fail (printf "\n\nperf-advisor-chart.fips.enabled is %v but yugaware.fips.enabled is %v.\nFIPS mode has to be on for both or neither.\n%s\n" $paFips .Values.yugaware.fips.enabled $fix) }}
 {{- end }}
+
+{{- /*
+  The sub-chart's db-init init container runs psql and pg_isready against the database in the
+  YugabyteDB Anywhere pod, so it should be the image that pod already runs - not just the same
+  postgres version. Letting them drift pulls a second postgres onto the node, and since this
+  chart's own default is the hardened build, the second one is the unhardened Docker Hub image:
+  a release that looks hardened while quietly running stock postgres in one container.
+
+  Compared field by field rather than as a whole reference because the sub-chart assembles it
+  from three values. All three have to be repeated here for the same reason the database
+  settings do - Helm resolves values before templates render.
+*/}}
+{{- $paImg := (($paRoot.image) | default dict).postgres | default dict }}
+{{- $mine := .Values.image.postgres }}
+{{- range $field := list "registry" "name" "tag" }}
+  {{- $want := toString (index $mine $field | default "") }}
+  {{- $got := toString (index $paImg $field | default "") }}
+  {{- if ne $got $want }}
+    {{- fail (printf "\n\nperf-advisor-chart.image.postgres.%s is %q but image.postgres.%s is %q.\nThe Perf Advisor db-init container talks to the database in the YugabyteDB Anywhere pod and should run the same image it does, so the node does not pull a second postgres - an unhardened one, by default.\n%s\n" $field $got $field $want $fix) }}
+  {{- end }}
+{{- end }}
 {{- end }}

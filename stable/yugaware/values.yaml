@@ -651,8 +651,16 @@ perf-advisor-chart:
 
   image:
     postgres:
-      ## Only used by the db-init init container. Matching image.postgres.tag above means
-      ## the node already has this image and does not pull a second postgres.
+      ## Only used by the db-init init container, which waits for the database and creates Perf
+      ## Advisor's own "ts" database in it. It runs psql and pg_isready against the server in the
+      ## YugabyteDB Anywhere pod, so it wants to be the same image that pod runs rather than
+      ## merely the same version: matching all three of registry, name and tag means the node
+      ## already has it and does not pull a second, unhardened postgres alongside the hardened
+      ## one. Mirror image.postgres above whenever that changes - Helm resolves values before
+      ## templates render, so this chart cannot pass its own image down to the sub-chart, and
+      ## perf-advisor-validation.yaml fails the render if the two drift apart.
+      registry: quay.io/yugabyte
+      name: hardened-postgres
       tag: '14.23'
     perfAdvisor:
       tag: '1.6.0-b7'
