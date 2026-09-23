@@ -94,4 +94,25 @@
     {{- fail (printf "\n\n%s set for YugabyteDB Anywhere, but no placement is set under perf-advisor-chart.\nThat places the Perf Advisor pod; this chart cannot pass its own placement down, because Helm resolves values before templates render.\nMirror it with perf-advisor-chart.nodeSelector, perf-advisor-chart.tolerations and perf-advisor-chart.zoneAffinity - the same values in the same form as above - set them to the placement you do want, or disable Perf Advisor with perf-advisor-chart.yugaware.enabled=false.\n" (join ", " $placed)) }}
   {{- end }}
 {{- end }}
+
+{{- /*
+  The sub-chart's db-init init container runs psql and pg_isready against the database in the
+  YugabyteDB Anywhere pod, so it should be the image that pod already runs - not just the same
+  postgres version. Letting them drift pulls a second postgres onto the node, and since this
+  chart's own default is the hardened build, the second one is the unhardened Docker Hub image:
+  a release that looks hardened while quietly running stock postgres in one container.
+
+  Compared field by field rather than as a whole reference because the sub-chart assembles it
+  from three values. All three have to be repeated here for the same reason the database
+  settings do - Helm resolves values before templates render.
+*/}}
+{{- $paImg := (($paRoot.image) | default dict).postgres | default dict }}
+{{- $mine := .Values.image.postgres }}
+{{- range $field := list "registry" "name" "tag" }}
+  {{- $want := toString (index $mine $field | default "") }}
+  {{- $got := toString (index $paImg $field | default "") }}
+  {{- if ne $got $want }}
+    {{- fail (printf "\n\nperf-advisor-chart.image.postgres.%s is %q but image.postgres.%s is %q.\nThe Perf Advisor db-init container talks to the database in the YugabyteDB Anywhere pod and should run the same image it does, so the node does not pull a second postgres - an unhardened one, by default.\n%s\n" $field $got $field $want $fix) }}
+  {{- end }}
+{{- end }}
 {{- end }}
