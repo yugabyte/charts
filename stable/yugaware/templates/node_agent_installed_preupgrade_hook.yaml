@@ -25,7 +25,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-upgrade
     "helm.sh/hook-weight": "1"
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-delete-policy": {{ include "yugaware.hookDeletePolicy" . | quote }}
   labels:
     app: "nodeagent-precheck"
     release: {{ .Release.Name | quote }}
@@ -164,7 +164,7 @@ metadata:
   annotations:
     "helm.sh/hook": pre-upgrade
     "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-delete-policy": {{ include "yugaware.hookDeletePolicy" . | quote }}
 data:
   application.docker.conf: |
     include classpath("application.common.conf")

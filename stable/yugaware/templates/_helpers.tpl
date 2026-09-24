@@ -362,3 +362,16 @@ https://{{ $releaseName }}-yugaware-ui:443
 http://{{ $releaseName }}-yugaware-ui:80
   {{- end -}}
 {{- end -}}
+{{/*
+Get the helm.sh/hook-delete-policy for hook resources.
+By default, hooks are deleted after they succeed and before a new hook is created.
+If yugaware.hooks.keepSucceedHooks is true, succeeded hooks are kept until the next
+hook of the same name is created.
+*/}}
+{{- define "yugaware.hookDeletePolicy" -}}
+  {{- if .Values.yugaware.hooks.keepSucceedHooks -}}
+before-hook-creation
+  {{- else -}}
+hook-succeeded,before-hook-creation
+  {{- end -}}
+{{- end -}}
