@@ -179,6 +179,10 @@ yugaware:
   # Example: ["X-Content-Type-Options: nosniff", "Keep-Alive: timeout=5, max=1000"]
   custom_headers: []
 
+  hooks:
+    # By default hooks are deleted on success. Set to true to keep them.
+    keepSucceedHooks: false
+
 ## Configure PostgreSQL part of the application
 postgres:
   # DO NOT CHANGE if using OCP Certified helm chart
