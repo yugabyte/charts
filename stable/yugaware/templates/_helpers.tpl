@@ -369,7 +369,7 @@ If yugaware.hooks.keepSucceedHooks is true, succeeded hooks are kept until the n
 hook of the same name is created.
 */}}
 {{- define "yugaware.hookDeletePolicy" -}}
-  {{- if (dig "hooks" "keepSucceedHooks" false (.Values.yugaware | default dict)) -}}
+  {{- if .Values.yugaware.hooks.keepSucceedHooks -}}
 before-hook-creation
   {{- else -}}
 hook-succeeded,before-hook-creation
