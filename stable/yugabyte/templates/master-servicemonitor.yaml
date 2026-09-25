@@ -32,6 +32,10 @@ spec:
     {{- else }}
     interval: {{ $.Values.serviceMonitor.interval }}
     {{- end }}
+    {{- if .params }}
+    params:
+      {{- toYaml .params | nindent 6 }}
+    {{- end }}
     relabelings:
     - targetLabel: "group"
       replacement: "yb-master"
