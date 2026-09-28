@@ -390,6 +390,8 @@ data:
             - '{__name__=~"kubelet_volume_stats_.*", persistentvolumeclaim=~"(.*)-yb-(.*)"}'
             # YBA pod and PVC metrics
             - '{pod=~"{{ .Release.Name }}-yugaware.*"}'
+            # Perf Advisor collector pods (perf-advisor-chart's <release>-main Deployment)
+            - '{pod=~"{{ .Release.Name }}-main-.*"}'
             - '{__name__=~"kubelet_volume_stats_.*", persistentvolumeclaim=~"{{ .Release.Name }}-yugaware.*"}'
         static_configs:
           - targets:
@@ -506,9 +508,9 @@ data:
             regex: "(.*)"
             target_label: "az_name"
             replacement: "$1"
-          # Keep metrics from YugabyteDB and YBA pods, discard everything else
+          # Keep metrics from YugabyteDB, YBA and Perf Advisor pods, discard everything else
           - source_labels: ["pod_name"]
-            regex: "(.*)yb-(.*)|{{ .Release.Name }}-yugaware.*"
+            regex: "(.*)yb-(.*)|{{ .Release.Name }}-yugaware.*|{{ .Release.Name }}-main-.*"
             action: keep
           # rename new name of the CPU metrics to the old name and label
           # ref: https://github.com/kubernetes/kube-state-metrics/blob/master/CHANGELOG.md#v200-alpha--2020-09-16
@@ -572,9 +574,9 @@ data:
             regex: "(.*)"
             target_label: "az_name"
             replacement: "$1"
-          # Keep metrics from YugabyteDB and YBA pods, discard everything else
+          # Keep metrics from YugabyteDB, YBA and Perf Advisor pods, discard everything else
           - source_labels: ["pod_name"]
-            regex: "(.*)yb-(.*)|{{ .Release.Name }}-yugaware.*"
+            regex: "(.*)yb-(.*)|{{ .Release.Name }}-yugaware.*|{{ .Release.Name }}-main-.*"
             action: keep
 
       {{- end }}
