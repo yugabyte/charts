@@ -1004,6 +1004,9 @@ ocpCompatibility:
 ## Set to true to run OTEL collector as a sidecar in tserver pods
 otelCollector:
   enabled: false
+  # Empty selects the chart's default, YugabyteDB's FIPS build on the hardened UBI9 base
+  # (quay.io/yugabyte/opentelemetry-collector-contrib-fips). Set it only to point at a mirror of
+  # that image.
   image: ""
   # When metricsExport is enabled, we need OTEL on master as well
   runOnMaster: false

@@ -33,9 +33,12 @@ spec:
   # config passthrough use their own bundled chart's structured assembly instead.
   config:
 {{ .Values.otelCollector.config | indent 4 }}
-  # Keep in step with ManageOtelCollector.OtelCollectorVersion; 0.121.0 is the floor (awss3
+  # YugabyteDB's own build of the collector - the unified-otelcol manifest in yugabyte-cloud, built
+  # with the FIPS 140-3 Go module on the RapidFort-curated UBI9 base the rest of YBA ships on, and
+  # published by its docker workflow under the same version as the VM tarball. Keep the tag in step
+  # with ManageOtelCollector.OtelCollectorVersion in YBA. 0.121.0 is the floor (awss3
   # s3_partition_format).
-  image: {{ .Values.otelCollector.image | default "otel/opentelemetry-collector-contrib:0.145.0" | quote }}
+  image: {{ .Values.otelCollector.image | default "quay.io/yugabyte/opentelemetry-collector-contrib-fips:0.145.0-fips" | quote }}
   ipFamilyPolicy: SingleStack
   managementState: managed
   mode: sidecar

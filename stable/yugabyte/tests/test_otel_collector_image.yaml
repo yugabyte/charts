@@ -1,0 +1,27 @@
+suite: otel collector image
+templates:
+  - templates/otel-collector.yaml
+tests:
+  # The default must be YugabyteDB's own FIPS build on the hardened base, not the upstream image;
+  # it is what every universe runs unless an override points at a mirror.
+  - it: defaults to YugabyteDB's FIPS collector image on the hardened UBI9 base
+    set:
+      otelCollector:
+        enabled: true
+        config: "x: y"
+    asserts:
+      - equal:
+          path: spec.image
+          value: quay.io/yugabyte/opentelemetry-collector-contrib-fips:0.145.0-fips
+          documentIndex: 0
+  - it: honours otelCollector.image for mirrors
+    set:
+      otelCollector:
+        enabled: true
+        config: "x: y"
+        image: mirror.example.com/yugabyte/opentelemetry-collector-contrib-fips:0.145.0-fips
+    asserts:
+      - equal:
+          path: spec.image
+          value: mirror.example.com/yugabyte/opentelemetry-collector-contrib-fips:0.145.0-fips
+          documentIndex: 0
