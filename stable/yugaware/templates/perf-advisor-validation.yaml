@@ -125,4 +125,23 @@
     {{- fail (printf "\n\nperf-advisor-chart.image.postgres.%s is %q but image.postgres.%s is %q.\nThe Perf Advisor db-init container talks to the database in the YugabyteDB Anywhere pod and should run the same image it does, so the node does not pull a second postgres - an unhardened one, by default.\n%s\n" $field $got $field $want $fix) }}
   {{- end }}
 {{- end }}
+
+{{- /*
+  Mandatory labels and security contexts have to reach Perf Advisor's resources too. Compared as
+  JSON so an integer from --set equals the same integer from a values file.
+*/}}
+{{- range $key := list "commonLabels" "securityContext" "containerSecurityContext" }}
+  {{- $want := toJson (index $.Values $key | default dict) }}
+  {{- $got := toJson (index $paRoot $key | default dict) }}
+  {{- if ne $got $want }}
+    {{- fail (printf "\n\nperf-advisor-chart.%s is %s but %s is %s.\nPerf Advisor's resources must carry the same labels and security contexts as YugabyteDB Anywhere's.\n%s\n" $key $got $key $want $fix) }}
+  {{- end }}
+{{- end }}
+
+{{- /* Both charts write these labels themselves, and use app in selectors. */}}
+{{- range $label := list "app" "chart" "release" "heritage" "app.kubernetes.io/component" "app.kubernetes.io/instance" }}
+  {{- if hasKey ($.Values.commonLabels | default dict) $label }}
+    {{- fail (printf "\n\ncommonLabels must not set %q: the chart sets that label itself.\n" $label) }}
+  {{- end }}
+{{- end }}
 {{- end }}
