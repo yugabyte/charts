@@ -54,7 +54,9 @@ tests:
   - failedTemplate:
       errorMessage: "yugaware.defaultUser cannot be registered with YugabyteDB Anywhere: yugaware.defaultUser.password does not meet the YugabyteDB Anywhere password policy: Password should contain at least 8 characters; Password should contain at least 1 upper case letters; Password should contain at least 1 digits; Password should contain at least 1 special characters"
 
-- it: rejects a backtick, which does not count as a special character
+# YBA's SPECIAL_CHARACTERS includes the backtick, so it satisfies the special-character rule and
+# is then rejected on its own.
+- it: rejects a backtick, which YBA counts as special but disallows
   set:
     yugaware.defaultUser.enabled: true
     yugaware.defaultUser.password: "Passw0rd`"
@@ -145,3 +147,35 @@ tests:
   asserts:
   - failedTemplate:
       errorMessage: "yugaware.defaultUser cannot be registered with YugabyteDB Anywhere: yugaware.defaultUser.code is 16 characters, at most 15 are allowed; yugaware.defaultUser.username is 2 characters, at least 3 are required"
+
+# Hooks are rendered on upgrade as well, but this Job only runs on install.
+- it: does not validate on upgrade, when the user already exists
+  release:
+    upgrade: true
+  set:
+    yugaware.fips.enabled: true
+    yugaware.defaultUser.enabled: true
+    yugaware.defaultUser.password: "Passw0rd!"
+    yugaware.defaultUser.code: ""
+  asserts:
+  - hasDocuments:
+      count: 1
+
+# Java's String.length() counts UTF-16 code units: an emoji is 2.
+- it: counts a character outside the BMP as 2, as Java does
+  set:
+    yugaware.defaultUser.enabled: true
+    yugaware.defaultUser.password: "Passw0rd!"
+    yugaware.defaultUser.username: "a😀"
+    yugaware.defaultUser.code: "abcdefghijklmn😀"
+  asserts:
+  - failedTemplate:
+      errorMessage: "yugaware.defaultUser cannot be registered with YugabyteDB Anywhere: yugaware.defaultUser.code is 16 characters, at most 15 are allowed"
+
+- it: counts an emoji towards the password length, but not as an upper case letter
+  set:
+    yugaware.defaultUser.enabled: true
+    yugaware.defaultUser.password: "w0rd!😀𝐀"
+  asserts:
+  - failedTemplate:
+      errorMessage: "yugaware.defaultUser cannot be registered with YugabyteDB Anywhere: yugaware.defaultUser.password does not meet the YugabyteDB Anywhere password policy: Password should contain at least 1 upper case letters"

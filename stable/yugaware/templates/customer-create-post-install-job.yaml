@@ -1,5 +1,12 @@
 {{- if .Values.yugaware.defaultUser.enabled -}}
+{{- /*
+  Helm renders hooks on every upgrade too, but this Job only runs on install. Checking then
+  would block upgrades of releases whose user already exists, over values that are no longer
+  used (for example, after turning on FIPS mode).
+*/}}
+{{- if .Release.IsInstall }}
 {{- include "yugaware.validateDefaultUser" . -}}
+{{- end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
