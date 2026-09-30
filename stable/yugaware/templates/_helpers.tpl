@@ -375,3 +375,73 @@ before-hook-creation
 hook-succeeded,before-hook-creation
   {{- end -}}
 {{- end -}}
+
+{{/*
+Fail the render when YugabyteDB Anywhere would reject the yugaware.defaultUser registration,
+listing every problem at once. Without this the post-install Job gets a 400 and the release
+installs with no user.
+
+The other fields mirror CustomerRegisterFormData: every field is @Required, code is
+@MaxLength(15), username (sent as "name") is @MinLength(3), and email must fully match Play's
+@Email pattern. Lengths are counted in characters, not bytes, as Java's String.length() does.
+
+The password mirrors PasswordPolicyService.checkPasswordPolicy: /api/register creates the
+customer and validates the password in the same call, so no customer-level policy can exist yet
+and the defaults under yb.pwdpolicy in reference.conf are what apply - 8 characters (14 in FIPS
+mode), at least one upper case letter, lower case letter, digit and special character, and no
+"`". Its messages are YugabyteDB Anywhere's own.
+*/}}
+{{- define "yugaware.validateDefaultUser" -}}
+  {{- $user := .Values.yugaware.defaultUser -}}
+  {{- $errors := list -}}
+  {{- $values := dict -}}
+  {{- range $field := list "email" "username" "code" "password" -}}
+    {{- $value := toString (index $user $field | default "") -}}
+    {{- $_ := set $values $field $value -}}
+    {{- if not $value -}}
+      {{- $errors = append $errors (printf "yugaware.defaultUser.%s must be set" $field) -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $code := len (regexFindAll "(?s)." $values.code -1) -}}
+  {{- if gt $code 15 -}}
+    {{- $errors = append $errors (printf "yugaware.defaultUser.code is %d characters, at most 15 are allowed" $code) -}}
+  {{- end -}}
+  {{- $name := len (regexFindAll "(?s)." $values.username -1) -}}
+  {{- if and $values.username (lt $name 3) -}}
+    {{- $errors = append $errors (printf "yugaware.defaultUser.username is %d characters, at least 3 are required" $name) -}}
+  {{- end -}}
+  {{- $emailPattern := "^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$" -}}
+  {{- if and $values.email (not (regexMatch $emailPattern $values.email)) -}}
+    {{- $errors = append $errors (printf "yugaware.defaultUser.email %q is not a valid email address" $values.email) -}}
+  {{- end -}}
+
+  {{- $password := $values.password -}}
+  {{- if $password -}}
+    {{- $minLength := ternary 14 8 (.Values.yugaware.fips.enabled | default false) -}}
+    {{- /* Java checks each char with Character.isUpperCase / isLowerCase / isDigit. */ -}}
+    {{- $checks := list
+          (list $minLength "(?s)." "characters")
+          (list 1 "\\p{Lu}" "upper case letters")
+          (list 1 "\\p{Ll}" "lower case letters")
+          (list 1 "\\p{Nd}" "digits")
+          (list 1 "[[:punct:]]" "special characters") -}}
+    {{- $policy := list -}}
+    {{- range $checks -}}
+      {{- $required := index . 0 -}}
+      {{- if lt (len (regexFindAll (index . 1) $password -1)) $required -}}
+        {{- $policy = append $policy (printf "Password should contain at least %d %s" $required (index . 2)) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if contains "`" $password -}}
+      {{- $policy = append $policy "Password should not contain `" -}}
+    {{- end -}}
+    {{- if $policy -}}
+      {{- $errors = append $errors (printf "yugaware.defaultUser.password does not meet the YugabyteDB Anywhere password policy: %s" (join "; " $policy)) -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- if $errors -}}
+    {{- fail (printf "yugaware.defaultUser cannot be registered with YugabyteDB Anywhere: %s" (join "; " $errors)) -}}
+  {{- end -}}
+{{- end -}}
