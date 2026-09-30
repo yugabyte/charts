@@ -218,6 +218,9 @@ spec:
             - '-c'
             - |
               /bin/bash /init-container/init-permissions.sh;
+          {{- if .Values.containerSecurityContext.enabled }}
+          {{- include "getSecurityContext" . | indent 10 }}
+          {{- end }}
           volumeMounts:
           - name: yugaware-storage
             mountPath: /opt/yugabyte/yugaware/data/
