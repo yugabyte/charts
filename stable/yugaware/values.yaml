@@ -7,6 +7,7 @@ nameOverride: ""
 
 # Common labels to apply to all objects deployed by this chart
 # This provides an escape hatch for adding custom labels globally
+# With Perf Advisor enabled, repeat them under perf-advisor-chart.commonLabels.
 commonLabels: {}
 
 # Use YugabyteDB as the backend DB for YB Anywhere (Yugaware)
@@ -630,6 +631,10 @@ perf-advisor-chart:
   yugaware:
     enabled: true
 
+  ## commonLabels, securityContext and containerSecurityContext must mirror the top-level values
+  ## of the same names: Helm does not pass them down, and templates/perf-advisor-validation.yaml
+  ## fails the render if they differ. The sub-chart's defaults already match this chart's.
+
   ## The sub-chart defaults to a 'perfadvisorserviceaccount' ServiceAccount and a
   ## 'perfadvisorsecret' pull secret, neither of which exists in this release. Empty means
   ## the namespace default ServiceAccount; the pull secret tracks image.pullSecret above.
@@ -650,7 +655,7 @@ perf-advisor-chart:
       name: hardened-postgres
       tag: '14.23'
     perfAdvisor:
-      tag: '1.5.1-b2'
+      tag: '1.6.0-b7'
 
   perfAdvisor:
     ## Lower than the sub-chart's own default of 2 CPU / 4Gi, which is sized for a standalone
