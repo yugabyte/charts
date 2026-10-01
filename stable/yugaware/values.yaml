@@ -139,10 +139,16 @@ yugaware:
     enabled: false
 
   # Create an initial user for YugabyteDB Anywhere. A user is required for YBA workflows.
+  #
+  # Templating fails if YugabyteDB Anywhere would reject any of these: every field is required,
+  # username needs at least 3 characters, code at most 15, and email must be a valid address.
   defaultUser:
     enabled: false
     username: yugabyte_k8s
-    # Please set the password. Templating will fail if it is not set.
+    # Please set the password. Templating fails if it is not set, or if YugabyteDB Anywhere's
+    # default password policy would reject it: at least 8 characters (14 with fips.enabled),
+    # with at least one upper case letter, lower case letter, digit and special character
+    # (!"#$%&'()*+,-./:;<=>?@[\]^_{|}~), and no backtick.
     password: ""
     code: k8soperator
     email: yugabyte_k8s@yugabyte.com
