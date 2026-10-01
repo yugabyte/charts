@@ -1,4 +1,12 @@
 {{- if .Values.yugaware.defaultUser.enabled -}}
+{{- /*
+  Helm renders hooks on every upgrade too, but this Job only runs on install. Checking then
+  would block upgrades of releases whose user already exists, over values that are no longer
+  used (for example, after turning on FIPS mode).
+*/}}
+{{- if .Release.IsInstall }}
+{{- include "yugaware.validateDefaultUser" . -}}
+{{- end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -91,8 +99,28 @@ spec:
         {{- if .Values.hooks.postInstallJob.resources }}
         resources: {{- toYaml .Values.hooks.postInstallJob.resources | nindent 10 }}
         {{- end }}
+        {{- /*
+          Built with toJson rather than spliced into a JSON literal: the password policy
+          requires a special character, and a quote or backslash there would otherwise
+          produce a body YugabyteDB Anywhere cannot parse, or a manifest Helm cannot.
+        */}}
+        {{- $body := dict
+              "email" (toString .Values.yugaware.defaultUser.email)
+              "password" (toString .Values.yugaware.defaultUser.password)
+              "code" (toString .Values.yugaware.defaultUser.code)
+              "name" (toString .Values.yugaware.defaultUser.username) }}
         command:
         - "curl"
+        # Without --fail a 4xx/5xx still exits 0, the hook is recorded as succeeded and the
+        # release comes up with no user. The platform may still be starting when this runs.
+        - "--fail"
+        - "--silent"
+        - "--show-error"
+        - "--retry"
+        - "30"
+        - "--retry-delay"
+        - "10"
+        - "--retry-connrefused"
         - "-X"
         - "POST"
         - "--url"
@@ -100,11 +128,5 @@ spec:
         - "--header"
         - "Content-Type: application/json"
         - "--data"
-        - '{"email": "{{ .Values.yugaware.defaultUser.email}}",
-{{- if eq .Values.yugaware.defaultUser.password ""}}
-{{- fail ".Values.yugaware.defaultUser.password cannot be empty string"}}
-{{- end }}
-"password": "{{ .Values.yugaware.defaultUser.password }}",
-"code": "operator",
-"name": "{{ .Values.yugaware.defaultUser.username }}"}'
+        - {{ $body | toJson | toJson }}
 {{- end -}}
