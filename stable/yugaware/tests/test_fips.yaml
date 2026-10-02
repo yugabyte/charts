@@ -164,3 +164,83 @@ tests:
     postgres.external.pass: short
   asserts:
   - notFailedTemplate: {}
+
+# FIPS mode is fixed at install. The installed mode is read from the running StatefulSet's
+# yugaware args, so these mock that lookup.
+- it: turning FIPS on for a release installed without it is rejected
+  template: templates/fips-validation.yaml
+  release: &release {name: yw, namespace: yb}
+  kubernetesProvider: &nonFipsRelease
+    scheme: &stsScheme
+      "apps/v1/StatefulSet":
+        gvr: {group: apps, version: v1, resource: statefulsets}
+        namespaced: true
+    objects:
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      metadata: {name: yw-yugaware, namespace: yb}
+      spec:
+        template:
+          spec:
+            containers:
+            - name: yugaware
+              args: ["bin/yugaware", "-Dconfig.file=/data/application.docker.conf"]
+  set:
+    yugaware.fips.enabled: true
+  asserts:
+  - failedTemplate:
+      errorPattern: 'installed with FIPS mode off, (.|\n)*Set yugaware\.fips\.enabled=false'
+
+- it: turning FIPS off for a release installed with it is rejected
+  template: templates/fips-validation.yaml
+  release: *release
+  kubernetesProvider: &fipsRelease
+    scheme: *stsScheme
+    objects:
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      metadata: {name: yw-yugaware, namespace: yb}
+      spec:
+        template:
+          spec:
+            containers:
+            - name: yugaware
+              args:
+              - bin/yugaware
+              - -Dorg.bouncycastle.fips.approved_only=true
+              - -Dconfig.file=/data/application.docker.conf
+  set:
+    yugaware.fips.enabled: false
+  asserts:
+  - failedTemplate:
+      errorPattern: 'installed with FIPS mode on, (.|\n)*Set yugaware\.fips\.enabled=true'
+
+- it: an upgrade that keeps the installed FIPS mode is accepted
+  template: templates/fips-validation.yaml
+  release: *release
+  kubernetesProvider: *fipsRelease
+  set:
+    yugaware.fips.enabled: true
+    postgres.external.host: db.example.com
+    postgres.external.pass: a-long-enough-password
+  asserts:
+  - notFailedTemplate: {}
+
+- it: so does one that keeps it off
+  template: templates/fips-validation.yaml
+  release: *release
+  kubernetesProvider: *nonFipsRelease
+  set:
+    yugaware.fips.enabled: false
+  asserts:
+  - notFailedTemplate: {}
+
+- it: a fresh install can choose either mode
+  template: templates/fips-validation.yaml
+  release: *release
+  set:
+    yugaware.fips.enabled: true
+    postgres.external.host: db.example.com
+    postgres.external.pass: a-long-enough-password
+  asserts:
+  - notFailedTemplate: {}

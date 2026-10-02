@@ -42,3 +42,22 @@
   {{- fail (printf "\n\n%s is %d bytes, but FIPS mode needs at least %d.\nPostgreSQL SCRAM authentication derives its key with PBKDF2 through the FIPS module, which\nrejects anything shorter, so YugabyteDB Anywhere and Perf Advisor would both fail to reach\nthe database on startup.\nRotate the database password to a longer one, or disable FIPS mode with yugaware.fips.enabled=false.\n" $field (len $password) $minBytes) }}
 {{- end }}
 {{- end }}
+
+{{- /*
+  FIPS mode is fixed at install: an existing release cannot be converted to or from it. The
+  running StatefulSet's yugaware args say which mode it was installed in. lookup returns nothing
+  under helm template, --dry-run and ArgoCD, so this only applies against a live cluster.
+*/}}
+{{- $sts := lookup "apps/v1" "StatefulSet" .Release.Namespace (printf "%s-yugaware" .Release.Name) }}
+{{- if $sts }}
+  {{- $installedFips := false }}
+  {{- range (($sts.spec).template.spec.containers | default list) }}
+    {{- if and (eq .name "yugaware") (has "-Dorg.bouncycastle.fips.approved_only=true" (.args | default list)) }}
+      {{- $installedFips = true }}
+    {{- end }}
+  {{- end }}
+  {{- $wantFips := .Values.yugaware.fips.enabled | default false }}
+  {{- if ne (toString $installedFips) (toString $wantFips) }}
+    {{- fail (printf "\n\nThis release was installed with FIPS mode %s, and an existing YugabyteDB Anywhere cannot be converted to or from FIPS mode.\nSet yugaware.fips.enabled=%t.\n" (ternary "on" "off" $installedFips) $installedFips) }}
+  {{- end }}
+{{- end }}
