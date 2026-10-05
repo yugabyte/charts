@@ -64,17 +64,12 @@ spec:
         {{- toYaml .Values.securityContext.additionalSettings | nindent 8 }}
         {{- end }}
       {{- else if not .Values.ocpCompatibility.enabled }}
-      # securityContext is disabled, but the hardened image now defaults to a non-root
-      # user (uid 10001). On upgrade from an older root deployment the data on the
-      # persistent volume is still root-owned, so apply fsGroup to give the non-root
-      # process group access to it. Only fsGroup is set -- runAsUser/runAsNonRoot are
-      # left to the image default so an image that still defaults to root keeps working.
-      # OCP is excluded (the SCC assigns fsGroup).
+      # securityContext disabled: run as root, as releases before the hardened
+      # (non-root) images did. Postgres and the major-version migration still drop to
+      # the data owner. No fsGroup, so enabling securityContext later still gets the
+      # kubelet's one-time regroup of the volume. OCP is excluded (the SCC sets the UID).
       securityContext:
-        fsGroup: {{ .Values.securityContext.fsGroup | default 10001 }}
-        {{- if (semverCompare ">=1.20-x" .Capabilities.KubeVersion.Version) }}
-        fsGroupChangePolicy: {{ .Values.securityContext.fsGroupChangePolicy }}
-        {{- end }}
+        runAsUser: 0
       {{- end }}
       {{- if .Values.nodeSelector }}
       nodeSelector:
@@ -195,6 +190,12 @@ spec:
             items:
               - key: postgresql.conf.sample
                 path: postgresql.conf.sample
+        - name: pg-poststart
+          configMap:
+            name: {{ .Release.Name }}-yugaware-pg-poststart
+            items:
+              - key: pg-poststart.sh
+                path: pg-poststart.sh
           {{- if .Values.postgres.extraVolumes -}}
             {{- include "yugaware.isExtraVolumesMappingExists" .Values.postgres -}}
             {{- .Values.postgres.extraVolumes | toYaml | nindent 8 -}}
@@ -316,8 +317,8 @@ spec:
           - name: prometheus-init-script
             mountPath: /prometheus-init
         {{- end }}
-        {{- if .Values.securityContext.enabled }}
         {{- if not .Values.useYugabyteDB }}
+        {{- if and .Values.securityContext.enabled (not .Values.postgres.external.host) }}
         - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           name: postgres-init
           {{- if .Values.initContainers.dbInit.resources }}
@@ -329,19 +330,20 @@ spec:
           {{- include "getSecurityContext" . | indent 10 }}
           {{- end }}
           env:
+            # Empty on OpenShift, where the Red Hat image manages its own data dir.
             - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
+              value: "{{ if not .Values.ocpCompatibility.enabled }}/pg_volume/postgres_data_{{ include "yugaware.pgMajor" . }}/pgdata{{ end }}"
             - name: PG_UID
               value: {{ .Values.securityContext.runAsUser | quote }}
             - name: PG_GID
               value: {{ .Values.securityContext.runAsGroup | quote }}
           volumeMounts:
           - name: yugaware-storage
-            mountPath: /var/lib/postgresql/data
-            subPath: postgres_data_14
+            mountPath: /pg_volume
           - name: pg-init
             mountPath: /pg_prerun
-        {{- else }}
+        {{- end }}
+        {{- else if .Values.securityContext.enabled }}
         - image: {{ include "full_image" (dict "containerName" "ybdb" "root" .) }}
           name: ybdb-init
           {{- if .Values.initContainers.dbInit.resources }}
@@ -368,6 +370,29 @@ spec:
           - name: ybdb-init
             mountPath: /ybdb_prerun
         {{- end }}
+        {{- if and (not .Values.useYugabyteDB) (not .Values.postgres.external.host) (not .Values.ocpCompatibility.enabled) }}
+        - image: {{ include "full_image" (dict "containerName" "postgresUpgrade" "root" .) }}
+          name: pg-major-upgrade
+          {{- if .Values.initContainers.pgMajorUpgrade.resources }}
+          resources: {{- toYaml .Values.initContainers.pgMajorUpgrade.resources | nindent 12 }}
+          {{ end -}}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.containerSecurityContext.enabled }}
+          {{- include "getSecurityContext" . | indent 10 }}
+          {{- end }}
+          env:
+            - name: PG_TARGET_MAJOR
+              value: {{ include "yugaware.pgMajor" . | quote }}
+            - name: UPGRADE_REVISION
+              value: {{ .Release.Revision | quote }}
+          volumeMounts:
+          # Whole volume: reads postgres_data_<old>, writes postgres_data_<new>.
+          - name: yugaware-storage
+            mountPath: /var/lib/postgresql
+          # The new cluster's initdb must pick up the chart's settings, as on a fresh install.
+          - name: pg-sample-config
+            mountPath: /usr/pgsql-{{ include "yugaware.pgMajor" . }}/share/postgresql.conf.sample
+            subPath: postgresql.conf.sample
         {{- end }}
       containers:
         {{ if not ( or .Values.useYugabyteDB .Values.postgres.external.host) }}
@@ -393,7 +418,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_db
-            {{- if and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io") }}
+            {{- if .Values.ocpCompatibility.enabled }}
             # Hardcoded the POSTGRESQL_USER because it's mandatory env var in RH PG image
             # It doesn't have access to create the DB, so YBA fails to create the perf_advisor DB.
             # Need to use admin user of RH PG image (postgres)
@@ -424,6 +449,12 @@ spec:
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
             {{- end }}
+          {{- if not .Values.ocpCompatibility.enabled }}
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/bash", "/pg_poststart/pg-poststart.sh"]
+          {{- end }}
           ports:
             - containerPort: 5432
               name: postgres
@@ -435,16 +466,20 @@ spec:
 
           volumeMounts:
             - name: yugaware-storage
-              {{- if and (.Values.ocpCompatibility.enabled) (eq .Values.image.postgres.registry "registry.redhat.io") }}
+              {{- if .Values.ocpCompatibility.enabled }}
               mountPath: /var/lib/pgsql/data
               subPath: postgres_data_13
               {{- else }}
               mountPath: /var/lib/postgresql/data
-              subPath: postgres_data_14
+              subPath: postgres_data_{{ include "yugaware.pgMajor" . }}
               {{- end }}
             - name: pg-sample-config
               mountPath: {{ .Values.image.postgres.sampleConfLocation }}
               subPath: postgresql.conf.sample
+            {{- if not .Values.ocpCompatibility.enabled }}
+            - name: pg-poststart
+              mountPath: /pg_poststart
+            {{- end }}
          {{- if .Values.postgres.extraVolumeMounts -}}
           {{- include "yugaware.isExtraVolumesMappingExists" .Values.postgres -}}
           {{- .Values.postgres.extraVolumeMounts | toYaml | nindent 12 -}}

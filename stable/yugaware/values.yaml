@@ -34,11 +34,24 @@ image:
   postgres:
     # For non default postgres image, set postgres.sampleConfig values accordingly.
     registry: quay.io/yugabyte
-    tag: '14.23'
+    tag: '18.6'
     name: hardened-postgres
+    # Postgres major version of the image above. Names the data directory
+    # (postgres_data_<major>) and is the target of the major-version migration.
+    # Leave empty to take it from the tag ("18.6" -> 18); set it only when the tag
+    # does not start with the major version, e.g. a retagged mirror ("prod").
+    majorVersion: ""
     # Postgres postgresql.conf.sample location on container. This will be used to mount
     # configmap with custom settings.
     sampleConfLocation: /usr/share/postgresql/postgresql.conf.sample
+
+  # Init container that migrates the bundled Postgres data to the major version of
+  # image.postgres with pg_upgrade. No-op on fresh installs and once migrated.
+  # Rollback to an older Postgres major is not supported.
+  postgresUpgrade:
+    registry: quay.io/yugabyte
+    tag: pg-18-b1
+    name: yba-postgres-upgrade
 
   prometheus:
     registry: quay.io/yugabyte
@@ -555,6 +568,13 @@ initContainers:
         cpu: "0.25"
         memory: 500Mi
 
+  ## Bundled Postgres major-version migration (image.postgresUpgrade).
+  pgMajorUpgrade:
+    resources:
+      requests:
+        cpu: "0.5"
+        memory: 500Mi
+
 preupgradeChecks:
   enabled: true
 
@@ -675,7 +695,7 @@ perf-advisor-chart:
       ## perf-advisor-validation.yaml fails the render if the two drift apart.
       registry: quay.io/yugabyte
       name: hardened-postgres
-      tag: '14.23'
+      tag: '18.6'
     perfAdvisor:
       tag: '1.7.0-b2'
 

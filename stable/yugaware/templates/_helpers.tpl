@@ -463,3 +463,26 @@ Length of a string in UTF-16 code units, which is what Java's String.length() re
     {{- fail (printf "yugaware.defaultUser cannot be registered with YugabyteDB Anywhere: %s" (join "; " $errors)) -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+Postgres major version of the bundled postgres image: image.postgres.majorVersion
+when set, otherwise the leading number of image.postgres.tag ("18.6" -> "18").
+Names the data directory and is the migration target. When both are set they must
+agree, which catches a stale override after a tag bump.
+*/}}
+{{- define "yugaware.pgMajor" -}}
+  {{- $tag := toString .Values.image.postgres.tag -}}
+  {{- $explicit := toString (.Values.image.postgres.majorVersion | default "") -}}
+  {{- $fromTag := regexFind "^[0-9]+" $tag -}}
+  {{- if and $explicit (not (regexMatch "^[0-9]+$" $explicit)) -}}
+    {{- fail (printf "image.postgres.majorVersion must be a Postgres major version such as 18 (got %q)" $explicit) -}}
+  {{- end -}}
+  {{- if and $explicit $fromTag (ne $explicit $fromTag) (not .Values.ocpCompatibility.enabled) -}}
+    {{- fail (printf "image.postgres.tag %q is Postgres %s but image.postgres.majorVersion is %s. Set them to the same major version, or leave majorVersion empty." $tag $fromTag $explicit) -}}
+  {{- end -}}
+  {{- $major := $explicit | default $fromTag -}}
+  {{- if not $major -}}
+    {{- fail (printf "Cannot tell the Postgres major version: image.postgres.tag %q does not start with one. Set image.postgres.majorVersion, e.g. 18." $tag) -}}
+  {{- end -}}
+  {{- $major -}}
+{{- end -}}

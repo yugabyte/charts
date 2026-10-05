@@ -264,32 +264,30 @@ data:
     #!/bin/bash
     set -x -o errexit
 
-    if [ -d "$PGDATA" ]; then
-        OWNER_ID=$(stat -c '%u' "$PGDATA")
-        
-        # If ownership is wrong, perform the "Copy-Replace" Fix
-        if [ "$OWNER_ID" != "$PG_UID" ]; then
-            echo "Starting copy-replace as PG data dir owner $OWNER_ID does not match run user $PG_UID"
-            
-            # Clean path string (remove trailing slash)
-            SAFE_PGDATA=${PGDATA%/}
-            BACKUP_DIR="${SAFE_PGDATA}_temp_fix"
+    # Postgres refuses a data dir it does not own. Hand every cluster on the
+    # volume to $PG_UID (e.g. after a runAsUser change); during an upgrade the old
+    # cluster must be ours before pg-major-upgrade reads it.
 
-            # A. Move curent data dir
-            # (fsGroup gives us write access to the parent folder)
-            mv "$SAFE_PGDATA" "$BACKUP_DIR"
+    # Copy-replace, as files created by cp are ours. Copy first and swap after,
+    # so a failed copy leaves the original in place.
+    take_ownership() {
+        d="$1"
+        OWNER_ID=$(stat -c '%u' "$d")
+        [ "$OWNER_ID" = "$PG_UID" ] && return
+        echo "Starting copy-replace as $d owner $OWNER_ID does not match run user $PG_UID"
+        rm -rf "$d.yba_new"
+        cp -R "$d" "$d.yba_new"
+        mv "$d" "$d.yba_old"
+        mv "$d.yba_new" "$d"
+        rm -rf "$d.yba_old" || echo "Warning: could not remove $d.yba_old; delete it manually"
+        echo "Ownership fixed successfully."
+    }
 
-            # B. Copy it back 
-            # (cp creates NEW files, so they are automatically owned by US)
-            cp -R "$BACKUP_DIR" "$SAFE_PGDATA"
+    for d in /pg_volume/postgres_data_*/pgdata; do
+        [ -d "$d" ] && take_ownership "$d"
+    done
 
-            # C. Cleanup
-            rm -rf "$BACKUP_DIR"
-            echo "Ownership fixed successfully."
-        fi
-    else
-        # If directory does not exist, simply create it.
-        # Since we are creating it, we will automatically own it.
+    if [ -n "$PGDATA" ] && [ ! -d "$PGDATA" ]; then
         echo "Creating new data directory..."
         mkdir -p "$PGDATA"
     fi
@@ -313,6 +311,43 @@ data:
     {{- range $conf_key, $conf_value := .Values.postgres.sampleConfig }}
     {{ $conf_key }} = {{ squote $conf_value }}
     {{- end }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-yugaware-pg-poststart
+  labels:
+    app: {{ template "yugaware.name" . }}
+    chart: {{ template "yugaware.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
+data:
+  pg-poststart.sh: |
+    #!/bin/bash
+    # One-time follow-up to a major-version migration, under the serving image.
+    # As a postStart hook it runs before YBA's container starts. Always exits 0 so
+    # a failure cannot kill postgres; without the done-file it retries next start.
+    set -o pipefail
+    D=/var/lib/postgresql/data
+    [ -f "$D/.yba-migration-done" ] && [ ! -f "$D/.yba-post-migration-done" ] || exit 0
+    exec >>"$D/yba-post-migration.log" 2>&1
+    echo "$(date -u +%FT%TZ) post-migration steps starting"
+    # -U is required: the run UID has no passwd entry, so libpq has no default user.
+    for i in $(seq 1 120); do pg_isready -q -h /var/run/postgresql -U "$POSTGRES_USER" && break; sleep 5; done
+    q() { psql -h /var/run/postgresql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 "$@"; }
+    # The migration recorded its own glibc's collation version; record the serving
+    # image's, or every connection warns. REFRESH rejects databases with none recorded.
+    q -Atc "SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION;', datname) FROM pg_database
+            WHERE datcollversion IS DISTINCT FROM pg_database_collation_actual_version(oid)
+              AND datcollversion IS NOT NULL" | q -q || exit 0
+    vacuumdb -h /var/run/postgresql -U "$POSTGRES_USER" --all --analyze-in-stages --missing-stats-only || exit 0
+    touch "$D/.yba-post-migration-done"
+    echo "$(date -u +%FT%TZ) post-migration steps done"
+    exit 0
 
 {{- end }}
 
