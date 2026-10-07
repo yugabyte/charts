@@ -75,9 +75,9 @@ Source - https://github.com/helm/charts/issues/5167#issuecomment-843962731
 */}}
 {{- define "getOrGeneratePassword" }}
 {{- $len := (default 8 .Length) | int -}}
-{{- $obj := (lookup "v1" .Kind .Namespace .Name).data -}}
-{{- if $obj }}
-{{- index $obj .Key -}}
+{{- $existing := index ((lookup "v1" .Kind .Namespace .Name).data | default dict) .Key -}}
+{{- if $existing }}
+{{- $existing -}}
 {{- else if (eq (lower .Kind) "secret") -}}
 {{- randAlphaNum $len | b64enc -}}
 {{- else -}}
@@ -94,13 +94,15 @@ installations are upgraded, and use getOrGeneratePassword.
 */}}
 {{- define "getOrGeneratePasswordConfigMapToSecret" }}
 {{- $len := (default 8 .Length) | int -}}
-{{- $obj := (lookup "v1" "Secret" .Namespace .Name).data -}}
-{{- if $obj }}
-{{- index $obj .Key -}}
+{{- /* Keyed on the entry, not the object: a key added in a later chart version (keystore_password
+when TLS is turned on by upgrade) is missing from an existing Secret and must still be generated. */ -}}
+{{- $existing := index ((lookup "v1" "Secret" .Namespace .Name).data | default dict) .Key -}}
+{{- if $existing }}
+{{- $existing -}}
 {{- else -}}
-{{- $obj := (lookup "v1" "ConfigMap" .Namespace .Name).data -}}
-{{- if $obj }}
-{{- index $obj .Key | b64enc -}}
+{{- $existing = index ((lookup "v1" "ConfigMap" .Namespace .Name).data | default dict) .Key -}}
+{{- if $existing }}
+{{- $existing | b64enc -}}
 {{- else -}}
 {{- randAlphaNum $len | b64enc -}}
 {{- end -}}
