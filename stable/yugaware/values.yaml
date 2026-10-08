@@ -677,7 +677,7 @@ perf-advisor-chart:
       name: hardened-postgres
       tag: '14.23'
     perfAdvisor:
-      tag: '1.6.0-b7'
+      tag: '1.7.0-b2'
 
   perfAdvisor:
     ## Lower than the sub-chart's own default of 2 CPU / 4Gi, which is sized for a standalone
