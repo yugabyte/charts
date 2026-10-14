@@ -271,7 +271,9 @@ spec:
             mountPath: /prometheus-init
         {{- end }}
         {{- if not .Values.useYugabyteDB }}
-        {{- if and .Values.securityContext.enabled (not .Values.postgres.external.host) }}
+        {{- if and (eq (include "checkInitPermissionsRequired" .) "true") (not .Values.postgres.external.host) }}
+        # Creates pgdata as the server's UID and takes over any pgdata it does not own, which
+        # the Red Hat image needs before it chmods its data dir.
         - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
           name: postgres-init
           {{- if .Values.initContainers.dbInit.resources }}
@@ -283,13 +285,14 @@ spec:
           {{- include "getSecurityContext" . | indent 10 }}
           {{- end }}
           env:
-            # Empty on OpenShift, where the Red Hat image manages its own data dir.
             - name: PGDATA
-              value: "{{ if not .Values.ocpCompatibility.enabled }}/pg_volume/postgres_data_{{ include "yugaware.pgMajor" . }}/pgdata{{ end }}"
+              value: /pg_volume/postgres_data_{{ include "yugaware.pgMajor" . }}/pgdata
+            {{- if .Values.securityContext.enabled }}
             - name: PG_UID
               value: {{ .Values.securityContext.runAsUser | quote }}
             - name: PG_GID
               value: {{ .Values.securityContext.runAsGroup | quote }}
+            {{- end }}
           volumeMounts:
           - name: yugaware-storage
             mountPath: /pg_volume
@@ -323,7 +326,7 @@ spec:
           - name: ybdb-init
             mountPath: /ybdb_prerun
         {{- end }}
-        {{- if and (not .Values.useYugabyteDB) (not .Values.postgres.external.host) (not .Values.ocpCompatibility.enabled) }}
+        {{- if and (not .Values.useYugabyteDB) (not .Values.postgres.external.host) }}
         - image: {{ include "full_image" (dict "containerName" "postgresUpgrade" "root" .) }}
           name: pg-major-upgrade
           {{- if .Values.initContainers.pgMajorUpgrade.resources }}
@@ -397,17 +400,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_db
-            {{- else }}
-            # The RH Postgres image doesn't allow this directory to be changed.
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
             {{- end }}
-          {{- if not .Values.ocpCompatibility.enabled }}
+            - name: PGDATA
+              value: {{ include "yugaware.pgDataDir" . }}
           lifecycle:
             postStart:
               exec:
                 command: ["/bin/bash", "/pg_poststart/pg-poststart.sh"]
-          {{- end }}
           ports:
             - containerPort: 5432
               name: postgres
@@ -418,21 +417,21 @@ spec:
           {{ end }}
 
           volumeMounts:
+            # Holds pgdata/, the migration's done-marker and the post-start state.
             - name: yugaware-storage
-              {{- if .Values.ocpCompatibility.enabled }}
-              mountPath: /var/lib/pgsql/data
-              subPath: postgres_data_13
-              {{- else }}
               mountPath: /var/lib/postgresql/data
               subPath: postgres_data_{{ include "yugaware.pgMajor" . }}
-              {{- end }}
+            {{- if ne (include "yugaware.pgDataDir" .) "/var/lib/postgresql/data/pgdata" }}
+            # The image keeps its data elsewhere (e.g. Red Hat's fixed userdata/): serve pgdata/ there.
+            - name: yugaware-storage
+              mountPath: {{ include "yugaware.pgDataDir" . }}
+              subPath: postgres_data_{{ include "yugaware.pgMajor" . }}/pgdata
+            {{- end }}
             - name: pg-sample-config
               mountPath: {{ .Values.image.postgres.sampleConfLocation }}
               subPath: postgresql.conf.sample
-            {{- if not .Values.ocpCompatibility.enabled }}
             - name: pg-poststart
               mountPath: /pg_poststart
-            {{- end }}
          {{- if .Values.postgres.extraVolumeMounts -}}
           {{- include "yugaware.isExtraVolumesMappingExists" .Values.postgres -}}
           {{- .Values.postgres.extraVolumeMounts | toYaml | nindent 12 -}}
