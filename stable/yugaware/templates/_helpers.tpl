@@ -505,21 +505,39 @@ Length of a string in UTF-16 code units, which is what Java's String.length() re
 Postgres major version of the bundled postgres image: image.postgres.majorVersion
 when set, otherwise the leading number of image.postgres.tag ("18.6" -> "18").
 Names the data directory and is the migration target. When both are set they must
-agree, which catches a stale override after a tag bump.
+agree, which catches a stale override after a tag bump. Only a tag that reads as a
+version counts ("18", "18.6", "18-alpine"): a build number such as the Red Hat
+image's "1-1791892090" says nothing about the major version.
 */}}
 {{- define "yugaware.pgMajor" -}}
   {{- $tag := toString .Values.image.postgres.tag -}}
   {{- $explicit := toString (.Values.image.postgres.majorVersion | default "") -}}
-  {{- $fromTag := regexFind "^[0-9]+" $tag -}}
+  {{- $fromTag := regexFind "^[0-9]+" (regexFind "^[0-9]+([.]|-[A-Za-z]|$)" $tag) -}}
   {{- if and $explicit (not (regexMatch "^[0-9]+$" $explicit)) -}}
     {{- fail (printf "image.postgres.majorVersion must be a Postgres major version such as 18 (got %q)" $explicit) -}}
   {{- end -}}
-  {{- if and $explicit $fromTag (ne $explicit $fromTag) (not .Values.ocpCompatibility.enabled) -}}
+  {{- if and $explicit $fromTag (ne $explicit $fromTag) -}}
     {{- fail (printf "image.postgres.tag %q is Postgres %s but image.postgres.majorVersion is %s. Set them to the same major version, or leave majorVersion empty." $tag $fromTag $explicit) -}}
   {{- end -}}
   {{- $major := $explicit | default $fromTag -}}
   {{- if not $major -}}
-    {{- fail (printf "Cannot tell the Postgres major version: image.postgres.tag %q does not start with one. Set image.postgres.majorVersion, e.g. 18." $tag) -}}
+    {{- fail (printf "Cannot tell the Postgres major version: image.postgres.tag %q is not a version (e.g. a build number or a retagged mirror). Set image.postgres.majorVersion, e.g. 18." $tag) -}}
   {{- end -}}
   {{- $major -}}
+{{- end -}}
+
+{{/*
+image.postgres.dataDir, checked. postgres_data_<major> is mounted at /var/lib/postgresql/data
+for the migration's state, so the data directory may sit there only as its pgdata/ (the
+default); any other path below it would add a stray mount point to the volume.
+*/}}
+{{- define "yugaware.pgDataDir" -}}
+  {{- $dir := clean (toString (.Values.image.postgres.dataDir | default "/var/lib/postgresql/data/pgdata")) -}}
+  {{- if not (isAbs $dir) -}}
+    {{- fail (printf "image.postgres.dataDir must be an absolute path (got %q)" $dir) -}}
+  {{- end -}}
+  {{- if and (or (eq $dir "/var/lib/postgresql/data") (hasPrefix "/var/lib/postgresql/data/" $dir)) (ne $dir "/var/lib/postgresql/data/pgdata") -}}
+    {{- fail (printf "image.postgres.dataDir %q is inside /var/lib/postgresql/data, where the chart keeps the migration state; use /var/lib/postgresql/data/pgdata or a path outside it" $dir) -}}
+  {{- end -}}
+  {{- $dir -}}
 {{- end -}}
