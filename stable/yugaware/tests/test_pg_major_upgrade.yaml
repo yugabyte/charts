@@ -1,0 +1,377 @@
+suite: Bundled Postgres major-version migration
+templates:
+- statefulset.yaml
+- configs.yaml
+tests:
+- it: runs pg-major-upgrade after postgres-init, on the whole volume, with the chart's sample config
+  template: statefulset.yaml
+  asserts:
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].image
+      value: quay.io/yugabyte/yba-postgres-upgrade:pg-18-b1
+  - contains:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].volumeMounts
+      content:
+        name: yugaware-storage
+        mountPath: /var/lib/postgresql
+  - contains:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].volumeMounts
+      content:
+        name: pg-sample-config
+        mountPath: /usr/pgsql-18/share/postgresql.conf.sample
+        subPath: postgresql.conf.sample
+  - exists:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].env[?(@.name == "UPGRADE_REVISION")].value
+  - equal:
+      path: spec.template.spec.initContainers[-1].name
+      value: pg-major-upgrade
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].env[?(@.name == "PG_TARGET_MAJOR")].value
+      value: "18"
+
+- it: serves postgres 18 from postgres_data_18 with the post-start hook
+  template: statefulset.yaml
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "postgres")].image
+      value: quay.io/yugabyte/hardened-postgres:18.6
+  - contains:
+      path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts
+      content:
+        name: yugaware-storage
+        mountPath: /var/lib/postgresql/data
+        subPath: postgres_data_18
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "postgres")].lifecycle.postStart.exec.command
+      value: ["/bin/bash", "/pg_poststart/pg-poststart.sh"]
+
+- it: postgres-init mounts the whole volume and creates the new data dir
+  template: statefulset.yaml
+  asserts:
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")].env[?(@.name == "PGDATA")].value
+      value: /pg_volume/postgres_data_18/pgdata
+  - contains:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")].volumeMounts
+      content:
+        name: yugaware-storage
+        mountPath: /pg_volume
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")].env[?(@.name == "PG_UID")].value
+      value: "10001"
+
+- it: postgres-init fixes ownership of every cluster on the volume, without naming versions
+  template: configs.yaml
+  documentSelector:
+    path: metadata.name
+    value: RELEASE-NAME-yugaware-pg-prerun
+  asserts:
+  - matchRegex:
+      path: data["pg-prerun.sh"]
+      pattern: for d in /pg_volume/postgres_data_\*/pgdata
+  - notMatchRegex:
+      path: data["pg-prerun.sh"]
+      pattern: userdata
+  - notMatchRegex:
+      path: data["pg-prerun.sh"]
+      pattern: chown
+
+- it: derives every version-specific path from image.postgres.tag
+  template: statefulset.yaml
+  set:
+    image.postgres.tag: "19.1"
+    perf-advisor-chart.image.postgres.tag: "19.1"
+  asserts:
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].env[?(@.name == "PG_TARGET_MAJOR")].value
+      value: "19"
+  - contains:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].volumeMounts
+      content:
+        name: pg-sample-config
+        mountPath: /usr/pgsql-19/share/postgresql.conf.sample
+        subPath: postgresql.conf.sample
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")].env[?(@.name == "PGDATA")].value
+      value: /pg_volume/postgres_data_19/pgdata
+  - contains:
+      path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts
+      content:
+        name: yugaware-storage
+        mountPath: /var/lib/postgresql/data
+        subPath: postgres_data_19
+
+- it: uses majorVersion when the tag carries no version, e.g. a retagged mirror
+  template: statefulset.yaml
+  set:
+    image.postgres.tag: prod
+    image.postgres.majorVersion: 18
+    perf-advisor-chart.image.postgres.tag: prod
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts
+      content:
+        name: yugaware-storage
+        mountPath: /var/lib/postgresql/data
+        subPath: postgres_data_18
+
+- it: fails early when neither the tag nor majorVersion gives a major version
+  template: statefulset.yaml
+  set:
+    image.postgres.tag: prod
+    perf-advisor-chart.image.postgres.tag: prod
+  asserts:
+  - failedTemplate:
+      errorMessage: "Cannot tell the Postgres major version: image.postgres.tag \"prod\" is not a version (e.g. a build number or a retagged mirror). Set image.postgres.majorVersion, e.g. 18."
+
+- it: fails when majorVersion disagrees with the tag
+  template: statefulset.yaml
+  set:
+    image.postgres.majorVersion: 19
+  asserts:
+  - failedTemplate:
+      errorMessage: 'image.postgres.tag "18.6" is Postgres 18 but image.postgres.majorVersion is 19. Set them to the same major version, or leave majorVersion empty.'
+
+- it: fails when majorVersion is not a number
+  template: statefulset.yaml
+  set:
+    image.postgres.majorVersion: latest
+  asserts:
+  - failedTemplate:
+      errorMessage: 'image.postgres.majorVersion must be a Postgres major version such as 18 (got "latest")'
+
+- it: takes the major version from any tag that reads as a version
+  template: statefulset.yaml
+  set:
+    image.postgres.tag: 18-alpine
+    perf-advisor-chart.image.postgres.tag: 18-alpine
+  asserts:
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].env[?(@.name == "PG_TARGET_MAJOR")].value
+      value: "18"
+
+- it: serves pgdata/ through PGDATA alone with the default dataDir
+  template: statefulset.yaml
+  set:
+    image.postgres.dataDir: /var/lib/postgresql/data/pgdata/
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "postgres")].env[?(@.name == "PGDATA")].value
+      value: /var/lib/postgresql/data/pgdata
+  - notExists:
+      path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts[?(@.subPath == "postgres_data_18/pgdata")]
+
+- it: serves pgdata/ at a custom dataDir, for an image with a fixed data path
+  template: statefulset.yaml
+  set:
+    image.postgres.dataDir: /data/pg
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "postgres")].env[?(@.name == "PGDATA")].value
+      value: /data/pg
+  - contains:
+      path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts
+      content:
+        name: yugaware-storage
+        mountPath: /data/pg
+        subPath: postgres_data_18/pgdata
+  - contains:
+      path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts
+      content:
+        name: yugaware-storage
+        mountPath: /var/lib/postgresql/data
+        subPath: postgres_data_18
+  - notExists:
+      path: spec.template.spec.containers[?(@.name == "postgres")].env[?(@.name == "POSTGRESQL_USER")]
+
+- it: rejects a dataDir inside the migration state mount
+  template: statefulset.yaml
+  set:
+    image.postgres.dataDir: /var/lib/postgresql/data
+  asserts:
+  - failedTemplate:
+      errorMessage: 'image.postgres.dataDir "/var/lib/postgresql/data" is inside /var/lib/postgresql/data, where the chart keeps the migration state; use /var/lib/postgresql/data/pgdata or a path outside it'
+
+- it: rejects a relative dataDir
+  template: statefulset.yaml
+  set:
+    image.postgres.dataDir: pgdata
+  asserts:
+  - failedTemplate:
+      errorMessage: 'image.postgres.dataDir must be an absolute path (got "pgdata")'
+
+- it: with securityContext disabled, runs the pod as root and migrates without the ownership fix
+  template: statefulset.yaml
+  set:
+    securityContext.enabled: false
+    perf-advisor-chart.securityContext.enabled: false
+  asserts:
+  - equal:
+      path: spec.template.spec.securityContext.runAsUser
+      value: 0
+  - notExists:
+      path: spec.template.spec.securityContext.fsGroup
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")]
+  - exists:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")]
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext
+  - notExists:
+      path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
+
+- it: with securityContext disabled, renders no ownership-fix script
+  template: configs.yaml
+  set:
+    securityContext.enabled: false
+    perf-advisor-chart.securityContext.enabled: false
+  asserts:
+  - notMatchRegex:
+      path: metadata.name
+      pattern: pg-prerun$
+
+- it: with securityContext enabled, leaves the UID to the pod securityContext
+  template: statefulset.yaml
+  asserts:
+  - equal:
+      path: spec.template.spec.securityContext.runAsUser
+      value: 10001
+  - notExists:
+      path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext
+
+- it: migrates the Red Hat image on OpenShift and serves postgres_data_18/pgdata from userdata/
+  template: statefulset.yaml
+  values:
+  - ../openshift.values.yaml
+  asserts:
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")].image
+      value: registry.redhat.io/rhel9/postgresql-18:1-1791892090
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")].env[?(@.name == "PGDATA")].value
+      value: /pg_volume/postgres_data_18/pgdata
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")].env[?(@.name == "PG_UID")]
+  - notExists:
+      path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].env[?(@.name == "PG_TARGET_MAJOR")].value
+      value: "18"
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "postgres")].image
+      value: registry.redhat.io/rhel9/postgresql-18:1-1791892090
+  - contains:
+      path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts
+      content:
+        name: yugaware-storage
+        mountPath: /var/lib/pgsql/data/userdata
+        subPath: postgres_data_18/pgdata
+  - contains:
+      path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts
+      content:
+        name: yugaware-storage
+        mountPath: /var/lib/postgresql/data
+        subPath: postgres_data_18
+  - contains:
+      path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts
+      content:
+        name: pg-sample-config
+        mountPath: /usr/share/pgsql/postgresql.conf.sample
+        subPath: postgresql.conf.sample
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "postgres")].lifecycle.postStart.exec.command
+      value: ["/bin/bash", "/pg_poststart/pg-poststart.sh"]
+  - exists:
+      path: spec.template.spec.containers[?(@.name == "postgres")].env[?(@.name == "POSTGRESQL_USER")]
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "postgres")].env[?(@.name == "PGDATA")].value
+      value: /var/lib/pgsql/data/userdata
+
+- it: uses the Red Hat layout on OpenShift whatever the registry, e.g. a mirror
+  template: statefulset.yaml
+  values:
+  - ../openshift.values.yaml
+  set:
+    image.postgres.registry: mirror.example.com/rh
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts
+      content:
+        name: yugaware-storage
+        mountPath: /var/lib/pgsql/data/userdata
+        subPath: postgres_data_18/pgdata
+  - exists:
+      path: spec.template.spec.containers[?(@.name == "postgres")].env[?(@.name == "POSTGRESQL_USER")]
+
+- it: on OpenShift, renders the ownership-fix script, which takes the UID the SCC assigned
+  template: configs.yaml
+  values:
+  - ../openshift.values.yaml
+  documentSelector:
+    path: metadata.name
+    value: RELEASE-NAME-yugaware-pg-prerun
+  asserts:
+  - matchRegex:
+      path: data["pg-prerun.sh"]
+      pattern: PG_UID="\$\{PG_UID:-\$\(id -u\)\}"
+
+- it: fails early for the Red Hat image without majorVersion, as its tags are build numbers
+  template: statefulset.yaml
+  values:
+  - ../openshift.values.yaml
+  set:
+    image.postgres.majorVersion: ""
+  asserts:
+  - failedTemplate:
+      errorMessage: "Cannot tell the Postgres major version: image.postgres.tag \"1-1791892090\" is not a version (e.g. a build number or a retagged mirror). Set image.postgres.majorVersion, e.g. 18."
+
+- it: touches no postgres data with an external database
+  template: statefulset.yaml
+  set:
+    postgres.external.host: db.example
+    perf-advisor-chart.yugaware.enabled: false
+  asserts:
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")]
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")]
+
+- it: does not need a major version from the tag with an external database
+  template: statefulset.yaml
+  set:
+    postgres.external.host: db.example
+    image.postgres.tag: prod
+    perf-advisor-chart.image.postgres.tag: prod
+    perf-advisor-chart.yugaware.enabled: false
+  asserts:
+  - notFailedTemplate: {}
+
+- it: does not migrate when YugabyteDB is the backend
+  template: statefulset.yaml
+  set:
+    useYugabyteDB: true
+    perf-advisor-chart.yugaware.enabled: false
+  asserts:
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")]
+
+- it: renders the post-start script
+  template: configs.yaml
+  documentSelector:
+    path: metadata.name
+    value: RELEASE-NAME-yugaware-pg-poststart
+  asserts:
+  - matchRegex:
+      path: data["pg-poststart.sh"]
+      pattern: REFRESH COLLATION VERSION
+  - matchRegex:
+      path: data["pg-poststart.sh"]
+      pattern: --missing-stats-only
+  - matchRegex:
+      path: data["pg-poststart.sh"]
+      pattern: pg_isready -q -h /var/run/postgresql -U "\$POSTGRES_USER"
+  - matchRegex:
+      path: data["pg-poststart.sh"]
+      pattern: pg_database_collation_actual_version
