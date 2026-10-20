@@ -1,0 +1,171 @@
+# Copyright (c) YugabyteDB, Inc.
+
+{{- /*
+  In FIPS mode the platform's TLS stack and the FIPS-built Go clients that call it (node agent,
+  Prometheus) accept only RSA 2048/3072/4096 or ECDSA P-256/P-384 certificates signed with SHA-256
+  or stronger - narrower than FIPS 140-3 itself. With anything else the platform still starts and
+  the probes, which use plain HTTP, pass while HTTPS fails. Helm cannot read a certificate at
+  render time, so a hook checks tls.certificate before anything is applied and a running release
+  keeps serving. cert-manager keys are checked at render time below.
+*/}}
+{{- if and .Values.tls.enabled .Values.yugaware.fips.enabled .Values.tls.certManager.enabled }}
+  {{- $cm := .Values.tls.certManager.configuration }}
+  {{- $size := toString $cm.keySize }}
+  {{- if not (or (and (eq (upper $cm.algorithm) "RSA") (has $size (list "2048" "3072" "4096"))) (and (eq (upper $cm.algorithm) "ECDSA") (has $size (list "256" "384")))) }}
+    {{- fail (printf "\n\ntls.certManager.configuration requests algorithm %s with keySize %s, which YugabyteDB Anywhere does not support in FIPS mode.\nUse RSA with keySize 2048, 3072 or 4096, or ECDSA with keySize 256 or 384.\n" $cm.algorithm $size) }}
+  {{- end }}
+{{- end }}
+{{- if and .Values.tls.enabled .Values.yugaware.fips.enabled .Values.tls.certificate (not .Values.tls.certManager.enabled) }}
+{{- if .Values.image.pullSecretFile }}
+# The release creates image.pullSecret from pullSecretFile only after pre-install hooks run, so
+# the check pulls its image with a copy that lives for the hook phase.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ trunc 35 (include "yugaware.fullname" .) }}-fips-cert-check-pull
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+    app: "fips-cert-check"
+    release: {{ .Release.Name | quote }}
+    chart: "{{ .Chart.Name }}"
+    component: "{{ .Values.Component }}"
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-21"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: {{ $.Files.Get .Values.image.pullSecretFile | b64enc }}
+---
+{{- end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ trunc 35 (include "yugaware.fullname" .) }}-fips-cert-check
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+    app: "fips-cert-check"
+    release: {{ .Release.Name | quote }}
+    chart: "{{ .Chart.Name }}"
+    component: "{{ .Values.Component }}"
+    heritage: {{ .Values.helm2Legacy | ternary "Tiller" (.Release.Service | quote) }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 4 }}
+{{- end }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    # Before the other hooks, so a failed check leaves nothing changed (pg_password_updator is -10).
+    "helm.sh/hook-weight": "-20"
+    "helm.sh/hook-delete-policy": {{ include "yugaware.hookDeletePolicy" . | quote }}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: "fips-cert-check"
+        release: {{ .Release.Name | quote }}
+{{- if .Values.commonLabels }}
+{{ include "yugaware.commonLabels" . | indent 8 }}
+{{- end }}
+    spec:
+      # The release's service account does not exist yet on install, and the check needs no API access.
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        {{- if .Values.image.pullSecretFile }}
+        - name: {{ trunc 35 (include "yugaware.fullname" .) }}-fips-cert-check-pull
+        {{- else }}
+        - name: {{ .Values.image.pullSecret }}
+        {{- end }}
+        {{- if .Values.image.extraPullSecrets }}
+        {{- range .Values.image.extraPullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+        {{- end }}
+      {{- if .Values.securityContext.enabled }}
+      securityContext:
+        runAsUser: {{ required "runAsUser cannot be empty" .Values.securityContext.runAsUser }}
+        {{- if ne .Values.securityContext.runAsGroup nil }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        {{- else }}
+        runAsGroup: {{ .Values.securityContext.runAsUser }}
+        {{- end }}
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+        {{- if .Values.securityContext.additionalSettings }}
+        {{- toYaml .Values.securityContext.additionalSettings | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8}}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+      {{- with .Values.tolerations }}{{ toYaml . | nindent 8 }}{{ end }}
+      {{- end }}
+      containers:
+        - name: fips-cert-check
+          image: {{ include "full_yugaware_image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.containerSecurityContext.enabled }}
+          {{- include "getSecurityContext" . | nindent 10 }}
+          {{- end }}
+          {{- if .Values.hooks.fipsCertCheck.resources }}
+          resources: {{- toYaml .Values.hooks.fipsCertCheck.resources | nindent 12 }}
+          {{- end }}
+          env:
+            - name: TLS_CERTIFICATE
+              value: {{ .Values.tls.certificate | quote }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e -o pipefail
+              fail() {
+                echo "Certificate ${1} in tls.certificate ${2}, which YugabyteDB Anywhere does not support"
+                echo "in FIPS mode. Use RSA 2048, 3072 or 4096-bit or ECDSA P-256 or P-384 keys, signed"
+                echo "with SHA-256 or stronger."
+                exit 1
+              }
+              dir=$(mktemp -d)
+              # One file per certificate. Anything else in the value, such as a key, is dropped.
+              echo "${TLS_CERTIFICATE}" | base64 -d | awk -v dir="${dir}" '
+                /-----BEGIN CERTIFICATE-----/ { n++; in_cert = 1 }
+                in_cert { print > (dir "/" n ".pem") }
+                /-----END CERTIFICATE-----/ { in_cert = 0 }'
+              count=$(ls "${dir}" | wc -l)
+              if (( count == 0 )); then
+                echo "tls.certificate holds no PEM certificate."
+                exit 1
+              fi
+              for i in $(seq 1 "${count}"); do
+                cert="${dir}/${i}.pem"
+                text=$(openssl x509 -in "${cert}" -noout -text)
+                subject=$(openssl x509 -in "${cert}" -noout -subject -nameopt RFC2253 | sed 's/^subject=//')
+                issuer=$(openssl x509 -in "${cert}" -noout -issuer -nameopt RFC2253 | sed 's/^issuer=//')
+                key_alg=$(sed -n 's/.*Public Key Algorithm: //p' <<< "${text}" | head -1)
+                case "${key_alg}" in
+                  rsaEncryption)
+                    bits=$(sed -n 's/.*Public-Key: (\([0-9]*\) bit).*/\1/p' <<< "${text}" | head -1)
+                    [[ "${bits}" =~ ^(2048|3072|4096)$ ]] || fail "\"${subject}\"" "has a ${bits}-bit RSA key"
+                    ;;
+                  id-ecPublicKey)
+                    curve=$(sed -n 's/.*ASN1 OID: //p' <<< "${text}" | head -1)
+                    [[ "${curve}" =~ ^(prime256v1|secp384r1)$ ]] || fail "\"${subject}\"" "has an ECDSA ${curve} key"
+                    ;;
+                  *)
+                    fail "\"${subject}\"" "has a ${key_alg} key"
+                    ;;
+                esac
+                sig_alg=$(sed -n 's/.*Signature Algorithm: //p' <<< "${text}" | head -1)
+                if grep -qiE 'sha1|md5|md2' <<< "${sig_alg}"; then
+                  # A self-signed root's own signature is not checked by any client.
+                  if (( i == 1 )) || [[ "${subject}" != "${issuer}" ]]; then
+                    fail "\"${subject}\"" "is signed with ${sig_alg}"
+                  fi
+                fi
+              done
+      restartPolicy: Never
+{{- end }}

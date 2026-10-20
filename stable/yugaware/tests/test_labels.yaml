@@ -129,6 +129,20 @@ tests:
           enabled: true
     asserts: *labelAsserts
 
+  - it: labels the FIPS certificate check hook
+    documentSelector: *everyResource
+    set:
+      tls:
+        enabled: true
+        certificate: Y2VydA==
+      yugaware:
+        fips:
+          enabled: true
+      perf-advisor-chart:
+        fips:
+          enabled: true
+    asserts: *labelAsserts
+
   - it: labels the universe boot script ConfigMap
     documentSelector: *everyResource
     set:

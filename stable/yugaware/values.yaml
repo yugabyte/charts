@@ -352,6 +352,7 @@ tls:
       algorithm: RSA # ECDSA or RSA
       # Can be 2048, 4096 or 8192 for RSA
       # Or 256, 384 or 521 for ECDSA
+      # With yugaware.fips.enabled, only 2048, 3072 or 4096 for RSA, or 256 or 384 for ECDSA
       keySize: 2048
 
 ## yugaware pod Security Context
@@ -593,6 +594,17 @@ hooks:
       limits:
         cpu: "0.25"
         memory: 256Mi
+
+  ## Pre-install and pre-upgrade check of tls.certificate's key size in FIPS
+  ## mode. Runs openssl once.
+  fipsCertCheck:
+    resources:
+      requests:
+        cpu: "0.1"
+        memory: 128Mi
+      limits:
+        cpu: "0.1"
+        memory: 128Mi
 
   ## Pre-upgrade postgres password sync. Runs a single kubectl exec.
   pgPasswordUpdate:

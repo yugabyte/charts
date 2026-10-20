@@ -79,6 +79,22 @@ tests:
         enabled: true
     asserts: *noBareContainer
 
+  - it: covers the FIPS certificate check hook
+    documentSelector: *controllerPods
+    set:
+      containerSecurityContext:
+        enabled: true
+      tls:
+        enabled: true
+        certificate: Y2VydA==
+      yugaware:
+        fips:
+          enabled: true
+      perf-advisor-chart:
+        fips:
+          enabled: true
+    asserts: *noBareContainer
+
   - it: covers the YugabyteDB ybdb-init initContainer
     documentSelector: *controllerPods
     set:

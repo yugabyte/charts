@@ -1,0 +1,184 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/quintush/helm-unittest/master/schema/helm-testsuite.json
+suite: FIPS check of the custom TLS certificate's key size
+templates:
+- templates/fips-server-cert-check.yaml
+set:
+  perf-advisor-chart:
+    fips:
+      enabled: true
+tests:
+- it: checks a custom certificate before install and upgrade in FIPS mode
+  set:
+    tls:
+      enabled: true
+      certificate: Y2VydA==
+    yugaware:
+      fips:
+        enabled: true
+  asserts:
+  - isKind:
+      of: Job
+  - equal:
+      path: metadata.annotations["helm.sh/hook"]
+      value: pre-install,pre-upgrade
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: TLS_CERTIFICATE
+        value: Y2VydA==
+
+- it: is not rendered outside FIPS mode
+  set:
+    tls:
+      enabled: true
+      certificate: Y2VydA==
+    yugaware:
+      fips:
+        enabled: false
+    perf-advisor-chart:
+      fips:
+        enabled: false
+  asserts:
+  - hasDocuments:
+      count: 0
+
+- it: is not rendered for the generated self-signed certificate
+  set:
+    tls:
+      enabled: true
+    yugaware:
+      fips:
+        enabled: true
+  asserts:
+  - hasDocuments:
+      count: 0
+
+- it: is not rendered for cert-manager certificates
+  set:
+    tls:
+      enabled: true
+      certificate: Y2VydA==
+      certManager:
+        enabled: true
+    yugaware:
+      fips:
+        enabled: true
+  asserts:
+  - hasDocuments:
+      count: 0
+
+- it: accepts the default cert-manager key in FIPS mode
+  set:
+    tls:
+      enabled: true
+      certManager:
+        enabled: true
+    yugaware:
+      fips:
+        enabled: true
+  asserts:
+  - hasDocuments:
+      count: 0
+
+- it: rejects a cert-manager RSA 8192 key in FIPS mode
+  set:
+    tls:
+      enabled: true
+      certManager:
+        enabled: true
+        configuration:
+          keySize: 8192
+    yugaware:
+      fips:
+        enabled: true
+  asserts:
+  - failedTemplate:
+      errorPattern: "requests algorithm RSA with keySize 8192"
+
+- it: rejects a cert-manager ECDSA P-521 key in FIPS mode
+  set:
+    tls:
+      enabled: true
+      certManager:
+        enabled: true
+        configuration:
+          algorithm: ECDSA
+          keySize: 521
+    yugaware:
+      fips:
+        enabled: true
+  asserts:
+  - failedTemplate:
+      errorPattern: "requests algorithm ECDSA with keySize 521"
+
+- it: leaves cert-manager keys alone outside FIPS mode
+  set:
+    tls:
+      enabled: true
+      certManager:
+        enabled: true
+        configuration:
+          keySize: 8192
+    yugaware:
+      fips:
+        enabled: false
+    perf-advisor-chart:
+      fips:
+        enabled: false
+  asserts:
+  - hasDocuments:
+      count: 0
+
+- it: runs before the other upgrade hooks
+  set:
+    tls:
+      enabled: true
+      certificate: Y2VydA==
+    yugaware:
+      fips:
+        enabled: true
+  asserts:
+  - equal:
+      path: metadata.annotations["helm.sh/hook-weight"]
+      value: "-20"
+  - contains:
+      path: spec.template.spec.imagePullSecrets
+      content:
+        name: yugabyte-k8s-pull-secret
+
+- it: pulls with a hook-scoped copy of a pull secret the release creates from pullSecretFile
+  set:
+    tls:
+      enabled: true
+      certificate: Y2VydA==
+    yugaware:
+      fips:
+        enabled: true
+    image:
+      pullSecretFile: values.yaml
+  asserts:
+  - hasDocuments:
+      count: 2
+  - isKind:
+      of: Secret
+    documentIndex: 0
+  - equal:
+      path: metadata.annotations["helm.sh/hook"]
+      value: pre-install,pre-upgrade
+    documentIndex: 0
+  - equal:
+      path: metadata.annotations["helm.sh/hook-weight"]
+      value: "-21"
+    documentIndex: 0
+  - equal:
+      path: type
+      value: kubernetes.io/dockerconfigjson
+    documentIndex: 0
+  - matchRegex:
+      path: metadata.name
+      pattern: -fips-cert-check-pull$
+    documentIndex: 0
+  - matchRegex:
+      path: spec.template.spec.imagePullSecrets[0].name
+      pattern: -fips-cert-check-pull$
+    documentIndex: 1
