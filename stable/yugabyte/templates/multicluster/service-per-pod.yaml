@@ -34,6 +34,11 @@ spec:
       port: {{ $port }}
     {{- end }}
     {{- end}}
+    {{- /* The node_exporter sidecar's port, for scrapes that address the pod through this Service. */}}
+    {{- if and $.Values.nodeExporter $.Values.nodeExporter.enabled }}
+    - name: "tcp-node-metrics"
+      port: {{ $.Values.nodeExporter.port }}
+    {{- end }}
   selector:
     statefulset.kubernetes.io/pod-name: {{ $podName | quote }}
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}

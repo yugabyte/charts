@@ -11,6 +11,11 @@ Image:
   tag: 2026.1.2.0-b137
   pullPolicy: IfNotPresent
   pullSecretName: ""
+  ## The node_exporter sidecar's image; needs node_exporter 1.11 or later.
+  nodeExporter:
+    repository: quay.io/prometheus/node-exporter
+    tag: v1.12.1
+    pullPolicy: IfNotPresent
 
 storage:
   ephemeral: false  # will not allocate PVs when true
@@ -553,7 +558,14 @@ serviceMonitor:
     targetLabel: "__name__"
     replacement: "rpc_latency$4"
 
-resources: {}
+resources:
+  nodeExporter:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 250Mi
 
 nodeSelector: {}
 
@@ -990,6 +1002,17 @@ containerSecurityContext:
   runAsGroup: 10001
   runAsNonRoot: true
   additionalSettings: {}
+
+## node_exporter sidecar: disk IOPS, throughput, utilization and latency for the
+## pod's own PVCs, plus the pod's network counters and TCP retransmits. On
+## ephemeral storage it exports no disk series.
+nodeExporter:
+  ## Set by YBA, which also adds the scrape target; set by hand, nothing scrapes
+  ## the sidecar. Data volumes it cannot attribute are skipped; if node_exporter
+  ## exits, Kubernetes restarts the container.
+  enabled: false
+  port: 9300
+  ## Image: Image.nodeExporter; resources: resources.nodeExporter.
 
 ## Added to handle old universe which has volume annotations
 ## K8s universe <= 2.5 to >= 2.6

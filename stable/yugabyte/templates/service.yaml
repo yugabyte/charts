@@ -939,7 +939,70 @@ spec:
         {{- end }}
       {{- end}}
 
+      {{- if and $root.Values.nodeExporter $root.Values.nodeExporter.enabled }}
+      - name: yb-node-exporter
+        image: "{{ $root.Values.Image.nodeExporter.repository }}:{{ $root.Values.Image.nodeExporter.tag }}"
+        imagePullPolicy: {{ $root.Values.Image.nodeExporter.pullPolicy }}
+        command:
+          - "/bin/sh"
+          - "/etc/yb-node-exporter/run-node-exporter.sh"
+        {{- if not $storageEphemeral }}
+        args:
+        {{- range $index := until (int ($storageInfo.count)) }}
+          - "/mnt/disk{{ $index }}"
+        {{- end }}
+        {{- end }}
+        env:
+          - name: YB_NODE_EXPORTER_PORT
+            value: {{ $root.Values.nodeExporter.port | quote }}
+          - name: YB_TEXTFILE_DIR
+            value: /run/yb-node-exporter
+        ports:
+          - containerPort: {{ $root.Values.nodeExporter.port }}
+            name: "node-metrics"
+        securityContext:
+          {{- with $root.Values.containerSecurityContext }}
+          {{- if .enabled }}
+          runAsUser: {{ required "runAsUser cannot be empty" .runAsUser }}
+          runAsGroup: {{ ne .runAsGroup nil | ternary .runAsGroup .runAsUser }}
+          runAsNonRoot: {{ .runAsNonRoot }}
+          {{- with omit (.additionalSettings | default dict) "runAsUser" "runAsGroup" "runAsNonRoot" "privileged" "allowPrivilegeEscalation" "readOnlyRootFilesystem" "capabilities" }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- end }}
+          {{- end }}
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        resources: {{ toYaml $root.Values.resources.nodeExporter | nindent 10 }}
+        volumeMounts:
+          - name: yb-node-exporter-scripts
+            mountPath: /etc/yb-node-exporter
+          - name: yb-node-exporter-textfile
+            mountPath: /run/yb-node-exporter
+          {{- if not $storageEphemeral }}
+          {{- /* Mounted only so mountinfo shows the backing device; nothing is read from it. */}}
+          {{- range $index := until (int ($storageInfo.count)) }}
+          - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
+            mountPath: /mnt/disk{{ $index }}
+            readOnly: true
+          {{- end }}
+          {{- end }}
+      {{- end }}
+
       volumes:
+        {{- if and $root.Values.nodeExporter $root.Values.nodeExporter.enabled }}
+        - name: yb-node-exporter-scripts
+          configMap:
+            name: {{ include "yugabyte.fullname" $root }}-node-exporter-scripts
+            defaultMode: 0755
+        {{- /* Files for node_exporter's textfile collector. In memory with a cap, so a runaway write fails instead of getting the pod evicted. */}}
+        - name: yb-node-exporter-textfile
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Mi
+        {{- end }}
         {{- if (eq $service.name "yb-masters") }}
         - name: debug-hooks-volume
           configMap:

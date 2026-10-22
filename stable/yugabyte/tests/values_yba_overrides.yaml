@@ -1,0 +1,24 @@
+# Shaped like the overrides file YBA passes to helm with -f: its own Image and
+# resource maps, which carry no nodeExporter keys.
+Image:
+  repository: registry.example.com/yugabyte
+  tag: 2.31.0.0-b546
+  pullSecretName: yb-pull-secret
+resource:
+  master:
+    requests:
+      cpu: "2"
+      memory: 2Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  tserver:
+    requests:
+      cpu: "4"
+      memory: 4Gi
+    limits:
+      cpu: "4"
+      memory: 4Gi
+nodeExporter:
+  enabled: true
+  port: 9300

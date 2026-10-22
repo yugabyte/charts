@@ -1,0 +1,699 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/quintush/helm-unittest/master/schema/helm-testsuite.json
+suite: node_exporter sidecar
+tests:
+- it: inherits the pod's user by default, like the database containers
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.securityContext.runAsUser
+      value: 10001
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext
+      value:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+
+- it: takes containerSecurityContext's user when that is on, like the database containers
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    containerSecurityContext.enabled: true
+    containerSecurityContext.runAsUser: 20001
+    containerSecurityContext.runAsGroup: null
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-tserver")].securityContext.runAsUser
+      value: 20001
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext
+      value:
+        runAsUser: 20001
+        runAsGroup: 20001
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+
+- it: takes containerSecurityContext's group and runAsNonRoot as given
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    containerSecurityContext.enabled: true
+    containerSecurityContext.runAsUser: 20001
+    containerSecurityContext.runAsGroup: 30001
+    containerSecurityContext.runAsNonRoot: false
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.runAsGroup
+      value: 30001
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.runAsNonRoot
+      value: false
+
+- it: applies containerSecurityContext's additionalSettings without loosening the sidecar
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    containerSecurityContext.enabled: true
+    containerSecurityContext.additionalSettings:
+      seccompProfile:
+        type: RuntimeDefault
+      readOnlyRootFilesystem: false
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.seccompProfile.type
+      value: RuntimeDefault
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.readOnlyRootFilesystem
+      value: true
+
+- it: never passes privileged from additionalSettings to the sidecar
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    containerSecurityContext.enabled: true
+    containerSecurityContext.additionalSettings.privileged: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - notExists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.privileged
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.allowPrivilegeEscalation
+      value: false
+
+- it: leaves the user to the SCC under ocpCompatibility
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    ocpCompatibility.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - notExists:
+      path: spec.template.spec.securityContext.runAsUser
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext
+      value:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+
+- it: leaves the user to the SCC under ocpCompatibility on masters
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    ocpCompatibility.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-master
+  asserts:
+  - exists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")]
+  - notExists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.runAsUser
+  - notExists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.runAsNonRoot
+
+- it: sets no user when podSecurityContext is disabled
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    podSecurityContext.enabled: false
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - notExists:
+      path: spec.template.spec.securityContext
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext
+      value:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+
+- it: inherits a root pod user rather than refusing it
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    podSecurityContext.runAsUser: 0
+    podSecurityContext.runAsNonRoot: false
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - exists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")]
+  - equal:
+      path: spec.template.spec.securityContext.runAsUser
+      value: 0
+  - notExists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.runAsUser
+  - notExists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.runAsNonRoot
+
+- it: runs the ConfigMap's script and wires the port and textfile directory through
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    nodeExporter.port: 9400
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].command
+      value: ["/bin/sh", "/etc/yb-node-exporter/run-node-exporter.sh"]
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      content:
+        name: yb-node-exporter-scripts
+        mountPath: /etc/yb-node-exporter
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      content:
+        name: yb-node-exporter-textfile
+        mountPath: /run/yb-node-exporter
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].ports
+      value:
+      - containerPort: 9400
+        name: node-metrics
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      value:
+      - name: YB_NODE_EXPORTER_PORT
+        value: "9400"
+      - name: YB_TEXTFILE_DIR
+        value: /run/yb-node-exporter
+
+- it: ships the script under the name the container runs
+  template: templates/node-exporter-configmap.yaml
+  set:
+    nodeExporter.enabled: true
+  asserts:
+  - exists:
+      path: data["run-node-exporter.sh"]
+
+- it: keeps the textfile directory in memory with a 4Mi cap
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - contains:
+      path: spec.template.spec.volumes
+      content:
+        name: yb-node-exporter-textfile
+        emptyDir:
+          medium: Memory
+          sizeLimit: 4Mi
+
+- it: renders the sidecar and its script volume on persistent storage
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    storage.ephemeral: false
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - contains:
+      path: spec.template.spec.volumes
+      content:
+        name: yb-node-exporter-scripts
+        configMap:
+          name: RELEASE-NAME-yugabyte-node-exporter-scripts
+          defaultMode: 493
+  - exists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")]
+
+- it: renders the sidecar without data mounts or arguments on ephemeral storage
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    storage.ephemeral: true
+    moveOp.storage.ephemeral: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - exists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")]
+  - notExists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].args
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      value:
+      - name: yb-node-exporter-scripts
+        mountPath: /etc/yb-node-exporter
+      - name: yb-node-exporter-textfile
+        mountPath: /run/yb-node-exporter
+
+- it: renders the ConfigMap on ephemeral storage
+  template: templates/node-exporter-configmap.yaml
+  set:
+    nodeExporter.enabled: true
+    storage.ephemeral: true
+    moveOp.storage.ephemeral: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: metadata.name
+      value: RELEASE-NAME-yugabyte-node-exporter-scripts
+
+- it: renders no ConfigMap when the sidecar is disabled
+  template: templates/node-exporter-configmap.yaml
+  set:
+    nodeExporter.enabled: false
+  asserts:
+  - hasDocuments:
+      count: 0
+
+- it: gives a moveOp StatefulSet on persistent storage its data mounts
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    storage.ephemeral: true
+    moveOp.storage.ephemeral: false
+    stsIndex.tserver.start: 0
+    stsIndex.tserver.end: 1
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver-1
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].args
+      value: ["/mnt/disk0", "/mnt/disk1"]
+
+- it: gives a moveOp StatefulSet on ephemeral storage the sidecar without data mounts
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    storage.ephemeral: false
+    moveOp.storage.ephemeral: true
+    stsIndex.tserver.start: 0
+    stsIndex.tserver.end: 1
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver-1
+  asserts:
+  - exists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")]
+  - notExists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].args
+
+- it: still gives the steady-state StatefulSet its data mounts during a moveOp
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    storage.ephemeral: false
+    moveOp.storage.ephemeral: true
+    stsIndex.tserver.start: 0
+    stsIndex.tserver.end: 1
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].args
+      value: ["/mnt/disk0", "/mnt/disk1"]
+
+- it: injects the sidecar into master pods
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-master
+  asserts:
+  - exists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")]
+  - contains:
+      path: spec.template.spec.volumes
+      content:
+        name: yb-node-exporter-scripts
+        configMap:
+          name: RELEASE-NAME-yugabyte-node-exporter-scripts
+          defaultMode: 493
+
+- it: passes one mount path per disk and mounts each read-only
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    storage.tserver.count: 3
+    storage.master.count: 1
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].args
+      value: ["/mnt/disk0", "/mnt/disk1", "/mnt/disk2"]
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      value:
+      - name: yb-node-exporter-scripts
+        mountPath: /etc/yb-node-exporter
+      - name: yb-node-exporter-textfile
+        mountPath: /run/yb-node-exporter
+      - name: datadir0
+        mountPath: /mnt/disk0
+        readOnly: true
+      - name: datadir1
+        mountPath: /mnt/disk1
+        readOnly: true
+      - name: datadir2
+        mountPath: /mnt/disk2
+        readOnly: true
+
+- it: sizes the master sidecar from the master disk count, not the tserver one
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    storage.tserver.count: 3
+    storage.master.count: 1
+  documentSelector:
+    path: metadata.name
+    value: yb-master
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].args
+      value: ["/mnt/disk0"]
+
+- it: mounts old-style data volume names
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    storage.tserver.count: 2
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      content:
+        name: datadir1
+        mountPath: /mnt/disk1
+        readOnly: true
+
+- it: mounts new-style data volume names
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: false
+    nodeExporter.enabled: true
+    storage.tserver.count: 2
+  documentSelector:
+    path: metadata.name
+    value: RELEASE-NAME-yugabyte-yb-tserver
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      content:
+        name: RELEASE-NAME-yugabyte-datadir1
+        mountPath: /mnt/disk1
+        readOnly: true
+
+- it: keeps the root filesystem read-only and drops all capabilities on the sidecar
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.readOnlyRootFilesystem
+      value: true
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.capabilities.drop
+      value: ["ALL"]
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].securityContext.allowPrivilegeEscalation
+      value: false
+
+- it: execs node_exporter with exactly these collectors and flags
+  template: templates/node-exporter-configmap.yaml
+  set:
+    nodeExporter.enabled: true
+  asserts:
+  - matchRegex:
+      path: data["run-node-exporter.sh"]
+      pattern: '(?m)^set \-\-\nif \[ \-n \"\$devices\" \]; then\n  set \-\- \-\-collector\.diskstats \-\-collector\.diskstats\.device\-include=\"\^\(\$\{devices\}\)\\\$\"\nfi\nexec /bin/node_exporter \\\n  \-\-web\.listen\-address=\":\$\{YB_NODE_EXPORTER_PORT:\-9300\}\" \\\n  \-\-collector\.disable\-defaults \\\n  \"\$@\" \\\n  \-\-collector\.netdev \\\n  \-\-collector\.netstat \\\n  \-\-collector\.netstat\.fields=''\^Tcp_RetransSegs\$'' \\\n  \-\-collector\.textfile \\\n  \-\-collector\.textfile\.directory=\"\$TEXTFILE_DIR\"$'
+
+- it: renders no sidecar or its volumes in yb-tserver pods when disabled
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - notExists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")]
+  - notExists:
+      path: spec.template.spec.volumes[?(@.name=="yb-node-exporter-scripts")]
+  - notExists:
+      path: spec.template.spec.volumes[?(@.name=="yb-node-exporter-textfile")]
+
+- it: renders no sidecar or its volumes in yb-master pods when disabled
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+  documentSelector:
+    path: metadata.name
+    value: yb-master
+  asserts:
+  - notExists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")]
+  - notExists:
+      path: spec.template.spec.volumes[?(@.name=="yb-node-exporter-scripts")]
+  - notExists:
+      path: spec.template.spec.volumes[?(@.name=="yb-node-exporter-textfile")]
+
+- it: renders nothing node_exporter related without a nodeExporter block (helm upgrade --reuse-values from an older chart)
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter: null
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - notExists:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")]
+  - notExists:
+      path: spec.template.spec.volumes[?(@.name=="yb-node-exporter-textfile")]
+
+- it: is disabled by default
+  template: templates/node-exporter-configmap.yaml
+  asserts:
+  - hasDocuments:
+      count: 0
+
+- it: exposes the sidecar port on master per-pod Services
+  template: templates/multicluster/service-per-pod.yaml
+  set:
+    oldNamingStyle: true
+    multicluster.createServicePerPod: true
+    nodeExporter.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-master-0
+  asserts:
+  - contains:
+      path: spec.ports
+      content:
+        name: tcp-node-metrics
+        port: 9300
+
+- it: exposes the configured sidecar port on tserver per-pod Services
+  template: templates/multicluster/service-per-pod.yaml
+  set:
+    oldNamingStyle: true
+    multicluster.createServicePerPod: true
+    nodeExporter.enabled: true
+    nodeExporter.port: 9400
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver-2
+  asserts:
+  - contains:
+      path: spec.ports
+      content:
+        name: tcp-node-metrics
+        port: 9400
+
+- it: leaves master per-pod Service ports unchanged when the sidecar is disabled
+  template: templates/multicluster/service-per-pod.yaml
+  set:
+    oldNamingStyle: true
+    multicluster.createServicePerPod: true
+  documentSelector:
+    path: metadata.name
+    value: yb-master-0
+  asserts:
+  - equal:
+      path: spec.ports
+      value:
+      - name: http-ui
+        port: 7000
+      - name: tcp-rpc-port
+        port: 7100
+      - name: yugabyted-ui
+        port: 15433
+
+- it: adds no sidecar port to tserver per-pod Services when the sidecar is disabled
+  template: templates/multicluster/service-per-pod.yaml
+  set:
+    oldNamingStyle: true
+    multicluster.createServicePerPod: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver-0
+  asserts:
+  - notContains:
+      path: spec.ports
+      content:
+        name: tcp-node-metrics
+        port: 9300
+
+- it: exposes the sidecar port on per-pod Services on ephemeral storage too
+  template: templates/multicluster/service-per-pod.yaml
+  set:
+    oldNamingStyle: true
+    multicluster.createServicePerPod: true
+    nodeExporter.enabled: true
+    storage.ephemeral: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver-0
+  asserts:
+  - contains:
+      path: spec.ports
+      content:
+        name: tcp-node-metrics
+        port: 9300
+
+- it: renders no per-pod Services without createServicePerPod, sidecar or not
+  template: templates/multicluster/service-per-pod.yaml
+  set:
+    nodeExporter.enabled: true
+  asserts:
+  - hasDocuments:
+      count: 0
+
+- it: takes the sidecar's image and resources from Image.nodeExporter and resources.nodeExporter
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
+      value: quay.io/prometheus/node-exporter:v1.12.1
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].imagePullPolicy
+      value: IfNotPresent
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].resources
+      value:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 250m
+          memory: 250Mi
+
+- it: keeps the sidecar's image and resources under YBA-shaped Image and resource overrides
+  template: templates/service.yaml
+  values:
+  - values_yba_overrides.yaml
+  set:
+    oldNamingStyle: true
+  documentSelector:
+    path: metadata.name
+    value: yb-master
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
+      value: quay.io/prometheus/node-exporter:v1.12.1
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].resources
+      value:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 250m
+          memory: 250Mi
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-master")].image
+      value: registry.example.com/yugabyte:2.31.0.0-b546
+
+- it: overrides one image field without losing the others
+  template: templates/service.yaml
+  values:
+  - values_yba_overrides.yaml
+  set:
+    oldNamingStyle: true
+    Image.nodeExporter.repository: mirror.example.com/prometheus/node-exporter
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
+      value: mirror.example.com/prometheus/node-exporter:v1.12.1
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].imagePullPolicy
+      value: IfNotPresent

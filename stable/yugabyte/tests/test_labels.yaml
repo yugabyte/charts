@@ -11,6 +11,7 @@ templates:
 - hooks/setup-credentials-job.yaml
 - certificates.yaml
 - service.yaml
+- node-exporter-configmap.yaml
 tests:
 # Test master-gflags-secret.yaml
 - it: master-gflags-secret has labels
@@ -108,6 +109,23 @@ tests:
     authCredentials:
       ysql:
         password: testpass
+  asserts:
+  - exists:
+      path: metadata.labels
+  - exists:
+      path: metadata.labels.app
+  - exists:
+      path: metadata.labels.release
+  - exists:
+      path: metadata.labels.chart
+  - exists:
+      path: metadata.labels.component
+
+# Test node-exporter-configmap.yaml
+- it: node-exporter-configmap has labels
+  template: templates/node-exporter-configmap.yaml
+  set:
+    nodeExporter.enabled: true
   asserts:
   - exists:
       path: metadata.labels

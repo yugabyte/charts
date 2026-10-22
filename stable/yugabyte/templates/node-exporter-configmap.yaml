@@ -1,0 +1,169 @@
+{{- $root := . -}}
+{{- if and $root.Values.nodeExporter $root.Values.nodeExporter.enabled }}
+{{ $appLabelArgs := dict "label" "yb-tserver" "root" $root }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "yugabyte.fullname" $root }}-node-exporter-scripts
+  namespace: "{{ $root.Release.Namespace }}"
+  labels:
+    {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
+    {{- include "yugabyte.labels" $root | indent 4 }}
+data:
+  run-node-exporter.sh: |
+    #!/bin/sh
+    # The sidecar's entrypoint; the arguments are the data mounts:
+    #   1. checks whether anything is mounted over /proc/diskstats;
+    #   2. traces each mount to its own block device, skipping any it cannot;
+    #   3. writes the yb_node_exporter_check reasons to $YB_TEXTFILE_DIR;
+    #   4. execs node_exporter with diskstats limited to those devices.
+    # A skipped mount is logged, never fatal. If node_exporter exits, Kubernetes
+    # restarts the container.
+    set -u
+
+    PROC=/proc
+    SYS=/sys
+    TEXTFILE_DIR="${YB_TEXTFILE_DIR:-/run/yb-node-exporter}"
+    OUT="$TEXTFILE_DIR/yb_node_exporter_check.prom"
+
+    # "<major:minor> <root>" of a mountpoint; the last entry wins, as a later
+    # mount over the same path hides the earlier ones.
+    mountinfo_entry() {
+      awk -v mp="$1" '
+        $5 == mp { e = $3 " " $4 }
+        END { if (e != "") print e }
+      ' "$PROC/self/mountinfo"
+    }
+
+    devno_to_kname() {
+      link="$SYS/dev/block/$1"
+      if [ ! -e "$link" ]; then
+        return 1
+      fi
+      basename "$(readlink -f "$link")"
+    }
+
+    # sysfs shows a "/" in a kernel name as "!" (cciss!c0d0); diskstats and the
+    # exported device label use "/".
+    diskstats_name() {
+      echo "$1" | tr '!' '/'
+    }
+
+    in_diskstats() {
+      awk -v d="$1" '
+        $3 == d { f = 1 }
+        END { exit !f }
+      ' "$PROC/diskstats"
+    }
+
+    series=""
+    # check <check> <target> <reason> [device]: adds one yb_node_exporter_check series.
+    check() {
+      series="$series
+    yb_node_exporter_check{check=\"$1\",target=\"$2\",reason=\"$3\",device=\"${4:-}\"} 1"
+    }
+    # skip <reason> <message> [device]: logs and records why the current mount is skipped.
+    skip() {
+      echo "warn: skipping $mp: $2" >&2
+      check data_volume "$mp" "$1" "${3:-}"
+    }
+
+    # 1. The filesystem type mounted over /proc/diskstats (the mountinfo field
+    # after " - "), empty when nothing is.
+    overlay="$(awk -v p="$PROC/diskstats" '
+      $5 == p {
+        f = 1
+        t = "unknown"
+        for (i = 7; i < NF; i++) {
+          if ($i == "-") {
+            t = $(i + 1)
+            break
+          }
+        }
+      }
+      END { if (f) print t }
+    ' "$PROC/self/mountinfo")"
+    if [ -n "$overlay" ]; then
+      echo "warn: $PROC/diskstats is overlaid ($overlay), so its counters may not be the host's; exporting no disk series" >&2
+      reason="overlaid_$(printf '%s' "$overlay" | tr -c 'A-Za-z0-9._-' '_')"
+      check diskstats "" "$reason"
+    else
+      check diskstats "" ok
+    fi
+
+    # 2. There are no arguments on ephemeral storage.
+    if [ $# -eq 0 ]; then
+      echo "info: no data volumes; exporting no disk series" >&2
+      check data_volume "" no_data_volumes
+    fi
+    devices=""
+    for mp in "$@"; do
+      entry="$(mountinfo_entry "$mp")"
+      if [ -z "$entry" ]; then
+        skip no_mount "nothing is mounted there"
+        continue
+      fi
+      devno="${entry%% *}"
+      mroot="${entry##* }"
+
+      # A volume is mounted at the root of its filesystem ("/" in mountinfo). Any
+      # other root is a bind mount of a node directory, on a device the node shares.
+      if [ "$mroot" != "/" ]; then
+        skip bind_mount "a bind mount of $mroot, not a dedicated volume"
+        continue
+      fi
+
+      # Overlay, tmpfs and network filesystems have no /sys/dev/block entry.
+      kname="$(devno_to_kname "$devno")"
+      if [ -z "$kname" ]; then
+        skip virtual_fs "on a virtual fs (devno $devno)"
+        continue
+      fi
+      name="$(diskstats_name "$kname")"
+
+      if [ -n "$overlay" ]; then
+        check data_volume "$mp" diskstats_overlaid "$name"
+        continue
+      fi
+      if ! in_diskstats "$name"; then
+        skip no_diskstats_row "$name has no row in $PROC/diskstats" "$name"
+        continue
+      fi
+
+      echo "info: $mp -> devno $devno -> $name" >&2
+      check data_volume "$mp" ok "$name"
+      devices="$devices $name"
+    done
+
+    # 3. Written whole, then renamed, so the textfile collector never reads half a file.
+    if ! printf '%s\n' \
+      "# HELP yb_node_exporter_check Whether each node_exporter sidecar disk source is exported, and why not." \
+      "# TYPE yb_node_exporter_check gauge$series" > "$OUT.tmp" ||
+      ! mv "$OUT.tmp" "$OUT"; then
+      echo "warn: could not write $OUT" >&2
+    fi
+
+    # 4. No diskstats collector without a device; netdev and netstat need no
+    # filter: they see only this pod's network namespace.
+    # The resolved devices as one regex alternation: "sdb|sdc".
+    devices="$(echo "$devices" |
+      tr ' ' '\n' |
+      grep -v '^$' |
+      sort -u |
+      tr '\n' '|' |
+      sed 's/|$//')"
+    echo "resolved device-include: ${devices:-(none)}" >&2
+    set --
+    if [ -n "$devices" ]; then
+      set -- --collector.diskstats --collector.diskstats.device-include="^(${devices})\$"
+    fi
+    exec /bin/node_exporter \
+      --web.listen-address=":${YB_NODE_EXPORTER_PORT:-9300}" \
+      --collector.disable-defaults \
+      "$@" \
+      --collector.netdev \
+      --collector.netstat \
+      --collector.netstat.fields='^Tcp_RetransSegs$' \
+      --collector.textfile \
+      --collector.textfile.directory="$TEXTFILE_DIR"
+{{- end }}
