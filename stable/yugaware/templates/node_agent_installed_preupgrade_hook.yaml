@@ -8,11 +8,24 @@
 {{- $newCompare := include "yb_version_compare" (list $newTagMain $stable $preview) | int }}
 {{- $shouldRun := ge $newCompare 0 }}
 {{- if and $shouldRun .Values.preupgradeChecks.enabled }}
-{{- /* need to get the ip address of the YBA pod, so we can connect to its pg */}}
-{{- $postgresIp := "localhost" }}
-{{- range $i, $p := (lookup "v1" "Pod" .Release.Namespace "" ).items }}
-  {{- if and (and (hasKey $p.metadata "labels") (hasKey $p.metadata.labels "app")) (eq $p.metadata.labels.app $stsName) }}
-    {{- $postgresIp = $p.status.podIP }}
+{{- /* The precheck connects to the YBA pod's database through the <release>-postgres
+  Service when it already exists. Otherwise (Service disabled, or first upgrade from a chart
+  that did not create it: hooks run before regular objects are applied) it uses the pod IP,
+  bracketed when IPv6 so it is a valid JDBC host. The Service always listens on 5432. */}}
+{{- $postgresPort := .Values.useYugabyteDB | ternary (.Values.yugabytedb.config.ysqlPort | default 5433) 5432 }}
+{{- $postgresHost := "localhost" }}
+{{- $pgSvcName := printf "%s-postgres" .Release.Name }}
+{{- if lookup "v1" "Service" .Release.Namespace $pgSvcName }}
+  {{- $postgresHost = printf "%s.%s.svc" $pgSvcName .Release.Namespace }}
+  {{- $postgresPort = 5432 }}
+{{- else }}
+  {{- range $i, $p := (lookup "v1" "Pod" .Release.Namespace "").items }}
+    {{- if and (and (hasKey $p.metadata "labels") (hasKey $p.metadata.labels "app")) (eq $p.metadata.labels.app $stsName) }}
+      {{- $postgresHost = $p.status.podIP }}
+    {{- end }}
+  {{- end }}
+  {{- if contains ":" $postgresHost }}
+    {{- $postgresHost = printf "[%s]" $postgresHost }}
   {{- end }}
 {{- end }}
 apiVersion: batch/v1
@@ -95,12 +108,12 @@ spec:
                   name: {{ .Release.Name }}-yugaware-global-config
                   key: postgres_db
             - name: POSTGRES_HOST
-              value: {{ $postgresIp | quote }}
+              value: {{ $postgresHost | quote }}
             - name: POSTGRES_PORT
               {{- if .Values.postgres.external.host }}
               value: {{ .Values.postgres.external.port | quote }}
               {{- else }}
-              value: {{ .Values.useYugabyteDB | ternary (.Values.yugabytedb.config.ysqlPort | default 5433) 5432 | quote }}
+              value: {{ $postgresPort | quote }}
               {{- end }}
             - name: APP_SECRET
               valueFrom:
@@ -149,10 +162,10 @@ data:
       default.host="{{ .Values.postgres.external.host }}"
       default.port={{ .Values.postgres.external.port }}
   {{ else }}
-      default.host={{ $postgresIp | quote }}
+      default.host={{ $postgresHost | quote }}
   {{ end }}
   {{- if .Values.useYugabyteDB }}
-      default.port={{ .Values.yugabytedb.config.ysqlPort | default "5433" }}
+      default.port={{ $postgresPort }}
   {{- end }}
       default.url="jdbc:postgresql://"${db.default.host}":"${db.default.port}"/"${db.default.dbname}${db.default.params}
       default.params="{{ .Values.jdbcParams }}"

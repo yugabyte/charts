@@ -99,6 +99,9 @@ spec:
     targetPort: 5432
   selector:
     app: {{ .Release.Name }}-yugaware
+  {{- /* The database answers even when the yugaware container is not Ready, and the
+    pre-upgrade precheck needs it then too (node_agent_installed_preupgrade_hook.yaml). */}}
+  publishNotReadyAddresses: true
   type: {{ .Values.postgres.service.type }}
   {{- if and (eq .Values.postgres.service.type "LoadBalancer") (.Values.postgres.service.ip) }}
   loadBalancerIP: "{{ .Values.postgres.service.ip }}"
