@@ -1,5 +1,6 @@
 {{- $root := . -}}
-{{- if and $root.Values.nodeExporter $root.Values.nodeExporter.enabled }}
+{{- /* Rendered even when the sidecar is off, so a pod recreated from an older revision that still runs the sidecar can mount it. */}}
+{{- if $root.Values.nodeExporter }}
 {{ $appLabelArgs := dict "label" "yb-tserver" "root" $root }}
 apiVersion: v1
 kind: ConfigMap

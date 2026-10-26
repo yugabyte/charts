@@ -993,10 +993,12 @@ spec:
 
       volumes:
         {{- if and $root.Values.nodeExporter $root.Values.nodeExporter.enabled }}
+        {{- /* Optional, so the pod still starts if the ConfigMap is gone, as after a rollback to a chart without the sidecar; only this container then fails. */}}
         - name: yb-node-exporter-scripts
           configMap:
             name: {{ include "yugabyte.fullname" $root }}-node-exporter-scripts
             defaultMode: 0755
+            optional: true
         {{- /* Files for node_exporter's textfile collector. In memory with a cap, so a runaway write fails instead of getting the pod evicted. */}}
         - name: yb-node-exporter-textfile
           emptyDir:

@@ -261,6 +261,7 @@ tests:
         configMap:
           name: RELEASE-NAME-yugabyte-node-exporter-scripts
           defaultMode: 493
+          optional: true
   - exists:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")]
 
@@ -300,10 +301,21 @@ tests:
       path: metadata.name
       value: RELEASE-NAME-yugabyte-node-exporter-scripts
 
-- it: renders no ConfigMap when the sidecar is disabled
+- it: renders the ConfigMap when the sidecar is disabled, for pods still on a revision that runs it
   template: templates/node-exporter-configmap.yaml
   set:
     nodeExporter.enabled: false
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: metadata.name
+      value: RELEASE-NAME-yugabyte-node-exporter-scripts
+
+- it: renders no ConfigMap without a nodeExporter block (helm upgrade --reuse-values from an older chart)
+  template: templates/node-exporter-configmap.yaml
+  set:
+    nodeExporter: null
   asserts:
   - hasDocuments:
       count: 0
@@ -378,6 +390,7 @@ tests:
         configMap:
           name: RELEASE-NAME-yugabyte-node-exporter-scripts
           defaultMode: 493
+          optional: true
 
 - it: passes one mount path per disk and mounts each read-only
   template: templates/service.yaml
@@ -531,11 +544,11 @@ tests:
   - notExists:
       path: spec.template.spec.volumes[?(@.name=="yb-node-exporter-textfile")]
 
-- it: is disabled by default
+- it: renders the ConfigMap by default
   template: templates/node-exporter-configmap.yaml
   asserts:
   - hasDocuments:
-      count: 0
+      count: 1
 
 - it: exposes the sidecar port on master per-pod Services
   template: templates/multicluster/service-per-pod.yaml
