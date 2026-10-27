@@ -13,12 +13,12 @@
   password out of this chart's <release>-yugaware-global-config Secret, so both components fail
   the same way, and neither says why.
 
-  A fresh install generates 16 bytes and passes. What this catches is an install created before
-  that, whose 8-byte generated password is kept across upgrades - turning FIPS mode on there
-  breaks the deployment, and rotating a database password is not something a chart can do for
-  the operator. `lookup` returns nothing under `helm template`, `--dry-run` and ArgoCD, so the
-  generated case can only be checked against a live cluster; the render is allowed through when
-  it cannot be read.
+  A fresh install generates 16 bytes and passes, and an upgrade replaces a shorter generated
+  password of the bundled PostgreSQL (see yugaware.postgresPassword). What is left is a password
+  the operator chose - postgres.external.pass - and a bundled one that cannot be replaced, on an
+  install over a Secret left behind by an earlier release. `lookup` returns nothing under
+  `helm template`, `--dry-run` and ArgoCD, so the generated case can only be checked against a
+  live cluster; the render is allowed through when it cannot be read.
 */}}
 {{- if .Values.yugaware.fips.enabled }}
 {{- $minBytes := 14 }}
@@ -28,6 +28,8 @@
 {{- if .Values.postgres.external.host }}
   {{- $password = .Values.postgres.external.pass | default "" }}
   {{- $field = "postgres.external.pass" }}
+{{- else if include "yugaware.postgresPasswordRotated" . }}
+  {{- $checked = false }}
 {{- else }}
   {{- $secretName := printf "%s-yugaware-global-config" .Release.Name }}
   {{- $data := (lookup "v1" "Secret" .Release.Namespace $secretName).data | default dict }}
@@ -39,7 +41,11 @@
   {{- end }}
 {{- end }}
 {{- if and $checked (lt (len $password) $minBytes) }}
-  {{- fail (printf "\n\n%s is %d bytes, but FIPS mode needs at least %d.\nPostgreSQL SCRAM authentication derives its key with PBKDF2 through the FIPS module, which\nrejects anything shorter, so YugabyteDB Anywhere and Perf Advisor would both fail to reach\nthe database on startup.\nRotate the database password to a longer one, or disable FIPS mode with yugaware.fips.enabled=false.\n" $field (len $password) $minBytes) }}
+  {{- $fix := "Rotate the database password to a longer one, or disable FIPS mode with yugaware.fips.enabled=false." }}
+  {{- if .Values.postgres.external.host }}
+    {{- $fix = printf "Change the password of database user %s on %s to one of at least %d bytes, and set it with\npostgres.external.pass." .Values.postgres.external.user .Values.postgres.external.host $minBytes }}
+  {{- end }}
+  {{- fail (printf "\n\n%s is %d bytes, but FIPS mode needs at least %d.\nPostgreSQL SCRAM authentication derives its key with PBKDF2 through the FIPS module, which\nrejects anything shorter, so YugabyteDB Anywhere and Perf Advisor would both fail to reach\nthe database on startup.\n%s\n" $field (len $password) $minBytes $fix) }}
 {{- end }}
 {{- end }}
 

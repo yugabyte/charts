@@ -147,6 +147,27 @@ tests:
   - failedTemplate:
       errorPattern: 'postgres\.external\.pass is 5 bytes, but FIPS mode needs at least 14'
 
+# An upgrade replaces a short generated password (test_postgres_password_rotation.yaml); an
+# install cannot, as no hook sets the new password in a database an earlier release left behind.
+- it: a short generated password left by an earlier release is rejected on install
+  template: templates/fips-validation.yaml
+  release: {name: yw, namespace: yb}
+  kubernetesProvider:
+    scheme:
+      "v1/Secret": {gvr: {version: v1, resource: secrets}, namespaced: true}
+      "apps/v1/StatefulSet": {gvr: {group: apps, version: v1, resource: statefulsets}, namespaced: true}
+    objects:
+    - apiVersion: v1
+      kind: Secret
+      metadata: {name: yw-yugaware-global-config, namespace: yb}
+      data:
+        postgres_password: YUIzZEU1Z0g=
+  set:
+    yugaware.fips.enabled: true
+  asserts:
+  - failedTemplate:
+      errorPattern: 'postgres_password in Secret yw-yugaware-global-config is 8 bytes, but FIPS mode needs at least 14'
+
 - it: a long enough external database password is accepted in FIPS mode
   template: templates/fips-validation.yaml
   set:

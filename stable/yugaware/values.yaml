@@ -153,9 +153,9 @@ yugaware:
     # Requires a database password of at least 14 bytes: the PostgreSQL driver derives its SCRAM
     # key with PBKDF2 through the validated module, which refuses anything shorter, so a shorter
     # password stops both YugabyteDB Anywhere and Perf Advisor reaching the database at all. A
-    # fresh install generates 16; an install created before that keeps its 8-byte one across
-    # upgrades, and templates/fips-validation.yaml fails the render rather than letting the pods
-    # crash-loop.
+    # fresh install generates 16, and an upgrade replaces the 8-byte one older charts generated
+    # for the bundled PostgreSQL. A shorter postgres.external.pass fails the render rather than
+    # letting the pods crash-loop.
     enabled: false
 
   # Create an initial user for YugabyteDB Anywhere. A user is required for YBA workflows.

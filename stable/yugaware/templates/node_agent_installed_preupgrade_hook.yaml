@@ -124,7 +124,7 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-yugaware-global-config
+                  name: {{ include "yugaware.hookPostgresPasswordSecret" . }}
                   key: postgres_password
             - name: POSTGRES_DB
               valueFrom:

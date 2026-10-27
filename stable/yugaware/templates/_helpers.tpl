@@ -110,6 +110,43 @@ when TLS is turned on by upgrade) is missing from an existing Secret and must st
 {{- end -}}
 
 {{/*
+The bundled PostgreSQL password, base64-encoded, for the global-config Secret and the pre-upgrade
+hooks. Generated once and kept, except on a FIPS upgrade of one shorter than 14 bytes - the
+8-character password charts before 2.31 generated: the PostgreSQL driver derives its SCRAM key
+through the FIPS module, which rejects it. Such a password is replaced, and the pg-password-update
+hook sets the new one in the database before the Secret is applied. Memoized in .Values so that
+every template of a render gets the same value.
+*/}}
+{{- define "yugaware.postgresPassword" -}}
+{{- if not (hasKey .Values "_postgresPassword") }}
+  {{- $current := include "getOrGeneratePasswordConfigMapToSecret" (dict "Namespace" .Release.Namespace "Name" (printf "%s-yugaware-global-config" .Release.Name) "Key" "postgres_password" "Length" 16) }}
+  {{- $rotate := and .Values.yugaware.fips.enabled .Release.IsUpgrade (not .Values.useYugabyteDB) (not .Values.postgres.external.host) (lt (len (b64dec $current)) 14) }}
+  {{- $_ := set .Values "_postgresPassword" (dict "value" ($rotate | ternary (randAlphaNum 16 | b64enc) $current) "rotated" $rotate) }}
+{{- end }}
+{{- .Values._postgresPassword.value -}}
+{{- end -}}
+
+{{/*
+"true" when this render replaces the bundled PostgreSQL password (see yugaware.postgresPassword).
+*/}}
+{{- define "yugaware.postgresPasswordRotated" -}}
+{{- $_ := include "yugaware.postgresPassword" . -}}
+{{- if .Values._postgresPassword.rotated }}true{{ end -}}
+{{- end -}}
+
+{{/*
+Secret the pre-upgrade hooks read the database password from: hooks run before the global-config
+Secret is updated, so a replaced password reaches them through a hook Secret of its own.
+*/}}
+{{- define "yugaware.hookPostgresPasswordSecret" -}}
+{{- if include "yugaware.postgresPasswordRotated" . -}}
+{{ .Release.Name }}-yugaware-pg-password-rotation
+{{- else -}}
+{{ .Release.Name }}-yugaware-global-config
+{{- end -}}
+{{- end -}}
+
+{{/*
 Make list of allowed CORS origins
 */}}
 {{- define "allowedCorsOrigins" -}}
