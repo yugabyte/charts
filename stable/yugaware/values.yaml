@@ -34,7 +34,7 @@ image:
   postgres:
     # For non default postgres image, set postgres.sampleConfig values accordingly.
     registry: quay.io/yugabyte
-    tag: '14.23'
+    tag: '14.24'
     name: hardened-postgres
     # Postgres postgresql.conf.sample location on container. This will be used to mount
     # configmap with custom settings.
@@ -659,7 +659,7 @@ perf-advisor-chart:
       ## perf-advisor-validation.yaml fails the render if the two drift apart.
       registry: quay.io/yugabyte
       name: hardened-postgres
-      tag: '14.23'
+      tag: '14.24'
     perfAdvisor:
       tag: '1.6.0-b7'
 
