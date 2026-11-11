@@ -940,6 +940,8 @@ spec:
       {{- end}}
 
       {{- if and $root.Values.nodeExporter $root.Values.nodeExporter.enabled }}
+      {{- /* dig: values reused from a chart without nodeExporter.tls have no such key. */}}
+      {{- $nodeExporterTls := and $root.Values.tls.enabled (dig "tls" "enabled" false $root.Values.nodeExporter) }}
       - name: yb-node-exporter
         image: "{{ $root.Values.Image.nodeExporter.repository }}:{{ $root.Values.Image.nodeExporter.tag }}"
         imagePullPolicy: {{ $root.Values.Image.nodeExporter.pullPolicy }}
@@ -957,6 +959,29 @@ spec:
             value: {{ $root.Values.nodeExporter.port | quote }}
           - name: YB_TEXTFILE_DIR
             value: /run/yb-node-exporter
+          {{- if $nodeExporterTls }}
+          {{- if $root.Values.tls.certManager.enabled }}
+          - name: YB_NODE_EXPORTER_TLS_CERT
+            value: /home/yugabyte/cert-manager/tls.crt
+          - name: YB_NODE_EXPORTER_TLS_KEY
+            value: /home/yugabyte/cert-manager/tls.key
+          {{- else }}
+          {{- /* HOSTNAME and NAMESPACE are expanded by Kubernetes in the paths below. */}}
+          {{- $nodeFqdn := include "yugabyte.server_fqdn" $serviceValues | replace "${HOSTNAME}" "$(HOSTNAME)" | replace "${NAMESPACE}" "$(NAMESPACE)" }}
+          - name: HOSTNAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: YB_NODE_EXPORTER_TLS_CERT
+            value: {{ printf "/opt/certs/yugabyte/node.%s.crt" $nodeFqdn | quote }}
+          - name: YB_NODE_EXPORTER_TLS_KEY
+            value: {{ printf "/opt/certs/yugabyte/node.%s.key" $nodeFqdn | quote }}
+          {{- end }}
+          {{- end }}
         ports:
           - containerPort: {{ $root.Values.nodeExporter.port }}
             name: "node-metrics"
@@ -989,11 +1014,16 @@ spec:
             readOnly: true
           {{- end }}
           {{- end }}
+          {{- if $nodeExporterTls }}
+          - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s%s-yugabyte-tls-cert" $service.label $stsIndexSuffix) (printf "%s-%s%s-tls-cert" (include "yugabyte.fullname" $root) $service.label $stsIndexSuffix) }}
+            mountPath: {{ $root.Values.tls.certManager.enabled | ternary "/home/yugabyte/cert-manager" "/opt/certs/yugabyte" }}
+            readOnly: true
+          {{- end }}
       {{- end }}
 
       volumes:
         {{- if and $root.Values.nodeExporter $root.Values.nodeExporter.enabled }}
-        {{- /* Optional, so the pod still starts if the ConfigMap is gone, as after a rollback to a chart without the sidecar; only this container then fails. */}}
+        {{- /* Optional, so the database containers still start when the ConfigMap is missing (a rollback to a chart without it). The sidecar then fails and the pod stays NotReady until it is rolled. */}}
         - name: yb-node-exporter-scripts
           configMap:
             name: {{ include "yugabyte.fullname" $root }}-node-exporter-scripts

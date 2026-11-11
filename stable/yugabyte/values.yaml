@@ -1007,11 +1007,15 @@ containerSecurityContext:
 ## pod's own PVCs, plus the pod's network counters and TCP retransmits. On
 ## ephemeral storage it exports no disk series.
 nodeExporter:
-  ## Set by YBA, which also adds the scrape target; set by hand, nothing scrapes
-  ## the sidecar. Data volumes it cannot attribute are skipped; if node_exporter
-  ## exits, Kubernetes restarts the container.
+  ## YBA sets this and adds the scrape target. The chart's serviceMonitor does not
+  ## scrape the sidecar; set by hand, scrape nodeExporter.port yourself. A data
+  ## volume the sidecar cannot attribute is skipped. While the sidecar restarts,
+  ## its pod is NotReady.
   enabled: false
   port: 9300
+  tls:
+    ## Set by YBA. Serves HTTPS with the pod's node certificate; needs tls.enabled.
+    enabled: false
   ## Image: Image.nodeExporter; resources: resources.nodeExporter.
 
 ## Added to handle old universe which has volume annotations
