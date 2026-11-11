@@ -66,7 +66,10 @@ spec:
                   description: Boolean indicating if backup is to be taken table by table.
                   type: boolean
                 keyspace:
-                  description: Name of keyspace to be backed up.
+                  description: >
+                    Name of the YSQL database or YCQL keyspace to back up.
+                    Omit to back up all databases (YSQL) or all keyspaces (YCQL)
+                    of backupType. A named value backs up that one database/keyspace only.
                   type: string
                 timeBeforeDelete:
                   description: Time before backup is deleted from storage in milliseconds.
@@ -92,7 +95,6 @@ spec:
                   type: boolean
                   default: true
               required:
-              - keyspace
               - backupType
               - storageConfig
               - universe
@@ -1343,6 +1345,13 @@ spec:
                   type: string
             spec:
               type: object
+              x-kubernetes-validations:
+                - rule: >
+                    !((has(self.keyspace) && size(self.keyspace) > 0) &&
+                      (has(self.restoreKeyspaces) && size(self.restoreKeyspaces) > 0))
+                  message: >
+                    spec.keyspace and spec.restoreKeyspaces cannot both be set.
+                    spec.keyspace is deprecated; use spec.restoreKeyspaces.
               properties:
                 actionType:
                   description: Type of action to be taken. Allowed values - RESTORE
@@ -1366,8 +1375,49 @@ spec:
                     Required only when the backup is encrypted; leave unset for plaintext backups.
                   type: string
                 keyspace:
-                  description: Name of the keyspace to be restored.
+                  description: >
+                    DEPRECATED: Use restoreKeyspaces instead. Still supported to
+                    rename the only YSQL database or YCQL keyspace of a
+                    single-keyspace backup; rejected for a multi-keyspace backup.
+                    Mutually exclusive with restoreKeyspaces.
                   type: string
+                restoreKeyspaces:
+                  description: >
+                    YSQL databases or YCQL keyspaces to restore from the backup.
+                    If empty, every keyspace is restored as its original name.
+                    When set, only listed keyspaces are restored. If newName is
+                    provided for a keyspace, it is restored with that name. If
+                    newName is empty, the original name is used.
+                  type: array
+                  # Bounds keep the pairwise uniqueness rule under the API server's
+                  # CEL cost budget; without them the CRD is rejected on apply.
+                  maxItems: 256
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - name
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        description: Name of the keyspace in the backup.
+                        type: string
+                        minLength: 1
+                        maxLength: 63
+                      newName:
+                        description: >
+                          Optional destination name. Omit to restore under the
+                          original name.
+                        type: string
+                        minLength: 1
+                        maxLength: 63
+                  x-kubernetes-validations:
+                    - rule: >
+                        self.all(a, self.all(b, a.name == b.name ||
+                          (has(a.newName) ? a.newName : a.name) !=
+                          (has(b.newName) ? b.newName : b.name)))
+                      message: restoreKeyspaces destination names must be unique
                 useTablespaces:
                   description: Restore tablespace information from the backup.
                   type: boolean
@@ -1434,6 +1484,13 @@ spec:
                   message: >
                     "Either 'schedulingFrequency' must be non-zero or
                     'cronExpression' must be a non-empty string."
+                # Field-level self == oldSelf is skipped when keyspace is absent
+                # (Kubernetes CEL does not evaluate rules on missing fields), so
+                # omit==omit is allowed. This spec-level rule forbids toggling
+                # between unset and set (omit cannot later gain a name, and a
+                # named keyspace cannot later be cleared).
+                - rule: has(self.keyspace) == has(oldSelf.keyspace)
+                  message: keyspace cannot be changed between unset and set
               properties:
                 name:
                   type: string
@@ -1478,7 +1535,11 @@ spec:
                   - message: tableByTableBackup cannot be changed
                     rule: self == oldSelf
                 keyspace:
-                  description: Name of keyspace to be backed up.
+                  description: >
+                    Name of the YSQL database or YCQL keyspace to back up.
+                    Omit to back up all databases (YSQL) or all keyspaces (YCQL)
+                    of backupType. A named value backs up that one database/keyspace only.
+                    Immutable: omit must stay omit, and a named value cannot change.
                   type: string
                   x-kubernetes-validations:
                   - message: keyspace cannot be changed
@@ -1513,18 +1574,26 @@ spec:
                   description: Include tablespace information in the backup.
                   type: boolean
                   default: false
+                  x-kubernetes-validations:
+                  - message: useTablespaces cannot be changed
+                    rule: self == oldSelf
                 useRoles:
                   description: Backup global YSQL roles.
                   type: boolean
                   default: false
+                  x-kubernetes-validations:
+                  - message: useRoles cannot be changed
+                    rule: self == oldSelf
                 usePrivileges:
                   description: >
                     Backup privileges for roles.
                     If false, --no-privileges will be added to the backup command.
                   type: boolean
                   default: true
+                  x-kubernetes-validations:
+                  - message: usePrivileges cannot be changed
+                    rule: self == oldSelf
               required:
-              - keyspace
               - backupType
               - storageConfig
               - universe
@@ -1632,6 +1701,10 @@ spec:
                       description: |
                         Use path style access for S3 bucket configuration. Valid for S3 compatible
                         storages.
+                      type: boolean
+                    IMMUTABLE_STORAGE:
+                      description: |
+                        If true, backup deletion only results in deletion of YBA metadata.
                       type: boolean
                     SIGNING_REGION:
                       description: |
@@ -5101,6 +5174,110 @@ spec:
                   x-kubernetes-validations:
                     - rule: self == oldSelf
                       message: "universe is immutable"
+              required:
+                - universe
+
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: universeservercertrotations.operator.yugabyte.io
+spec:
+  group: operator.yugabyte.io
+  scope: Namespaced
+  names:
+    plural: universeservercertrotations
+    singular: universeservercertrotation
+    shortNames:
+      - uscr
+    kind: UniverseServerCertRotation
+    categories:
+      - all
+      - yugabyte
+  versions:
+    - name: v1alpha1
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Universe
+          type: string
+          description: The universe whose server certificates are rotated
+          jsonPath: .spec.universe
+        - name: State
+          type: string
+          description: The state of the server certificate rotation
+          jsonPath: .status.state
+        - name: Retries
+          type: integer
+          description: Number of times the rotation task has been retried after a failure
+          jsonPath: .status.retryCount
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: >
+            Custom resource definition for a YugabyteDB Anywhere universe server certificate
+            rotation. Each resource represents a single imperative rotation that reissues the node
+            and client (leaf) certificates under the universe's current rootCA, so listing the
+            resources for a universe gives the rotation history. For cert-manager issued
+            certificates, renew the Certificate resources with cert-manager first (for example
+            with cmctl renew); the rotation then rolls the renewed certificates out to the nodes.
+            To rotate the rootCA itself, change rootCA on the ybuniverse resource instead.
+          type: object
+          properties:
+            status:
+              description: Server certificate rotation status for the custom resource.
+              type: object
+              properties:
+                state:
+                  description: >
+                    State of the rotation (e.g. Running, Retrying, Succeeded, Failed).
+                  type: string
+                message:
+                  description: Message for the rotation (failure reason, progress, etc.).
+                  type: string
+                taskUUID:
+                  description: >
+                    Internal UUID of the task currently tracked for the rotation. A failed task is
+                    retried by the ybuniverse reconciler, and this then follows the retry task.
+                  type: string
+                retryCount:
+                  description: Number of times the rotation task has been retried after a failure.
+                  type: integer
+                requestedAt:
+                  description: Timestamp when the rotation was requested.
+                  type: string
+                completedAt:
+                  description: Timestamp when the rotation completed.
+                  type: string
+            spec:
+              type: object
+              description: Server certificate rotation specification.
+              properties:
+                universe:
+                  description: >
+                    Name of the universe whose server certificates are to be rotated. Refers to a
+                    ybuniverse CR name in the same namespace. Immutable.
+                  type: string
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "universe is immutable"
+                upgradeOption:
+                  description: >
+                    Strategy used to roll the new certificates out. "Rolling" restarts nodes one
+                    batch at a time, "Non-Rolling" restarts all nodes simultaneously, and
+                    "Non-Restart" hot-reloads the certificates without restarting nodes. Defaults
+                    to the upgradeOption of the ybuniverse resource. Rolling batch size and wait
+                    times always come from the ybuniverse resource. Immutable.
+                  type: string
+                  enum:
+                    - Rolling
+                    - Non-Rolling
+                    - Non-Restart
+                  x-kubernetes-validations:
+                    - rule: self == oldSelf
+                      message: "upgradeOption is immutable"
               required:
                 - universe
 
