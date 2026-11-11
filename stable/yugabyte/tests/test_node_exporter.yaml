@@ -655,7 +655,7 @@ tests:
   asserts:
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
-      value: quay.io/prometheus/node-exporter:v1.12.1
+      value: quay.io/yugabyte/node-exporter-fips:1.12.1-fips-b2
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].imagePullPolicy
       value: IfNotPresent
@@ -681,7 +681,7 @@ tests:
   asserts:
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
-      value: quay.io/prometheus/node-exporter:v1.12.1
+      value: quay.io/yugabyte/node-exporter-fips:1.12.1-fips-b2
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].resources
       value:
@@ -701,14 +701,14 @@ tests:
   - values_yba_overrides.yaml
   set:
     oldNamingStyle: true
-    Image.nodeExporter.repository: mirror.example.com/prometheus/node-exporter
+    Image.nodeExporter.repository: mirror.example.com/yugabyte/node-exporter-fips
   documentSelector:
     path: metadata.name
     value: yb-tserver
   asserts:
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
-      value: mirror.example.com/prometheus/node-exporter:v1.12.1
+      value: mirror.example.com/yugabyte/node-exporter-fips:1.12.1-fips-b2
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].imagePullPolicy
       value: IfNotPresent
