@@ -19,8 +19,8 @@ data:
     #   3. writes the yb_node_exporter_check reasons to $YB_TEXTFILE_DIR;
     #   4. with YB_NODE_EXPORTER_TLS_CERT set, writes the TLS web config;
     #   5. execs node_exporter with diskstats limited to those devices.
-    # A skipped mount is logged, never fatal; so is a TLS file it cannot use,
-    # which serves plain HTTP.
+    # A skipped mount is logged, never fatal; so is a missing, unreadable or empty
+    # TLS file, which serves plain HTTP. A malformed certificate or key stops node_exporter.
     set -u
 
     PROC=/proc
