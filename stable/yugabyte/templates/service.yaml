@@ -960,14 +960,11 @@ spec:
           - name: YB_TEXTFILE_DIR
             value: /run/yb-node-exporter
           {{- if $nodeExporterTls }}
-          {{- if $root.Values.tls.certManager.enabled }}
-          - name: YB_NODE_EXPORTER_TLS_CERT
-            value: /home/yugabyte/cert-manager/tls.crt
-          - name: YB_NODE_EXPORTER_TLS_KEY
-            value: /home/yugabyte/cert-manager/tls.key
-          {{- else }}
-          {{- /* HOSTNAME and NAMESPACE are expanded by Kubernetes in the paths below. */}}
+          {{- /* The server's own certificate files: with cert-manager, the copy the init container
+               verified into /mnt/disk0/certs (/opt/certs/yugabyte for the server); otherwise the
+               mounted Secret. HOSTNAME and NAMESPACE are expanded by Kubernetes in the paths below. */}}
           {{- $nodeFqdn := include "yugabyte.server_fqdn" $serviceValues | replace "${HOSTNAME}" "$(HOSTNAME)" | replace "${NAMESPACE}" "$(NAMESPACE)" }}
+          {{- $certsDir := $root.Values.tls.certManager.enabled | ternary "/mnt/disk0/certs" "/opt/certs/yugabyte" }}
           - name: HOSTNAME
             valueFrom:
               fieldRef:
@@ -977,10 +974,9 @@ spec:
               fieldRef:
                 fieldPath: metadata.namespace
           - name: YB_NODE_EXPORTER_TLS_CERT
-            value: {{ printf "/opt/certs/yugabyte/node.%s.crt" $nodeFqdn | quote }}
+            value: {{ printf "%s/node.%s.crt" $certsDir $nodeFqdn | quote }}
           - name: YB_NODE_EXPORTER_TLS_KEY
-            value: {{ printf "/opt/certs/yugabyte/node.%s.key" $nodeFqdn | quote }}
-          {{- end }}
+            value: {{ printf "%s/node.%s.key" $certsDir $nodeFqdn | quote }}
           {{- end }}
         ports:
           - containerPort: {{ $root.Values.nodeExporter.port }}
@@ -1007,16 +1003,17 @@ spec:
           - name: yb-node-exporter-textfile
             mountPath: /run/yb-node-exporter
           {{- if not $storageEphemeral }}
-          {{- /* Mounted only so mountinfo shows the backing device; nothing is read from it. */}}
+          {{- /* Mounted so mountinfo shows the backing device. With cert-manager TLS, the sidecar
+               also reads the server certificate from /mnt/disk0/certs. */}}
           {{- range $index := until (int ($storageInfo.count)) }}
           - name: {{ $root.Values.oldNamingStyle | ternary (printf "datadir%d" $index) (printf "%s%d" (include "yugabyte.volume_name" $root) $index) }}
             mountPath: /mnt/disk{{ $index }}
             readOnly: true
           {{- end }}
           {{- end }}
-          {{- if $nodeExporterTls }}
+          {{- if and $nodeExporterTls (not $root.Values.tls.certManager.enabled) }}
           - name: {{ $root.Values.oldNamingStyle | ternary (printf "%s%s-yugabyte-tls-cert" $service.label $stsIndexSuffix) (printf "%s-%s%s-tls-cert" (include "yugabyte.fullname" $root) $service.label $stsIndexSuffix) }}
-            mountPath: {{ $root.Values.tls.certManager.enabled | ternary "/home/yugabyte/cert-manager" "/opt/certs/yugabyte" }}
+            mountPath: /opt/certs/yugabyte
             readOnly: true
           {{- end }}
       {{- end }}

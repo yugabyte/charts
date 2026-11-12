@@ -932,7 +932,7 @@ tests:
       path: data["node.yb-tserver-0.yb-tservers.NAMESPACE.svc.cluster.local.key"]
       value: a2V5
 
-- it: reads tls.crt and tls.key from the cert-manager volume
+- it: reads the server certificate the cert-manager init container copied, not the live Secret
   template: templates/service.yaml
   set:
     oldNamingStyle: true
@@ -951,18 +951,33 @@ tests:
         value: "9300"
       - name: YB_TEXTFILE_DIR
         value: /run/yb-node-exporter
+      - name: HOSTNAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
       - name: YB_NODE_EXPORTER_TLS_CERT
-        value: /home/yugabyte/cert-manager/tls.crt
+        value: /mnt/disk0/certs/node.$(HOSTNAME).yb-tservers.$(NAMESPACE).svc.cluster.local.crt
       - name: YB_NODE_EXPORTER_TLS_KEY
-        value: /home/yugabyte/cert-manager/tls.key
+        value: /mnt/disk0/certs/node.$(HOSTNAME).yb-tservers.$(NAMESPACE).svc.cluster.local.key
+  - matchRegex:
+      path: spec.template.spec.initContainers[?(@.name=="certmanager-init")].command[2]
+      pattern: 'cp /home/yugabyte/cert-manager/tls\.crt /mnt/disk0/certs/node\.\$\{HOSTNAME\}\.yb-tservers\.\$\{NAMESPACE\}\.svc\.cluster\.local\.crt;'
   - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      content:
+        name: datadir0
+        mountPath: /mnt/disk0
+        readOnly: true
+  - notContains:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
       content:
         name: yb-tserver-yugabyte-tls-cert
         mountPath: /home/yugabyte/cert-manager
         readOnly: true
-  - exists:
-      path: spec.template.spec.volumes[?(@.name=="yb-tserver-yugabyte-tls-cert")].projected
 
 - it: uses the clusterset FQDN with createServiceExports
   template: templates/service.yaml
@@ -1050,4 +1065,4 @@ tests:
   asserts:
   - matchRegex:
       path: data["run-node-exporter.sh"]
-      pattern: '(?m)^ +"  min_version: TLS12" > "\$TEXTFILE_DIR/web\.yml"; then$'
+      pattern: '(?m)^ +"  min_version: TLS12" > "\$web_config"; then$'
