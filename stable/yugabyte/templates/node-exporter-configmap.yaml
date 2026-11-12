@@ -1,5 +1,5 @@
 {{- $root := . -}}
-{{- /* Rendered even when the sidecar is off, so a pod recreated from an older revision that still runs the sidecar can mount it. */}}
+{{- /* Rendered even when the sidecar is off: a pod recreated on an older StatefulSet revision may still run the sidecar and mount this ConfigMap. */}}
 {{- if $root.Values.nodeExporter }}
 {{ $appLabelArgs := dict "label" "yb-tserver" "root" $root }}
 apiVersion: v1
@@ -17,9 +17,10 @@ data:
     #   1. checks whether anything is mounted over /proc/diskstats;
     #   2. traces each mount to its own block device, skipping any it cannot;
     #   3. writes the yb_node_exporter_check reasons to $YB_TEXTFILE_DIR;
-    #   4. execs node_exporter with diskstats limited to those devices.
-    # A skipped mount is logged, never fatal. If node_exporter exits, Kubernetes
-    # restarts the container.
+    #   4. with YB_NODE_EXPORTER_TLS_CERT set, writes the TLS web config;
+    #   5. execs node_exporter with diskstats limited to those devices.
+    # A skipped mount is logged, never fatal; so is a missing, unreadable or empty
+    # TLS file, which serves plain HTTP. A malformed certificate or key stops node_exporter.
     set -u
 
     PROC=/proc
@@ -74,6 +75,7 @@ data:
     overlay="$(awk -v p="$PROC/diskstats" '
       $5 == p {
         f = 1
+        # A mount over /proc/diskstats whose line has no fstype still counts as overlaid.
         t = "unknown"
         for (i = 7; i < NF; i++) {
           if ($i == "-") {
@@ -92,7 +94,7 @@ data:
       check diskstats "" ok
     fi
 
-    # 2. There are no arguments on ephemeral storage.
+    # 2. Each argument is a data mount; ephemeral storage passes none.
     if [ $# -eq 0 ]; then
       echo "info: no data volumes; exporting no disk series" >&2
       check data_volume "" no_data_volumes
@@ -107,8 +109,8 @@ data:
       devno="${entry%% *}"
       mroot="${entry##* }"
 
-      # A volume is mounted at the root of its filesystem ("/" in mountinfo). Any
-      # other root is a bind mount of a node directory, on a device the node shares.
+      # A whole volume is mounted at its filesystem root ("/" in mountinfo). Any
+      # other root is a bind mount of a directory, not a dedicated volume.
       if [ "$mroot" != "/" ]; then
         skip bind_mount "a bind mount of $mroot, not a dedicated volume"
         continue
@@ -144,8 +146,44 @@ data:
       echo "warn: could not write $OUT" >&2
     fi
 
-    # 4. No diskstats collector without a device; netdev and netstat need no
-    # filter: they see only this pod's network namespace.
+    # 4. HTTPS only if both files are non-empty and readable and web.yml is written,
+    # else plain HTTP.
+    web_config=""
+    cert="${YB_NODE_EXPORTER_TLS_CERT:-}"
+    if [ -n "$cert" ]; then
+      key="${YB_NODE_EXPORTER_TLS_KEY:-}"
+      tls_ok=1
+      for f in "$cert" "$key"; do
+        if [ -z "$f" ]; then
+          echo "warn: YB_NODE_EXPORTER_TLS_KEY is not set; serving plain HTTP" >&2
+          tls_ok=0
+        elif [ ! -e "$f" ]; then
+          echo "warn: $f does not exist; serving plain HTTP" >&2
+          tls_ok=0
+        elif [ ! -r "$f" ]; then
+          echo "warn: $f is not readable by uid $(id -u); serving plain HTTP" >&2
+          tls_ok=0
+        elif [ ! -s "$f" ]; then
+          echo "warn: $f is empty; serving plain HTTP" >&2
+          tls_ok=0
+        fi
+      done
+      if [ "$tls_ok" = 1 ]; then
+        if printf '%s\n' \
+          "tls_server_config:" \
+          "  cert_file: \"$cert\"" \
+          "  key_file: \"$key\"" \
+          "  min_version: TLS12" > "$TEXTFILE_DIR/web.yml"; then
+          web_config="$TEXTFILE_DIR/web.yml"
+          echo "info: serving HTTPS with $cert" >&2
+        else
+          echo "warn: could not write $TEXTFILE_DIR/web.yml; serving plain HTTP" >&2
+        fi
+      fi
+    fi
+
+    # 5. The diskstats collector runs only with a resolved device. netdev and
+    # netstat need no filter, as they see only this pod's network namespace.
     # The resolved devices as one regex alternation: "sdb|sdc".
     devices="$(echo "$devices" |
       tr ' ' '\n' |
@@ -157,6 +195,9 @@ data:
     set --
     if [ -n "$devices" ]; then
       set -- --collector.diskstats --collector.diskstats.device-include="^(${devices})\$"
+    fi
+    if [ -n "$web_config" ]; then
+      set -- "$@" --web.config.file="$web_config"
     fi
     exec /bin/node_exporter \
       --web.listen-address=":${YB_NODE_EXPORTER_PORT:-9300}" \

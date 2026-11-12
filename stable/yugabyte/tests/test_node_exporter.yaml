@@ -162,7 +162,7 @@ tests:
         capabilities:
           drop: ["ALL"]
 
-- it: inherits a root pod user rather than refusing it
+- it: inherits a root pod user and sets no runAsNonRoot
   template: templates/service.yaml
   set:
     oldNamingStyle: true
@@ -320,7 +320,7 @@ tests:
   - hasDocuments:
       count: 0
 
-- it: gives a moveOp StatefulSet on persistent storage its data mounts
+- it: passes a moveOp StatefulSet on persistent storage its data mount paths
   template: templates/service.yaml
   set:
     oldNamingStyle: true
@@ -355,7 +355,7 @@ tests:
   - notExists:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].args
 
-- it: still gives the steady-state StatefulSet its data mounts during a moveOp
+- it: still passes the steady-state StatefulSet its data mount paths during a moveOp
   template: templates/service.yaml
   set:
     oldNamingStyle: true
@@ -498,7 +498,7 @@ tests:
   asserts:
   - matchRegex:
       path: data["run-node-exporter.sh"]
-      pattern: '(?m)^set \-\-\nif \[ \-n \"\$devices\" \]; then\n  set \-\- \-\-collector\.diskstats \-\-collector\.diskstats\.device\-include=\"\^\(\$\{devices\}\)\\\$\"\nfi\nexec /bin/node_exporter \\\n  \-\-web\.listen\-address=\":\$\{YB_NODE_EXPORTER_PORT:\-9300\}\" \\\n  \-\-collector\.disable\-defaults \\\n  \"\$@\" \\\n  \-\-collector\.netdev \\\n  \-\-collector\.netstat \\\n  \-\-collector\.netstat\.fields=''\^Tcp_RetransSegs\$'' \\\n  \-\-collector\.textfile \\\n  \-\-collector\.textfile\.directory=\"\$TEXTFILE_DIR\"$'
+      pattern: '(?m)^set \-\-\nif \[ \-n \"\$devices\" \]; then\n  set \-\- \-\-collector\.diskstats \-\-collector\.diskstats\.device\-include=\"\^\(\$\{devices\}\)\\\$\"\nfi\nif \[ \-n \"\$web_config\" \]; then\n  set \-\- \"\$@\" \-\-web\.config\.file=\"\$web_config\"\nfi\nexec /bin/node_exporter \\\n  \-\-web\.listen\-address=\":\$\{YB_NODE_EXPORTER_PORT:\-9300\}\" \\\n  \-\-collector\.disable\-defaults \\\n  \"\$@\" \\\n  \-\-collector\.netdev \\\n  \-\-collector\.netstat \\\n  \-\-collector\.netstat\.fields=''\^Tcp_RetransSegs\$'' \\\n  \-\-collector\.textfile \\\n  \-\-collector\.textfile\.directory=\"\$TEXTFILE_DIR\"$'
 
 - it: renders no sidecar or its volumes in yb-tserver pods when disabled
   template: templates/service.yaml
@@ -543,6 +543,8 @@ tests:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")]
   - notExists:
       path: spec.template.spec.volumes[?(@.name=="yb-node-exporter-textfile")]
+  - notExists:
+      path: spec.template.spec.volumes[?(@.name=="yb-node-exporter-scripts")]
 
 - it: renders the ConfigMap by default
   template: templates/node-exporter-configmap.yaml
@@ -634,7 +636,7 @@ tests:
         name: tcp-node-metrics
         port: 9300
 
-- it: renders no per-pod Services without createServicePerPod, sidecar or not
+- it: renders no per-pod Services without createServicePerPod when the sidecar is on
   template: templates/multicluster/service-per-pod.yaml
   set:
     nodeExporter.enabled: true
@@ -653,7 +655,7 @@ tests:
   asserts:
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
-      value: quay.io/prometheus/node-exporter:v1.12.1
+      value: quay.io/yugabyte/node-exporter-fips:1.12.1-fips-b2
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].imagePullPolicy
       value: IfNotPresent
@@ -679,7 +681,7 @@ tests:
   asserts:
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
-      value: quay.io/prometheus/node-exporter:v1.12.1
+      value: quay.io/yugabyte/node-exporter-fips:1.12.1-fips-b2
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].resources
       value:
@@ -699,14 +701,353 @@ tests:
   - values_yba_overrides.yaml
   set:
     oldNamingStyle: true
-    Image.nodeExporter.repository: mirror.example.com/prometheus/node-exporter
+    Image.nodeExporter.repository: mirror.example.com/yugabyte/node-exporter-fips
   documentSelector:
     path: metadata.name
     value: yb-tserver
   asserts:
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
-      value: mirror.example.com/prometheus/node-exporter:v1.12.1
+      value: mirror.example.com/yugabyte/node-exporter-fips:1.12.1-fips-b2
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].imagePullPolicy
       value: IfNotPresent
+
+- it: renders no sidecar TLS with tls.enabled but nodeExporter.tls off
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    tls.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      value:
+      - name: YB_NODE_EXPORTER_PORT
+        value: "9300"
+      - name: YB_TEXTFILE_DIR
+        value: /run/yb-node-exporter
+  - notContains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      content:
+        name: yb-tserver-yugabyte-tls-cert
+      any: true
+
+- it: renders no sidecar TLS with nodeExporter.tls on but tls.enabled off
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    nodeExporter.tls.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      value:
+      - name: YB_NODE_EXPORTER_PORT
+        value: "9300"
+      - name: YB_TEXTFILE_DIR
+        value: /run/yb-node-exporter
+  - lengthEqual:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      count: 4
+
+- it: renders no sidecar TLS for values reused from a chart without nodeExporter.tls
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    nodeExporter.tls: null
+    tls.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - notContains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      content:
+        name: YB_NODE_EXPORTER_TLS_CERT
+      any: true
+
+- it: points the sidecar at this pod's node certificate from the YBA CA, old naming
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    tls.enabled: true
+    nodeExporter.tls.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      value:
+      - name: YB_NODE_EXPORTER_PORT
+        value: "9300"
+      - name: YB_TEXTFILE_DIR
+        value: /run/yb-node-exporter
+      - name: HOSTNAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: YB_NODE_EXPORTER_TLS_CERT
+        value: /opt/certs/yugabyte/node.$(HOSTNAME).yb-tservers.$(NAMESPACE).svc.cluster.local.crt
+      - name: YB_NODE_EXPORTER_TLS_KEY
+        value: /opt/certs/yugabyte/node.$(HOSTNAME).yb-tservers.$(NAMESPACE).svc.cluster.local.key
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      content:
+        name: yb-tserver-yugabyte-tls-cert
+        mountPath: /opt/certs/yugabyte
+        readOnly: true
+  - contains:
+      path: spec.template.spec.volumes
+      content:
+        name: yb-tserver-yugabyte-tls-cert
+        secret:
+          secretName: yb-tserver-yugabyte-tls-cert
+          defaultMode: 256
+
+- it: names the certificate after the key the node-cert Secret stores for the pod
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    tls.enabled: true
+    nodeExporter.tls.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver-yugabyte-tls-cert
+  asserts:
+  - exists:
+      path: data["node.yb-tserver-0.yb-tservers.NAMESPACE.svc.cluster.local.crt"]
+  - exists:
+      path: data["node.yb-tserver-0.yb-tservers.NAMESPACE.svc.cluster.local.key"]
+
+- it: mounts the node certificate in master pods too
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    tls.enabled: true
+    nodeExporter.tls.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-master
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      content:
+        name: YB_NODE_EXPORTER_TLS_CERT
+        value: /opt/certs/yugabyte/node.$(HOSTNAME).yb-masters.$(NAMESPACE).svc.cluster.local.crt
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      content:
+        name: yb-master-yugabyte-tls-cert
+        mountPath: /opt/certs/yugabyte
+        readOnly: true
+
+- it: uses new-style volume and Service names
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: false
+    nodeExporter.enabled: true
+    tls.enabled: true
+    nodeExporter.tls.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: RELEASE-NAME-yugabyte-yb-tserver
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      content:
+        name: YB_NODE_EXPORTER_TLS_CERT
+        value: /opt/certs/yugabyte/node.$(HOSTNAME).RELEASE-NAME-yugabyte-yb-tservers.$(NAMESPACE).svc.cluster.local.crt
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      content:
+        name: YB_NODE_EXPORTER_TLS_KEY
+        value: /opt/certs/yugabyte/node.$(HOSTNAME).RELEASE-NAME-yugabyte-yb-tservers.$(NAMESPACE).svc.cluster.local.key
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      content:
+        name: RELEASE-NAME-yugabyte-yb-tserver-tls-cert
+        mountPath: /opt/certs/yugabyte
+        readOnly: true
+
+- it: uses the same paths for Vault-issued certificates in tls.nodeCert
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    tls.enabled: true
+    nodeExporter.tls.enabled: true
+    tls.rootCA.key: ""
+    tls.nodeCert.cert: Y2VydA==
+    tls.nodeCert.key: a2V5
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      content:
+        name: YB_NODE_EXPORTER_TLS_CERT
+        value: /opt/certs/yugabyte/node.$(HOSTNAME).yb-tservers.$(NAMESPACE).svc.cluster.local.crt
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      content:
+        name: yb-tserver-yugabyte-tls-cert
+        mountPath: /opt/certs/yugabyte
+        readOnly: true
+
+- it: stores Vault-issued certificates under the key the sidecar reads
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    tls.enabled: true
+    nodeExporter.tls.enabled: true
+    tls.rootCA.key: ""
+    tls.nodeCert.cert: Y2VydA==
+    tls.nodeCert.key: a2V5
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver-yugabyte-tls-cert
+  asserts:
+  - equal:
+      path: data["node.yb-tserver-0.yb-tservers.NAMESPACE.svc.cluster.local.crt"]
+      value: Y2VydA==
+  - equal:
+      path: data["node.yb-tserver-0.yb-tservers.NAMESPACE.svc.cluster.local.key"]
+      value: a2V5
+
+- it: reads tls.crt and tls.key from the cert-manager volume
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    tls.enabled: true
+    tls.certManager.enabled: true
+    nodeExporter.tls.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      value:
+      - name: YB_NODE_EXPORTER_PORT
+        value: "9300"
+      - name: YB_TEXTFILE_DIR
+        value: /run/yb-node-exporter
+      - name: YB_NODE_EXPORTER_TLS_CERT
+        value: /home/yugabyte/cert-manager/tls.crt
+      - name: YB_NODE_EXPORTER_TLS_KEY
+        value: /home/yugabyte/cert-manager/tls.key
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].volumeMounts
+      content:
+        name: yb-tserver-yugabyte-tls-cert
+        mountPath: /home/yugabyte/cert-manager
+        readOnly: true
+  - exists:
+      path: spec.template.spec.volumes[?(@.name=="yb-tserver-yugabyte-tls-cert")].projected
+
+- it: uses the clusterset FQDN with createServiceExports
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    tls.enabled: true
+    nodeExporter.tls.enabled: true
+    multicluster.createServiceExports: true
+    multicluster.kubernetesClusterId: c1
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      content:
+        name: YB_NODE_EXPORTER_TLS_CERT
+        value: /opt/certs/yugabyte/node.$(HOSTNAME).c1.yb-tservers.$(NAMESPACE).svc.clusterset.local.crt
+
+- it: uses the clusterset FQDN with createServiceExports, new naming
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: false
+    nodeExporter.enabled: true
+    tls.enabled: true
+    nodeExporter.tls.enabled: true
+    multicluster.createServiceExports: true
+    multicluster.kubernetesClusterId: c1
+  documentSelector:
+    path: metadata.name
+    value: RELEASE-NAME-yugabyte-yb-tserver
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      content:
+        name: YB_NODE_EXPORTER_TLS_CERT
+        value: /opt/certs/yugabyte/node.$(HOSTNAME).c1.RELEASE-NAME-yugabyte-yb-tservers.$(NAMESPACE).svc.clusterset.local.crt
+
+- it: uses the per-pod Service FQDN with createServicePerPod
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    tls.enabled: true
+    nodeExporter.tls.enabled: true
+    multicluster.createServicePerPod: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      content:
+        name: YB_NODE_EXPORTER_TLS_CERT
+        value: /opt/certs/yugabyte/node.$(HOSTNAME).$(NAMESPACE).svc.cluster.local.crt
+  - contains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      content:
+        name: YB_NODE_EXPORTER_TLS_KEY
+        value: /opt/certs/yugabyte/node.$(HOSTNAME).$(NAMESPACE).svc.cluster.local.key
+
+- it: keeps the sidecar port on per-pod Services with sidecar TLS on
+  template: templates/multicluster/service-per-pod.yaml
+  set:
+    oldNamingStyle: true
+    multicluster.createServicePerPod: true
+    nodeExporter.enabled: true
+    tls.enabled: true
+    nodeExporter.tls.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-tserver-0
+  asserts:
+  - contains:
+      path: spec.ports
+      content:
+        name: tcp-node-metrics
+        port: 9300
+
+- it: writes the TLS web config next to the textfile reasons, as a non-.prom file
+  template: templates/node-exporter-configmap.yaml
+  set:
+    nodeExporter.enabled: true
+  asserts:
+  - matchRegex:
+      path: data["run-node-exporter.sh"]
+      pattern: '(?m)^ +"  min_version: TLS12" > "\$TEXTFILE_DIR/web\.yml"; then$'
