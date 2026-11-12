@@ -577,7 +577,7 @@ spec:
         {{- end }}
         {{- if and $root.Values.tls.enabled $root.Values.tls.clientToServer (ne $service.name "yb-masters") }}
         - name: SSL_CERTFILE
-          value: /root/.yugabytedb/root.crt
+          value: /home/yugabyte/.yugabytedb/root.crt
         {{- end }}
         resources:
         {{- if eq $service.name "yb-masters" }}
@@ -706,7 +706,7 @@ spec:
             mountPath: /opt/certs
           {{- end }}
           - name: {{ $root.Values.oldNamingStyle | ternary "yugabyte-tls-client-cert" (printf "%s-client-tls" (include "yugabyte.fullname" $root)) }}
-            mountPath: /root/.yugabytedb/
+            mountPath: /home/yugabyte/.yugabytedb/
             readOnly: true
           {{- end }}
           {{- if and (eq $service.name "yb-masters") ($root.Values.master.extraVolumeMounts) -}}
