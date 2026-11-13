@@ -54,7 +54,7 @@ image:
 
   prometheus:
     registry: ""
-    tag: v3.15.1
+    tag: v3.16.0
     name: prom/prometheus
 
   ybdb:
