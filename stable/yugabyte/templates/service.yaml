@@ -772,6 +772,37 @@ spec:
               fieldPath: metadata.namespace
         - name: YUGABYTED_UI_K8S
           value: "true"
+        {{- /* The credentials, set as the setup-credentials job sets them; the script below passes each to yugabyted-ui as one quoted argument. */}}
+        {{- if $root.Values.authCredentials.ysql.user }}
+        - name: YSQL_USER
+          value: {{ $root.Values.authCredentials.ysql.user | quote }}
+        {{- end }}
+        {{- if or $root.Values.authCredentials.ysql.password $root.Values.authCredentials.ysql.passwordSecretName }}
+        - name: YSQL_PASSWORD
+          {{- if $root.Values.authCredentials.ysql.passwordSecretName }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ $root.Values.authCredentials.ysql.passwordSecretName }}
+              key: ysqlPassword
+          {{- else }}
+          value: {{ $root.Values.authCredentials.ysql.password | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if $root.Values.authCredentials.ycql.user }}
+        - name: YCQL_USER
+          value: {{ $root.Values.authCredentials.ycql.user | quote }}
+        {{- end }}
+        {{- if or $root.Values.authCredentials.ycql.password $root.Values.authCredentials.ycql.passwordSecretName }}
+        - name: YCQL_PASSWORD
+          {{- if $root.Values.authCredentials.ycql.passwordSecretName }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ $root.Values.authCredentials.ycql.passwordSecretName }}
+              key: ycqlPassword
+          {{- else }}
+          value: {{ $root.Values.authCredentials.ycql.password | quote }}
+          {{- end }}
+        {{- end }}
         command:
           - "/sbin/tini"
           - "--"
@@ -808,16 +839,16 @@ spec:
               -secure={{ $root.Values.tls.enabled }} \
             {{- end }}
             {{- if $root.Values.authCredentials.ysql.user }}
-              -ysql_username={{ $root.Values.authCredentials.ysql.user }} \
+              -ysql_username="$YSQL_USER" \
             {{- end }}
             {{- if $root.Values.authCredentials.ycql.user }}
-              -ycql_username={{ $root.Values.authCredentials.ycql.user }} \
+              -ycql_username="$YCQL_USER" \
             {{- end }}
-            {{- if $root.Values.authCredentials.ysql.password }}
-              -ysql_password={{ $root.Values.authCredentials.ysql.password }} \
+            {{- if or $root.Values.authCredentials.ysql.password $root.Values.authCredentials.ysql.passwordSecretName }}
+              -ysql_password="$YSQL_PASSWORD" \
             {{- end }}
-            {{- if $root.Values.authCredentials.ycql.password }}
-              -ycql_password={{ $root.Values.authCredentials.ycql.password }} \
+            {{- if or $root.Values.authCredentials.ycql.password $root.Values.authCredentials.ycql.passwordSecretName }}
+              -ycql_password="$YCQL_PASSWORD" \
             {{- end }}
             || echo "ERROR: yugabyted-ui failed. This might be because your yugabyte \
             version is older than 2.21.0. If this is the case, set yugabytedUi.enabled to false \
