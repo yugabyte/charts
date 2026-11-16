@@ -164,7 +164,7 @@ data:
         exit 1
       fi
       # Without TLS, as with the reasons file in step 3, the sidecar runs on.
-      echo "warn: could not write $web_config; serving plain HTTP without it" >&2
+      echo "warn: could not write $web_config; TLS is not requested, so serving plain HTTP without it" >&2
       web_config=""
     fi
 
