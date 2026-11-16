@@ -245,7 +245,7 @@ data:
 
 {{- if not .Values.useYugabyteDB }}
 ---
-{{- if .Values.securityContext.enabled }}
+{{- if eq (include "checkInitPermissionsRequired" .) "true" }}
 ---
 apiVersion: "v1"
 kind: ConfigMap
@@ -266,7 +266,11 @@ data:
 
     # Postgres refuses a data dir it does not own. Hand every cluster on the
     # volume to $PG_UID (e.g. after a runAsUser change); during an upgrade the old
-    # cluster must be ours before pg-major-upgrade reads it.
+    # cluster must be ours before pg-major-upgrade reads it. This also covers a
+    # pgdata the kubelet created as root for a subPath mount (the Red Hat image).
+
+    # On OpenShift the SCC picks the UID and the chart passes none: use our own.
+    PG_UID="${PG_UID:-$(id -u)}"
 
     # Copy-replace, as files created by cp are ours. Copy first and swap after,
     # so a failed copy leaves the original in place.
