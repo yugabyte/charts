@@ -498,7 +498,7 @@ tests:
   asserts:
   - matchRegex:
       path: data["run-node-exporter.sh"]
-      pattern: '(?m)^set \-\-\nif \[ \-n \"\$devices\" \]; then\n  set \-\- \-\-collector\.diskstats \-\-collector\.diskstats\.device\-include=\"\^\(\$\{devices\}\)\\\$\"\nfi\nexec /bin/node_exporter \\\n  \-\-web\.listen\-address=\":\$\{YB_NODE_EXPORTER_PORT:\-9300\}\" \\\n  \-\-web\.config\.file=\"\$web_config\" \\\n  \-\-collector\.disable\-defaults \\\n  \"\$@\" \\\n  \-\-collector\.netdev \\\n  \-\-collector\.netstat \\\n  \-\-collector\.netstat\.fields=''\^Tcp_RetransSegs\$'' \\\n  \-\-collector\.textfile \\\n  \-\-collector\.textfile\.directory=\"\$TEXTFILE_DIR\"$'
+      pattern: '(?m)^set \-\-\nif \[ \-n \"\$devices\" \]; then\n  set \-\- \-\-collector\.diskstats \-\-collector\.diskstats\.device\-include=\"\^\(\$\{devices\}\)\\\$\"\nfi\nexec /bin/node_exporter \\\n  \-\-web\.listen\-address=\":\$\{YB_NODE_EXPORTER_PORT:\-9300\}\" \\\n  \$\{web_config:\+\"\-\-web\.config\.file=\$web_config\"\} \\\n  \-\-collector\.disable\-defaults \\\n  \"\$@\" \\\n  \-\-collector\.netdev \\\n  \-\-collector\.netstat \\\n  \-\-collector\.netstat\.fields=''\^Tcp_RetransSegs\$'' \\\n  \-\-collector\.textfile \\\n  \-\-collector\.textfile\.directory=\"\$TEXTFILE_DIR\"$'
 
 - it: renders no sidecar or its volumes in yb-tserver pods when disabled
   template: templates/service.yaml

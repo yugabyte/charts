@@ -159,8 +159,13 @@ data:
       echo "info: serving HTTPS with $YB_NODE_EXPORTER_TLS_CERT" >&2
     fi
     if ! printf '%s' "$tls_config" > "$web_config"; then
-      echo "error: could not write $web_config" >&2
-      exit 1
+      if [ -n "$tls_config" ]; then
+        echo "error: could not write $web_config" >&2
+        exit 1
+      fi
+      # Without TLS, as with the reasons file in step 3, the sidecar runs on.
+      echo "warn: could not write $web_config; serving plain HTTP without it" >&2
+      web_config=""
     fi
 
     # 5. The diskstats collector runs only with a resolved device. netdev and
@@ -179,7 +184,7 @@ data:
     fi
     exec /bin/node_exporter \
       --web.listen-address=":${YB_NODE_EXPORTER_PORT:-9300}" \
-      --web.config.file="$web_config" \
+      ${web_config:+"--web.config.file=$web_config"} \
       --collector.disable-defaults \
       "$@" \
       --collector.netdev \
