@@ -15,7 +15,7 @@ Image:
   ## A mirror or another image needs node_exporter 1.11 or later.
   nodeExporter:
     repository: quay.io/yugabyte/node-exporter-fips
-    tag: 1.12.1-fips-b2
+    tag: 1.12.1-fips-b4
     pullPolicy: IfNotPresent
 
 storage:
