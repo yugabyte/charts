@@ -11,10 +11,11 @@ Image:
   tag: 2026.1.3.0-b100
   pullPolicy: IfNotPresent
   pullSecretName: ""
-  ## The node_exporter sidecar's image; needs node_exporter 1.11 or later.
+  ## The node_exporter sidecar's image: YugabyteDB's FIPS build of node_exporter on a UBI9 base.
+  ## A mirror or another image needs node_exporter 1.11 or later.
   nodeExporter:
-    repository: quay.io/prometheus/node-exporter
-    tag: v1.12.1
+    repository: quay.io/yugabyte/node-exporter-fips
+    tag: 1.12.1-fips-b2
     pullPolicy: IfNotPresent
 
 storage:
@@ -1007,11 +1008,15 @@ containerSecurityContext:
 ## pod's own PVCs, plus the pod's network counters and TCP retransmits. On
 ## ephemeral storage it exports no disk series.
 nodeExporter:
-  ## Set by YBA, which also adds the scrape target; set by hand, nothing scrapes
-  ## the sidecar. Data volumes it cannot attribute are skipped; if node_exporter
-  ## exits, Kubernetes restarts the container.
+  ## YBA sets this and adds the scrape target. The chart's serviceMonitor does not
+  ## scrape the sidecar; set by hand, scrape nodeExporter.port yourself. A data
+  ## volume the sidecar cannot attribute is skipped. While the sidecar restarts,
+  ## its pod is NotReady.
   enabled: false
   port: 9300
+  tls:
+    ## Set by YBA. Serves HTTPS with the pod's node certificate; needs tls.enabled.
+    enabled: false
   ## Image: Image.nodeExporter; resources: resources.nodeExporter.
 
 ## Added to handle old universe which has volume annotations

@@ -1,5 +1,5 @@
 {{- $root := . -}}
-{{- /* Rendered even when the sidecar is off, so a pod recreated from an older revision that still runs the sidecar can mount it. */}}
+{{- /* Rendered even when the sidecar is off: a pod recreated on an older StatefulSet revision may still run the sidecar and mount this ConfigMap. */}}
 {{- if $root.Values.nodeExporter }}
 {{ $appLabelArgs := dict "label" "yb-tserver" "root" $root }}
 apiVersion: v1
@@ -17,9 +17,10 @@ data:
     #   1. checks whether anything is mounted over /proc/diskstats;
     #   2. traces each mount to its own block device, skipping any it cannot;
     #   3. writes the yb_node_exporter_check reasons to $YB_TEXTFILE_DIR;
-    #   4. execs node_exporter with diskstats limited to those devices.
-    # A skipped mount is logged, never fatal. If node_exporter exits, Kubernetes
-    # restarts the container.
+    #   4. writes the web config, with TLS when YB_NODE_EXPORTER_TLS_CERT is set;
+    #   5. execs node_exporter with diskstats limited to those devices.
+    # A skipped mount is logged, never fatal. With TLS set, the sidecar stops if it
+    # cannot serve HTTPS, as yb-master and yb-tserver do without their certificates.
     set -u
 
     PROC=/proc
@@ -74,6 +75,7 @@ data:
     overlay="$(awk -v p="$PROC/diskstats" '
       $5 == p {
         f = 1
+        # A mount over /proc/diskstats whose line has no fstype still counts as overlaid.
         t = "unknown"
         for (i = 7; i < NF; i++) {
           if ($i == "-") {
@@ -92,7 +94,7 @@ data:
       check diskstats "" ok
     fi
 
-    # 2. There are no arguments on ephemeral storage.
+    # 2. Each argument is a data mount; ephemeral storage passes none.
     if [ $# -eq 0 ]; then
       echo "info: no data volumes; exporting no disk series" >&2
       check data_volume "" no_data_volumes
@@ -107,8 +109,8 @@ data:
       devno="${entry%% *}"
       mroot="${entry##* }"
 
-      # A volume is mounted at the root of its filesystem ("/" in mountinfo). Any
-      # other root is a bind mount of a node directory, on a device the node shares.
+      # A whole volume is mounted at its filesystem root ("/" in mountinfo). Any
+      # other root is a bind mount of a directory, not a dedicated volume.
       if [ "$mroot" != "/" ]; then
         skip bind_mount "a bind mount of $mroot, not a dedicated volume"
         continue
@@ -144,8 +146,30 @@ data:
       echo "warn: could not write $OUT" >&2
     fi
 
-    # 4. No diskstats collector without a device; netdev and netstat need no
-    # filter: they see only this pod's network namespace.
+    # 4. The web config: HTTPS with YB_NODE_EXPORTER_TLS_CERT set, else empty, which
+    # serves plain HTTP. node_exporter exits if it cannot load the certificate or key.
+    web_config="$TEXTFILE_DIR/web.yml"
+    tls_config=""
+    if [ -n "${YB_NODE_EXPORTER_TLS_CERT:-}" ]; then
+      tls_config="tls_server_config:
+      cert_file: \"$YB_NODE_EXPORTER_TLS_CERT\"
+      key_file: \"${YB_NODE_EXPORTER_TLS_KEY:?not set}\"
+      min_version: TLS12
+    "
+      echo "info: serving HTTPS with $YB_NODE_EXPORTER_TLS_CERT" >&2
+    fi
+    if ! printf '%s' "$tls_config" > "$web_config"; then
+      if [ -n "$tls_config" ]; then
+        echo "error: could not write $web_config" >&2
+        exit 1
+      fi
+      # Without TLS, as with the reasons file in step 3, the sidecar runs on.
+      echo "warn: could not write $web_config; TLS is not requested, so serving plain HTTP without it" >&2
+      web_config=""
+    fi
+
+    # 5. The diskstats collector runs only with a resolved device. netdev and
+    # netstat need no filter, as they see only this pod's network namespace.
     # The resolved devices as one regex alternation: "sdb|sdc".
     devices="$(echo "$devices" |
       tr ' ' '\n' |
@@ -160,6 +184,7 @@ data:
     fi
     exec /bin/node_exporter \
       --web.listen-address=":${YB_NODE_EXPORTER_PORT:-9300}" \
+      ${web_config:+"--web.config.file=$web_config"} \
       --collector.disable-defaults \
       "$@" \
       --collector.netdev \
