@@ -498,7 +498,7 @@ tests:
   asserts:
   - matchRegex:
       path: data["run-node-exporter.sh"]
-      pattern: '(?m)^set \-\-\nif \[ \-n \"\$devices\" \]; then\n  set \-\- \-\-collector\.diskstats \-\-collector\.diskstats\.device\-include=\"\^\(\$\{devices\}\)\\\$\"\nfi\nif \[ \-n \"\$web_config\" \]; then\n  set \-\- \"\$@\" \-\-web\.config\.file=\"\$web_config\"\nfi\nexec /bin/node_exporter \\\n  \-\-web\.listen\-address=\":\$\{YB_NODE_EXPORTER_PORT:\-9300\}\" \\\n  \-\-collector\.disable\-defaults \\\n  \"\$@\" \\\n  \-\-collector\.netdev \\\n  \-\-collector\.netstat \\\n  \-\-collector\.netstat\.fields=''\^Tcp_RetransSegs\$'' \\\n  \-\-collector\.textfile \\\n  \-\-collector\.textfile\.directory=\"\$TEXTFILE_DIR\"$'
+      pattern: '(?m)^set \-\-\nif \[ \-n \"\$devices\" \]; then\n  set \-\- \-\-collector\.diskstats \-\-collector\.diskstats\.device\-include=\"\^\(\$\{devices\}\)\\\$\"\nfi\nexec /bin/node_exporter \\\n  \-\-web\.listen\-address=\":\$\{YB_NODE_EXPORTER_PORT:\-9300\}\" \\\n  \-\-web\.config\.file=\"\$web_config\" \\\n  \-\-collector\.disable\-defaults \\\n  \"\$@\" \\\n  \-\-collector\.netdev \\\n  \-\-collector\.netstat \\\n  \-\-collector\.netstat\.fields=''\^Tcp_RetransSegs\$'' \\\n  \-\-collector\.textfile \\\n  \-\-collector\.textfile\.directory=\"\$TEXTFILE_DIR\"$'
 
 - it: renders no sidecar or its volumes in yb-tserver pods when disabled
   template: templates/service.yaml
@@ -1058,11 +1058,17 @@ tests:
         name: tcp-node-metrics
         port: 9300
 
-- it: writes the TLS web config next to the textfile reasons, as a non-.prom file
+- it: always writes the web config next to the textfile reasons, as a non-.prom file, empty without TLS
   template: templates/node-exporter-configmap.yaml
   set:
     nodeExporter.enabled: true
   asserts:
   - matchRegex:
       path: data["run-node-exporter.sh"]
-      pattern: '(?m)^ +"  min_version: TLS12" > "\$web_config"; then$'
+      pattern: '(?m)^web_config="\$TEXTFILE_DIR/web\.yml"\ntls_config=""$'
+  - matchRegex:
+      path: data["run-node-exporter.sh"]
+      pattern: '(?m)^  min_version: TLS12\n"$'
+  - matchRegex:
+      path: data["run-node-exporter.sh"]
+      pattern: '(?m)^if ! printf ''%s'' "\$tls_config" > "\$web_config"; then$'

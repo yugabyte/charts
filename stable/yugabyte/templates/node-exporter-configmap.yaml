@@ -17,7 +17,7 @@ data:
     #   1. checks whether anything is mounted over /proc/diskstats;
     #   2. traces each mount to its own block device, skipping any it cannot;
     #   3. writes the yb_node_exporter_check reasons to $YB_TEXTFILE_DIR;
-    #   4. with YB_NODE_EXPORTER_TLS_CERT set, writes the TLS web config;
+    #   4. writes the web config, with TLS when YB_NODE_EXPORTER_TLS_CERT is set;
     #   5. execs node_exporter with diskstats limited to those devices.
     # A skipped mount is logged, never fatal. With TLS set, the sidecar stops if it
     # cannot serve HTTPS, as yb-master and yb-tserver do without their certificates.
@@ -146,20 +146,21 @@ data:
       echo "warn: could not write $OUT" >&2
     fi
 
-    # 4. With YB_NODE_EXPORTER_TLS_CERT set, serve HTTPS only. node_exporter exits if
-    # it cannot load the certificate or key.
-    web_config=""
+    # 4. The web config: HTTPS with YB_NODE_EXPORTER_TLS_CERT set, else empty, which
+    # serves plain HTTP. node_exporter exits if it cannot load the certificate or key.
+    web_config="$TEXTFILE_DIR/web.yml"
+    tls_config=""
     if [ -n "${YB_NODE_EXPORTER_TLS_CERT:-}" ]; then
-      web_config="$TEXTFILE_DIR/web.yml"
-      if ! printf '%s\n' \
-        "tls_server_config:" \
-        "  cert_file: \"$YB_NODE_EXPORTER_TLS_CERT\"" \
-        "  key_file: \"${YB_NODE_EXPORTER_TLS_KEY:?not set}\"" \
-        "  min_version: TLS12" > "$web_config"; then
-        echo "error: could not write $web_config" >&2
-        exit 1
-      fi
+      tls_config="tls_server_config:
+      cert_file: \"$YB_NODE_EXPORTER_TLS_CERT\"
+      key_file: \"${YB_NODE_EXPORTER_TLS_KEY:?not set}\"
+      min_version: TLS12
+    "
       echo "info: serving HTTPS with $YB_NODE_EXPORTER_TLS_CERT" >&2
+    fi
+    if ! printf '%s' "$tls_config" > "$web_config"; then
+      echo "error: could not write $web_config" >&2
+      exit 1
     fi
 
     # 5. The diskstats collector runs only with a resolved device. netdev and
@@ -176,11 +177,9 @@ data:
     if [ -n "$devices" ]; then
       set -- --collector.diskstats --collector.diskstats.device-include="^(${devices})\$"
     fi
-    if [ -n "$web_config" ]; then
-      set -- "$@" --web.config.file="$web_config"
-    fi
     exec /bin/node_exporter \
       --web.listen-address=":${YB_NODE_EXPORTER_PORT:-9300}" \
+      --web.config.file="$web_config" \
       --collector.disable-defaults \
       "$@" \
       --collector.netdev \
