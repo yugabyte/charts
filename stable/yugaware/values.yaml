@@ -33,7 +33,7 @@ image:
   postgres:
     # For non default postgres image, set postgres.sampleConfig values accordingly.
     registry: ""
-    tag: '18.6'
+    tag: '18.7'
     name: postgres
     # Postgres major version of the image above. Names the data directory
     # (postgres_data_<major>) and is the target of the major-version migration.
