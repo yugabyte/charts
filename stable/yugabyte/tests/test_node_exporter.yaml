@@ -655,7 +655,7 @@ tests:
   asserts:
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
-      value: quay.io/yugabyte/node-exporter-fips:1.12.1-fips-b2
+      value: quay.io/yugabyte/node-exporter-fips:1.12.1-fips-b4
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].imagePullPolicy
       value: IfNotPresent
@@ -681,7 +681,7 @@ tests:
   asserts:
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
-      value: quay.io/yugabyte/node-exporter-fips:1.12.1-fips-b2
+      value: quay.io/yugabyte/node-exporter-fips:1.12.1-fips-b4
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].resources
       value:
@@ -708,7 +708,7 @@ tests:
   asserts:
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].image
-      value: mirror.example.com/yugabyte/node-exporter-fips:1.12.1-fips-b2
+      value: mirror.example.com/yugabyte/node-exporter-fips:1.12.1-fips-b4
   - equal:
       path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].imagePullPolicy
       value: IfNotPresent
