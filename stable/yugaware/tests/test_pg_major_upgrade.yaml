@@ -34,7 +34,7 @@ tests:
   asserts:
   - equal:
       path: spec.template.spec.containers[?(@.name == "postgres")].image
-      value: quay.io/yugabyte/hardened-postgres:18.7
+      value: postgres:18.7
   - contains:
       path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts
       content:
@@ -200,25 +200,35 @@ tests:
   - failedTemplate:
       errorMessage: 'image.postgres.dataDir must be an absolute path (got "pgdata")'
 
-- it: with securityContext disabled, runs the pod as root and migrates without the ownership fix
+- it: with securityContext disabled, runs only the non-root images that write the volume as root
   template: statefulset.yaml
   set:
     securityContext.enabled: false
-    perf-advisor-chart.securityContext.enabled: false
+    sidecars:
+    - name: user-sidecar
+      image: busybox
   asserts:
-  - equal:
-      path: spec.template.spec.securityContext.runAsUser
-      value: 0
   - notExists:
-      path: spec.template.spec.securityContext.fsGroup
+      path: spec.template.spec.securityContext
   - notExists:
       path: spec.template.spec.initContainers[?(@.name == "postgres-init")]
-  - exists:
-      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")]
-  - notExists:
+  - equal:
       path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext
+      value: {runAsUser: 0}
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "prometheus")].securityContext
+      value: {runAsUser: 0}
+  # Their default images already run as root.
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "prometheus-configuration")].securityContext
   - notExists:
       path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
+  - notExists:
+      path: spec.template.spec.containers[?(@.name == "yugaware")].securityContext
+  - exists:
+      path: spec.template.spec.containers[?(@.name == "user-sidecar")]
+  - notExists:
+      path: spec.template.spec.containers[?(@.name == "user-sidecar")].securityContext
 
 - it: with securityContext disabled, renders no ownership-fix script
   template: configs.yaml
@@ -230,16 +240,30 @@ tests:
       path: metadata.name
       pattern: pg-prerun$
 
-- it: with securityContext enabled, leaves the UID to the pod securityContext
+- it: with securityContext enabled, runs every container as securityContext.runAsUser
   template: statefulset.yaml
   asserts:
   - equal:
-      path: spec.template.spec.securityContext.runAsUser
+      path: spec.template.spec.securityContext.fsGroup
       value: 10001
   - notExists:
-      path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
+      path: spec.template.spec.securityContext.runAsUser
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")].securityContext.runAsUser
+      value: 10001
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext.runAsUser
+      value: 10001
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "postgres")].securityContext.runAsUser
+      value: 10001
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "yugaware")].securityContext.runAsUser
+      value: 10001
   - notExists:
-      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext
+      path: spec.template.spec.initContainers[?(@.securityContext.runAsUser == 0)]
+  - notExists:
+      path: spec.template.spec.containers[?(@.securityContext.runAsUser == 0)]
 
 - it: migrates the Red Hat image on OpenShift and serves postgres_data_18/pgdata from userdata/
   template: statefulset.yaml
@@ -254,8 +278,13 @@ tests:
       value: /pg_volume/postgres_data_18/pgdata
   - notExists:
       path: spec.template.spec.initContainers[?(@.name == "postgres-init")].env[?(@.name == "PG_UID")]
+  # The SCC assigns the UID: no container may pin one, or restricted-v2 rejects the pod.
   - notExists:
-      path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
+      path: spec.template.spec.securityContext
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.securityContext)]
+  - notExists:
+      path: spec.template.spec.containers[?(@.securityContext)]
   - equal:
       path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].env[?(@.name == "PG_TARGET_MAJOR")].value
       value: "18"
