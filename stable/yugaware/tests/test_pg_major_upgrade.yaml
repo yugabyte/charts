@@ -34,7 +34,7 @@ tests:
   asserts:
   - equal:
       path: spec.template.spec.containers[?(@.name == "postgres")].image
-      value: postgres:18.6
+      value: postgres:18.7
   - contains:
       path: spec.template.spec.containers[?(@.name == "postgres")].volumeMounts
       content:
@@ -130,7 +130,7 @@ tests:
     image.postgres.majorVersion: 19
   asserts:
   - failedTemplate:
-      errorMessage: 'image.postgres.tag "18.6" is Postgres 18 but image.postgres.majorVersion is 19. Set them to the same major version, or leave majorVersion empty.'
+      errorMessage: 'image.postgres.tag "18.7" is Postgres 18 but image.postgres.majorVersion is 19. Set them to the same major version, or leave majorVersion empty.'
 
 - it: fails when majorVersion is not a number
   template: statefulset.yaml
