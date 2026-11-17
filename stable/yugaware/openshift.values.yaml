@@ -8,11 +8,15 @@ image:
     # For non default postgres image, set postgres.sampleConfig values accordingly
     # in values.yaml.
     registry: registry.redhat.io
-    tag: 1-88.1661531722
-    name: rhscl/postgresql-13-rhel7
+    tag: 1-1791892090
+    name: rhel9/postgresql-18
+    # Red Hat tags are build numbers, not Postgres versions.
+    majorVersion: "18"
     # Postgres postgresql.conf.sample location on container. This will be used to mount
     # configmap with custom settings.
-    sampleConfLocation: /opt/rh/rh-postgresql13/root/usr/share/pgsql/postgresql.conf.sample
+    sampleConfLocation: /usr/share/pgsql/postgresql.conf.sample
+    # The Red Hat image ignores PGDATA and keeps its data here.
+    dataDir: /var/lib/pgsql/data/userdata
 
   prometheus:
     registry: registry.redhat.io

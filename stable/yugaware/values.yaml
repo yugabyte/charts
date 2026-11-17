@@ -37,12 +37,20 @@ image:
     name: postgres
     # Postgres major version of the image above. Names the data directory
     # (postgres_data_<major>) and is the target of the major-version migration.
-    # Leave empty to take it from the tag ("18.6" -> 18); set it only when the tag
-    # does not start with the major version, e.g. a retagged mirror ("prod").
+    # Leave empty to take it from the tag ("18.6", "18" or "18-alpine" -> 18); set it
+    # when the tag is not a version, e.g. a retagged mirror ("prod") or a build number.
     majorVersion: ""
     # Postgres postgresql.conf.sample location on container. This will be used to mount
     # configmap with custom settings.
     sampleConfLocation: /usr/share/postgresql/postgresql.conf.sample
+    # Data directory of the image above, inside the container. The volume always keeps
+    # the cluster in postgres_data_<major>/pgdata; the chart serves it here and sets
+    # PGDATA to it. Keep the default for images that honour PGDATA, such as the
+    # official and hardened ones; set the image's fixed path otherwise, e.g.
+    # /var/lib/pgsql/data/userdata for Red Hat rhel9/postgresql-<major>.
+    # A custom image also needs bash, psql and pg_isready, must run as the pod's
+    # non-root UID, and takes its settings from POSTGRES_* (on OpenShift, POSTGRESQL_*).
+    dataDir: /var/lib/postgresql/data/pgdata
 
   # Init container that migrates the bundled Postgres data to the major version of
   # image.postgres with pg_upgrade. No-op on fresh installs and once migrated.
