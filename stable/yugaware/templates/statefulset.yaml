@@ -63,13 +63,6 @@ spec:
         {{- if .Values.securityContext.additionalSettings }}
         {{- toYaml .Values.securityContext.additionalSettings | nindent 8 }}
         {{- end }}
-      {{- else if not .Values.ocpCompatibility.enabled }}
-      # securityContext disabled: run as root, as releases before the hardened
-      # (non-root) images did. Postgres and the major-version migration still drop to
-      # the data owner. No fsGroup, so enabling securityContext later still gets the
-      # kubelet's one-time regroup of the volume. OCP is excluded (the SCC sets the UID).
-      securityContext:
-        runAsUser: 0
       {{- end }}
       {{- if .Values.nodeSelector }}
       nodeSelector:
@@ -302,6 +295,9 @@ spec:
               cp /default_prometheus_config/prometheus.yml /prometheus_configs/prometheus.yml && /bin/bash /prometheus-init/init-prometheus.sh;
           {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | indent 10 }}
+          {{- else if eq (include "yugaware.runAsRoot" .) "true" }}
+          securityContext:
+            runAsUser: 0
           {{- end }}
           volumeMounts:
           - name: prometheus-config
@@ -334,12 +330,6 @@ spec:
           env:
             - name: PGDATA
               value: /pg_volume/postgres_data_{{ include "yugaware.pgMajor" . }}/pgdata
-            {{- if .Values.securityContext.enabled }}
-            - name: PG_UID
-              value: {{ .Values.securityContext.runAsUser | quote }}
-            - name: PG_GID
-              value: {{ .Values.securityContext.runAsGroup | quote }}
-            {{- end }}
           volumeMounts:
           - name: yugaware-storage
             mountPath: /pg_volume
@@ -382,6 +372,9 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | indent 10 }}
+          {{- else if eq (include "yugaware.runAsRoot" .) "true" }}
+          securityContext:
+            runAsUser: 0
           {{- end }}
           env:
             - name: PG_TARGET_MAJOR
@@ -404,6 +397,9 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | indent 10 }}
+          {{- else if eq (include "yugaware.runAsRoot" .) "true" }}
+          securityContext:
+            runAsUser: 0
           {{- end }}
           env:
             - name: POSTGRES_USER
@@ -541,7 +537,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | nindent 10 }}
-          {{- else if (and (not .Values.securityContext.enabled) (not .Values.ocpCompatibility.enabled)) }}
+          {{- else if eq (include "yugaware.runAsRoot" .) "true" }}
           securityContext:
             runAsUser: 0
           {{- end }}
@@ -602,6 +598,9 @@ spec:
           image: {{ include "full_yugaware_image" . }}
           {{- if .Values.containerSecurityContext.enabled }}
           {{- include "getSecurityContext" . | nindent 10 }}
+          {{- else if eq (include "yugaware.runAsRoot" .) "true" }}
+          securityContext:
+            runAsUser: 0
           {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
 
