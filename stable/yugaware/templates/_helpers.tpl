@@ -198,6 +198,36 @@ Check export of nss_wrapper environment variables required
   {{- end -}}
 {{- end -}}
 
+{{/*
+Whether postgres-init and its pg-prerun script run. They must run for every non-root
+case: either securityContext is enabled (general non-root), or we are on OpenShift where
+securityContext is disabled but the platform assigns an arbitrary non-root UID.
+*/}}
+{{- define "checkInitPermissionsRequired" -}}
+  {{- if or .Values.securityContext.enabled .Values.ocpCompatibility.enabled -}}
+    {{- printf "true" -}}
+  {{- else -}}
+    {{- printf "false" -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Whether the containers whose image runs as non-root, but which must write the root-owned
+volume, run as root: with securityContext disabled, outside OpenShift (where the SCC
+picks the UID). That is pg-major-upgrade (its image runs as 10001; it migrates as the
+data owner) and prometheus (its image runs as nobody). The other default images on
+this branch already run as root, and user sidecars keep their image's user. There is
+no fsGroup, so enabling securityContext later still gets the kubelet's one-time regroup
+of the volume.
+*/}}
+{{- define "yugaware.runAsRoot" -}}
+  {{- if and (not .Values.securityContext.enabled) (not .Values.ocpCompatibility.enabled) -}}
+    {{- printf "true" -}}
+  {{- else -}}
+    {{- printf "false" -}}
+  {{- end -}}
+{{- end -}}
+
 
 {{/*
   Verify the extraVolumes and extraVolumeMounts mappings.

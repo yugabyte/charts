@@ -53,13 +53,6 @@ spec:
         {{- if (semverCompare ">=1.20-x" .Capabilities.KubeVersion.Version) }}
         fsGroupChangePolicy: {{ .Values.securityContext.fsGroupChangePolicy }}
         {{- end }}
-      {{- else if not .Values.ocpCompatibility.enabled }}
-      # securityContext disabled: run as root, as releases before the hardened
-      # (non-root) images did. Postgres and the major-version migration still drop to
-      # the data owner. No fsGroup, so enabling securityContext later still gets the
-      # kubelet's one-time regroup of the volume. OCP is excluded (the SCC sets the UID).
-      securityContext:
-        runAsUser: 0
       {{- end }}
       {{- if .Values.nodeSelector }}
       nodeSelector:
@@ -254,7 +247,9 @@ spec:
           {{ end -}}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/bin/bash", "/pg_prerun/pg-prerun.sh"]
+          {{- if .Values.securityContext.enabled }}
           {{- include "getSecurityContext" . | indent 10 }}
+          {{- end }}
           env:
             - name: PGDATA
               value: /pg_volume/postgres_data_{{ include "yugaware.pgMajor" . }}/pgdata
@@ -303,6 +298,9 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.securityContext.enabled }}
           {{- include "getSecurityContext" . | indent 10 }}
+          {{- else if eq (include "yugaware.runAsRoot" .) "true" }}
+          securityContext:
+            runAsUser: 0
           {{- end }}
           env:
             - name: PG_TARGET_MAJOR
@@ -461,7 +459,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.securityContext.enabled }}
           {{- include "getSecurityContext" . | nindent 10 }}
-          {{- else if (not .Values.ocpCompatibility.enabled) }}
+          {{- else if eq (include "yugaware.runAsRoot" .) "true" }}
           securityContext:
             runAsUser: 0
           {{- end }}
