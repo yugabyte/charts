@@ -1,5 +1,6 @@
 {{- $sm := .Values.serviceMonitor }}
-{{ if and $sm.enabled (or $sm.tserver.enabled $sm.ycql.enabled $sm.ysql.enabled $sm.yedis.enabled) }}
+{{- $nodeEndpoint := and (dig "nodeExporter" "enabled" false $sm) (dig "enabled" false (.Values.nodeExporter | default dict)) }}
+{{ if and $sm.enabled (or $sm.tserver.enabled $sm.ycql.enabled $sm.ysql.enabled $sm.yedis.enabled $nodeEndpoint) }}
 {{- $appLabelArgs := dict "label" "yb-tserver" "root" . -}}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -105,6 +106,33 @@ spec:
       replacement: {{ $.Release.Name | quote }}
     metricRelabelings:
     {{- toYaml $.Values.serviceMonitor.commonMetricRelabelings | nindent 4 }}
+  {{- end }}
+  {{- end }}
+
+  {{- if $nodeEndpoint }}
+  {{- with $sm.nodeExporter }}
+  - port: {{ .port }}
+    path: {{ .path }}
+    {{- if .interval }}
+    interval: {{ .interval }}
+    {{- else }}
+    interval: {{ $sm.interval }}
+    {{- end }}
+    {{- if eq (include "yugabyte.nodeExporter.tlsEnabled" $) "true" }}
+    {{- /* Each pod's certificate names that pod, so no single serverName verifies them all. */}}
+    scheme: https
+    tlsConfig:
+      insecureSkipVerify: true
+    {{- end }}
+    relabelings:
+    - targetLabel: "group"
+      replacement: "node"
+    - targetLabel: "export_type"
+      replacement: "node_export"
+    - targetLabel: "node_prefix"
+      replacement: {{ $.Release.Name | quote }}
+    metricRelabelings:
+    {{- toYaml $sm.commonMetricRelabelings | nindent 4 }}
   {{- end }}
   {{- end }}
 {{- end }}
