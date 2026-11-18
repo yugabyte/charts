@@ -18,7 +18,8 @@ data:
     #   2. traces each mount to its own block device, skipping any it cannot;
     #   3. writes the yb_node_exporter_check reasons to $YB_TEXTFILE_DIR;
     #   4. writes the web config, with TLS when YB_NODE_EXPORTER_TLS_CERT is set;
-    #   5. execs node_exporter with diskstats limited to those devices.
+    #   5. execs node_exporter with diskstats limited to those devices and
+    #      filesystem limited to those mounts.
     # A skipped mount is logged, never fatal. With TLS set, the sidecar stops if it
     # cannot serve HTTPS, as yb-master and yb-tserver do without their certificates.
     set -u
@@ -100,6 +101,7 @@ data:
       check data_volume "" no_data_volumes
     fi
     devices=""
+    fs_mounts=""
     for mp in "$@"; do
       entry="$(mountinfo_entry "$mp")"
       if [ -z "$entry" ]; then
@@ -122,6 +124,9 @@ data:
         skip virtual_fs "on a virtual fs (devno $devno)"
         continue
       fi
+      # A dedicated volume, so statfs on it gives that volume's usage, whatever happens to its
+      # disk counters below.
+      fs_mounts="$fs_mounts $mp"
       name="$(diskstats_name "$kname")"
 
       if [ -n "$overlay" ]; then
@@ -178,9 +183,19 @@ data:
       tr '\n' '|' |
       sed 's/|$//')"
     echo "resolved device-include: ${devices:-(none)}" >&2
+    # The dedicated volumes' mountpoints as one regex alternation: "/mnt/disk0|/mnt/disk1".
+    fs_mounts="$(echo "$fs_mounts" |
+      tr ' ' '\n' |
+      grep -v '^$' |
+      tr '\n' '|' |
+      sed 's/|$//')"
+    echo "resolved mount-points-include: ${fs_mounts:-(none)}" >&2
     set --
     if [ -n "$devices" ]; then
       set -- --collector.diskstats --collector.diskstats.device-include="^(${devices})\$"
+    fi
+    if [ -n "$fs_mounts" ]; then
+      set -- "$@" --collector.filesystem --collector.filesystem.mount-points-include="^(${fs_mounts})\$"
     fi
     exec /bin/node_exporter \
       --web.listen-address=":${YB_NODE_EXPORTER_PORT:-9300}" \
