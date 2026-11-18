@@ -325,6 +325,27 @@ tests:
       path: metadata.labels.component
       documentIndex: 1
 
+- it: certificates CA certificate secret gets common labels
+  template: templates/certificates.yaml
+  set:
+    commonLabels:
+      team: platform
+    tls:
+      certManager:
+        enabled: true
+        bootstrapSelfsigned: true
+        certificates:
+          algorithm: RSA
+          keySize: 2048
+  asserts:
+  - equal:
+      path: spec.secretTemplate.labels.team
+      value: platform
+    documentIndex: 1
+  - exists:
+      path: spec.secretTemplate.labels.release
+    documentIndex: 1
+
 # Test certificates.yaml - Service-specific Certificate
 - it: certificates service certificate has labels
   template: templates/certificates.yaml
