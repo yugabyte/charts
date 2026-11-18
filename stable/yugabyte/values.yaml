@@ -1017,9 +1017,10 @@ containerSecurityContext:
 ## ephemeral storage it exports no disk series.
 nodeExporter:
   ## YBA sets this and scrapes the sidecar with its own Prometheus. Without YBA,
-  ## set it by hand; serviceMonitor.nodeExporter then scrapes the sidecar on the
-  ## headless Services' port tcp-node-metrics. A data volume the sidecar cannot
-  ## attribute is skipped. While the sidecar restarts, its pod is NotReady.
+  ## set it by hand; with serviceMonitor.enabled, serviceMonitor.nodeExporter then
+  ## scrapes the sidecar on the headless Services' port tcp-node-metrics. A data
+  ## volume the sidecar cannot attribute is skipped. While the sidecar restarts,
+  ## its pod is NotReady.
   enabled: false
   port: 9300
   tls:
