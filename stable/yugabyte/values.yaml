@@ -533,6 +533,14 @@ serviceMonitor:
     port: "http-yedis-met"
     interval: ""
     path: "/prometheus-metrics"
+  ## The node_exporter sidecar, on both ServiceMonitors. Scraped only while
+  ## nodeExporter.enabled is set; over HTTPS, without verifying the pod's
+  ## certificate, when the sidecar serves TLS (nodeExporter.tls.enabled).
+  nodeExporter:
+    enabled: true
+    port: "tcp-node-metrics"
+    interval: ""
+    path: "/metrics"
 
   commonMetricRelabelings:
   # https://git.io/JJW5p
@@ -1008,10 +1016,10 @@ containerSecurityContext:
 ## pod's own PVCs, plus the pod's network counters and TCP retransmits. On
 ## ephemeral storage it exports no disk series.
 nodeExporter:
-  ## YBA sets this and adds the scrape target. The chart's serviceMonitor does not
-  ## scrape the sidecar; set by hand, scrape nodeExporter.port yourself. A data
-  ## volume the sidecar cannot attribute is skipped. While the sidecar restarts,
-  ## its pod is NotReady.
+  ## YBA sets this and scrapes the sidecar with its own Prometheus. Without YBA,
+  ## set it by hand; serviceMonitor.nodeExporter then scrapes the sidecar on the
+  ## headless Services' port tcp-node-metrics. A data volume the sidecar cannot
+  ## attribute is skipped. While the sidecar restarts, its pod is NotReady.
   enabled: false
   port: 9300
   tls:

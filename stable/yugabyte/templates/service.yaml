@@ -121,6 +121,10 @@ spec:
       port: {{ $port }}
     {{- end }}
     {{- end }}
+    {{- if and $root.Values.nodeExporter $root.Values.nodeExporter.enabled }}
+    - name: "tcp-node-metrics"
+      port: {{ $root.Values.nodeExporter.port }}
+    {{- end }}
   selector:
     {{- include "yugabyte.appselector" ($appLabelArgs) | indent 4 }}
   {{- include "yugabyte.ipFamilyConfig" ($root) | indent 2 }}
@@ -940,8 +944,7 @@ spec:
       {{- end}}
 
       {{- if and $root.Values.nodeExporter $root.Values.nodeExporter.enabled }}
-      {{- /* dig: values reused from a chart without nodeExporter.tls have no such key. */}}
-      {{- $nodeExporterTls := and $root.Values.tls.enabled (dig "tls" "enabled" false $root.Values.nodeExporter) }}
+      {{- $nodeExporterTls := eq (include "yugabyte.nodeExporter.tlsEnabled" $root) "true" }}
       - name: yb-node-exporter
         image: "{{ $root.Values.Image.nodeExporter.repository }}:{{ $root.Values.Image.nodeExporter.tag }}"
         imagePullPolicy: {{ $root.Values.Image.nodeExporter.pullPolicy }}
