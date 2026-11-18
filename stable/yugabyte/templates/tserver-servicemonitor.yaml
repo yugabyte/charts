@@ -119,7 +119,7 @@ spec:
     interval: {{ $sm.interval }}
     {{- end }}
     {{- if eq (include "yugabyte.nodeExporter.tlsEnabled" $) "true" }}
-    {{- /* Each pod's certificate names that pod, so no single serverName verifies them all. */}}
+    {{- /* As YBA's own node_exporter scrape does: the sidecar serves the node certificate, signed by a per-universe CA. */}}
     scheme: https
     tlsConfig:
       insecureSkipVerify: true
