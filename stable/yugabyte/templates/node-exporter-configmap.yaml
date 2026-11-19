@@ -184,6 +184,7 @@ data:
       sed 's/|$//')"
     echo "resolved device-include: ${devices:-(none)}" >&2
     # The dedicated volumes' mountpoints as one regex alternation: "/mnt/disk0|/mnt/disk1".
+    # node_filesystem_readonly reads 1 for them, as this sidecar mounts them read-only.
     fs_mounts="$(echo "$fs_mounts" |
       tr ' ' '\n' |
       grep -v '^$' |
