@@ -88,7 +88,7 @@ data:
       END { if (f) print t }
     ' "$PROC/self/mountinfo")"
     if [ -n "$overlay" ]; then
-      echo "warn: $PROC/diskstats is overlaid ($overlay), so its counters may not be the host's; exporting no disk series" >&2
+      echo "warn: $PROC/diskstats is overlaid ($overlay), so its counters may not be the host's; exporting no disk I/O series" >&2
       reason="overlaid_$(printf '%s' "$overlay" | tr -c 'A-Za-z0-9._-' '_')"
       check diskstats "" "$reason"
     else
@@ -134,7 +134,7 @@ data:
         continue
       fi
       if ! in_diskstats "$name"; then
-        skip no_diskstats_row "$name has no row in $PROC/diskstats" "$name"
+        skip no_diskstats_row "$name has no row in $PROC/diskstats; exporting its file system usage only" "$name"
         continue
       fi
 
@@ -145,7 +145,7 @@ data:
 
     # 3. Written whole, then renamed, so the textfile collector never reads half a file.
     if ! printf '%s\n' \
-      "# HELP yb_node_exporter_check Whether each node_exporter sidecar disk source is exported, and why not." \
+      "# HELP yb_node_exporter_check Whether the node_exporter sidecar exports each disk source's I/O counters, and why not." \
       "# TYPE yb_node_exporter_check gauge$series" > "$OUT.tmp" ||
       ! mv "$OUT.tmp" "$OUT"; then
       echo "warn: could not write $OUT" >&2
