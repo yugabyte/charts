@@ -692,6 +692,14 @@ false
 {{- end -}}
 
 {{/*
+  Returns true when the node_exporter sidecar serves HTTPS: tls.enabled and nodeExporter.tls.enabled.
+  dig: values reused from a chart without nodeExporter or nodeExporter.tls have no such key.
+*/}}
+{{- define "yugabyte.nodeExporter.tlsEnabled" -}}
+{{- and .Values.tls.enabled (dig "tls" "enabled" false (.Values.nodeExporter | default dict)) -}}
+{{- end -}}
+
+{{/*
 Get ipFamily and ipFamilyPolicy settings.
 */}}
 {{- define "yugabyte.ipFamilyConfig" }}
