@@ -498,7 +498,16 @@ tests:
   asserts:
   - matchRegex:
       path: data["run-node-exporter.sh"]
-      pattern: '(?m)^set \-\-\nif \[ \-n \"\$devices\" \]; then\n  set \-\- \-\-collector\.diskstats \-\-collector\.diskstats\.device\-include=\"\^\(\$\{devices\}\)\\\$\"\nfi\nexec /bin/node_exporter \\\n  \-\-web\.listen\-address=\":\$\{YB_NODE_EXPORTER_PORT:\-9300\}\" \\\n  \$\{web_config:\+\"\-\-web\.config\.file=\$web_config\"\} \\\n  \-\-collector\.disable\-defaults \\\n  \"\$@\" \\\n  \-\-collector\.netdev \\\n  \-\-collector\.netstat \\\n  \-\-collector\.netstat\.fields=''\^Tcp_RetransSegs\$'' \\\n  \-\-collector\.textfile \\\n  \-\-collector\.textfile\.directory=\"\$TEXTFILE_DIR\"$'
+      pattern: '(?m)^set \-\-\nif \[ \-n \"\$devices\" \]; then\n  set \-\- \-\-collector\.diskstats \-\-collector\.diskstats\.device\-include=\"\^\(\$\{devices\}\)\\\$\"\nfi\nif \[ \-n \"\$fs_mounts\" \]; then\n  set \-\- \"\$@\" \-\-collector\.filesystem \-\-collector\.filesystem\.mount\-points\-include=\"\^\(\$\{fs_mounts\}\)\\\$\"\nfi\nexec /bin/node_exporter \\\n  \-\-web\.listen\-address=\":\$\{YB_NODE_EXPORTER_PORT:\-9300\}\" \\\n  \$\{web_config:\+\"\-\-web\.config\.file=\$web_config\"\} \\\n  \-\-collector\.disable\-defaults \\\n  \"\$@\" \\\n  \-\-collector\.netdev \\\n  \-\-collector\.netstat \\\n  \-\-collector\.netstat\.fields=''\^Tcp_RetransSegs\$'' \\\n  \-\-collector\.textfile \\\n  \-\-collector\.textfile\.directory=\"\$TEXTFILE_DIR\"$'
+
+- it: limits the filesystem collector to the data mounts that are dedicated volumes
+  template: templates/node-exporter-configmap.yaml
+  set:
+    nodeExporter.enabled: true
+  asserts:
+  - matchRegex:
+      path: data["run-node-exporter.sh"]
+      pattern: '(?m)^  if \[ \-z "\$kname" \]; then\n    skip virtual_fs "on a virtual fs \(devno \$devno\)"\n    continue\n  fi\n  # A dedicated volume, so statfs on it gives that volume''s usage, whatever happens to its\n  # disk counters below\.\n  fs_mounts="\$fs_mounts \$mp"$'
 
 - it: renders no sidecar or its volumes in yb-tserver pods when disabled
   template: templates/service.yaml
