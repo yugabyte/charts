@@ -25,6 +25,10 @@ metadata:
     {{- include "yugabyte.applabel" ($appLabelArgs) | indent 4 }}
     {{- include "yugabyte.labels" $root | indent 4 }}
 spec:
+  secretTemplate:
+    labels:
+      {{- include "yugabyte.applabel" ($appLabelArgs) | indent 6 }}
+      {{- include "yugabyte.labels" $root | indent 6 }}
   isCA: true
   privateKey:
     algorithm: {{ $root.Values.tls.certManager.certificates.algorithm | quote }}
