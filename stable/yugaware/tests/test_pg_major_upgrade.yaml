@@ -56,9 +56,11 @@ tests:
       content:
         name: yugaware-storage
         mountPath: /pg_volume
-  - equal:
-      path: spec.template.spec.initContainers[?(@.name == "postgres-init")].env[?(@.name == "PG_UID")].value
-      value: "10001"
+  # It takes the UID from the shell (see the pg-prerun test), not from the chart's values.
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")].env[?(@.name == "PG_UID")]
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")].env[?(@.name == "PG_GID")]
 
 - it: postgres-init fixes ownership of every cluster on the volume, without naming versions
   template: configs.yaml
@@ -200,25 +202,114 @@ tests:
   - failedTemplate:
       errorMessage: 'image.postgres.dataDir must be an absolute path (got "pgdata")'
 
-- it: with securityContext disabled, runs the pod as root and migrates without the ownership fix
+- it: with securityContext disabled, runs only the containers that write to the volume as root
   template: statefulset.yaml
   set:
     securityContext.enabled: false
     perf-advisor-chart.securityContext.enabled: false
+    tls.enabled: true
+    sidecars:
+    - name: user-sidecar
+      image: busybox
+  asserts:
+  - notExists:
+      path: spec.template.spec.securityContext
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "postgres-init")]
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "prometheus-configuration")].securityContext
+      value: {runAsUser: 0}
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext
+      value: {runAsUser: 0}
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
+      value: {runAsUser: 0}
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "prometheus")].securityContext
+      value: {runAsUser: 0}
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "yugaware")].securityContext
+      value: {runAsUser: 0}
+  - exists:
+      path: spec.template.spec.initContainers[?(@.name == "build-keystore")]
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "build-keystore")].securityContext
+  - exists:
+      path: spec.template.spec.containers[?(@.name == "user-sidecar")]
+  - notExists:
+      path: spec.template.spec.containers[?(@.name == "user-sidecar")].securityContext
+
+- it: on OpenShift with securityContext disabled, leaves the UID to the SCC
+  template: statefulset.yaml
+  set:
+    securityContext.enabled: false
+    perf-advisor-chart.securityContext.enabled: false
+    ocpCompatibility.enabled: true
+  asserts:
+  - notExists:
+      path: spec.template.spec.securityContext
+  - notExists:
+      path: spec.template.spec.containers[?(@.securityContext)]
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.securityContext)]
+
+- it: with securityContext disabled and containerSecurityContext enabled, the root containers take containerSecurityContext's user
+  template: statefulset.yaml
+  set:
+    securityContext.enabled: false
+    perf-advisor-chart.securityContext.enabled: false
+    containerSecurityContext.enabled: true
+    containerSecurityContext.runAsUser: 2000
+    containerSecurityContext.runAsGroup: 3000
+    perf-advisor-chart.containerSecurityContext.enabled: true
+  asserts:
+  - notExists:
+      path: spec.template.spec.securityContext
+  - notExists:
+      path: spec.template.spec.containers[?(@.securityContext.runAsUser == 0)]
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.securityContext.runAsUser == 0)]
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "prometheus-configuration")].securityContext
+      value: {runAsUser: 2000, runAsGroup: 3000, runAsNonRoot: true}
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext
+      value: {runAsUser: 2000, runAsGroup: 3000, runAsNonRoot: true}
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
+      value: {runAsUser: 2000, runAsGroup: 3000, runAsNonRoot: true}
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "prometheus")].securityContext
+      value: {runAsUser: 2000, runAsGroup: 3000, runAsNonRoot: true}
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "yugaware")].securityContext
+      value: {runAsUser: 2000, runAsGroup: 3000, runAsNonRoot: true}
+
+- it: with both securityContext and containerSecurityContext enabled, the containers take containerSecurityContext's user
+  template: statefulset.yaml
+  set:
+    containerSecurityContext.enabled: true
+    containerSecurityContext.runAsUser: 2000
+    containerSecurityContext.runAsGroup: 3000
+    perf-advisor-chart.containerSecurityContext.enabled: true
   asserts:
   - equal:
       path: spec.template.spec.securityContext.runAsUser
-      value: 0
+      value: 10001
   - notExists:
-      path: spec.template.spec.securityContext.fsGroup
+      path: spec.template.spec.containers[?(@.securityContext.runAsUser == 0)]
   - notExists:
-      path: spec.template.spec.initContainers[?(@.name == "postgres-init")]
-  - exists:
-      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")]
-  - notExists:
-      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext
-  - notExists:
-      path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
+      path: spec.template.spec.initContainers[?(@.securityContext.runAsUser == 0)]
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext.runAsUser
+      value: 2000
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "postgres")].securityContext.runAsUser
+      value: 2000
+  - equal:
+      path: spec.template.spec.containers[?(@.name == "yugaware")].securityContext.runAsUser
+      value: 2000
 
 - it: with securityContext disabled, renders no ownership-fix script
   template: configs.yaml
@@ -237,9 +328,9 @@ tests:
       path: spec.template.spec.securityContext.runAsUser
       value: 10001
   - notExists:
-      path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
+      path: spec.template.spec.containers[?(@.securityContext)]
   - notExists:
-      path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext
+      path: spec.template.spec.initContainers[?(@.securityContext)]
 
 - it: migrates the Red Hat image on OpenShift and serves postgres_data_18/pgdata from userdata/
   template: statefulset.yaml
@@ -305,7 +396,17 @@ tests:
   - exists:
       path: spec.template.spec.containers[?(@.name == "postgres")].env[?(@.name == "POSTGRESQL_USER")]
 
-- it: on OpenShift, renders the ownership-fix script, which takes the UID the SCC assigned
+- it: renders the ownership-fix script, which hands pgdata to the UID it runs as
+  template: configs.yaml
+  documentSelector:
+    path: metadata.name
+    value: RELEASE-NAME-yugaware-pg-prerun
+  asserts:
+  - matchRegex:
+      path: data["pg-prerun.sh"]
+      pattern: \n *PG_UID=\$\(id -u\)\n
+
+- it: on OpenShift, renders the same ownership-fix script, which takes the UID the SCC assigned
   template: configs.yaml
   values:
   - ../openshift.values.yaml
@@ -315,7 +416,7 @@ tests:
   asserts:
   - matchRegex:
       path: data["pg-prerun.sh"]
-      pattern: PG_UID="\$\{PG_UID:-\$\(id -u\)\}"
+      pattern: \n *PG_UID=\$\(id -u\)\n
 
 - it: fails early for the Red Hat image without majorVersion, as its tags are build numbers
   template: statefulset.yaml
