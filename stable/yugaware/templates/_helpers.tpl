@@ -252,6 +252,24 @@ It is independent of Prometheus.
   {{- end -}}
 {{- end -}}
 
+{{/*
+Whether the containers that write to the volume run as root: with securityContext and
+containerSecurityContext both disabled, outside OpenShift (where the SCC picks the UID).
+The volume, and data written by releases from before the non-root images, belong to
+root, so these containers run as root as they did then; Postgres and the major-version
+migration still drop to the data owner. Other containers, and user sidecars, keep their
+image's user. There is no fsGroup, so enabling securityContext later still gets the
+kubelet's one-time regroup of the volume. When containerSecurityContext is enabled, its
+user wins: these containers take getSecurityContext instead, never root.
+*/}}
+{{- define "yugaware.runAsRoot" -}}
+  {{- if and (not .Values.securityContext.enabled) (not .Values.containerSecurityContext.enabled) (not .Values.ocpCompatibility.enabled) -}}
+    {{- printf "true" -}}
+  {{- else -}}
+    {{- printf "false" -}}
+  {{- end -}}
+{{- end -}}
+
 
 {{/*
   Verify the extraVolumes and extraVolumeMounts mappings.
