@@ -12,16 +12,16 @@ tests:
     asserts:
       - equal:
           path: spec.image
-          value: quay.io/yugabyte/opentelemetry-collector-contrib-fips:0.145.0-fips
+          value: quay.io/yugabyte/opentelemetry-collector-contrib-fips:0.165.1-1-fips
           documentIndex: 0
   - it: honours otelCollector.image for mirrors
     set:
       otelCollector:
         enabled: true
         config: "x: y"
-        image: mirror.example.com/yugabyte/opentelemetry-collector-contrib-fips:0.145.0-fips
+        image: mirror.example.com/yugabyte/opentelemetry-collector-contrib-fips:0.165.1-1-fips
     asserts:
       - equal:
           path: spec.image
-          value: mirror.example.com/yugabyte/opentelemetry-collector-contrib-fips:0.145.0-fips
+          value: mirror.example.com/yugabyte/opentelemetry-collector-contrib-fips:0.165.1-1-fips
           documentIndex: 0
