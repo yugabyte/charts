@@ -38,7 +38,8 @@ spec:
   # published by its docker workflow under the same version as the VM tarball. Keep the tag in step
   # with ManageOtelCollector.OtelCollectorVersion in YBA. 0.121.0 is the floor (awss3
   # s3_partition_format).
-  image: {{ .Values.otelCollector.image | default "quay.io/yugabyte/opentelemetry-collector-contrib-fips:0.145.0-fips" | quote }}
+  {{- $defaultImage := "quay.io/yugabyte/opentelemetry-collector-contrib-fips:0.165.1-1-fips" }}
+  image: {{ .Values.otelCollector.image | default $defaultImage | quote }}
   ipFamilyPolicy: SingleStack
   managementState: managed
   mode: sidecar
