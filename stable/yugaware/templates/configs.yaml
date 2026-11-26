@@ -319,11 +319,12 @@ data:
     {{ $conf_key }} = {{ squote $conf_value }}
     {{- end }}
 
+{{- if not .Values.postgres.external.host }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Release.Name }}-yugaware-pg-poststart
+  name: {{ .Release.Name }}-yugaware-pg-upkeep
   labels:
     app: {{ template "yugaware.name" . }}
     chart: {{ template "yugaware.chart" . }}
@@ -333,28 +334,68 @@ metadata:
 {{ include "yugaware.commonLabels" . | indent 4 }}
 {{- end }}
 data:
-  pg-poststart.sh: |
+  pg-upkeep.sh: |
     #!/bin/bash
-    # One-time follow-up to a major-version migration, under the serving image.
-    # As a postStart hook it runs before YBA's container starts. Always exits 0 so
-    # a failure cannot kill postgres; without the done-file it retries next start.
-    set -o pipefail
+    # Last init container of the yugaware pod, on the serving postgres image: brings the
+    # cluster up to date before postgres serves anyone. Always exits 0 so it cannot keep
+    # postgres from starting; whatever did not finish is retried on the next start.
     D=/var/lib/postgresql/data
-    [ -f "$D/.yba-migration-done" ] && [ ! -f "$D/.yba-post-migration-done" ] || exit 0
-    exec >>"$D/yba-post-migration.log" 2>&1
-    echo "$(date -u +%FT%TZ) post-migration steps starting"
-    # -U is required: the run UID has no passwd entry, so libpq has no default user.
-    for i in $(seq 1 120); do pg_isready -q -h /var/run/postgresql -U "$POSTGRES_USER" && break; sleep 5; done
-    q() { psql -h /var/run/postgresql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 "$@"; }
-    # The migration recorded its own glibc's collation version; record the serving
-    # image's, or every connection warns. REFRESH rejects databases with none recorded.
-    q -Atc "SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION;', datname) FROM pg_database
-            WHERE datcollversion IS DISTINCT FROM pg_database_collation_actual_version(oid)
-              AND datcollversion IS NOT NULL" | q -q || exit 0
-    vacuumdb -h /var/run/postgresql -U "$POSTGRES_USER" --all --analyze-in-stages --missing-stats-only || exit 0
-    touch "$D/.yba-post-migration-done"
-    echo "$(date -u +%FT%TZ) post-migration steps done"
+    PGDATA=$D/pgdata
+    # Fresh install: the postgres container has not run initdb yet.
+    [ -f "$PGDATA/PG_VERSION" ] || exit 0
+    exec >>"$D/yba-pg-upkeep.log" 2>&1
+    log() { echo "$(date -u +%FT%TZ) $*"; }
+
+    # A temporary server reachable only through a socket in /tmp - no TCP, so nothing
+    # outside this container can connect while it works - and trusted on that socket.
+    # config_file=/dev/null runs it on defaults: it needs none of the cluster's settings,
+    # except huge_pages=off from postgres.sampleConfig - with the default "try", postgres
+    # dies of SIGBUS on nodes with huge pages the pod may not use (PLAT-8563).
+    # -t 3600: crash recovery after an unclean shutdown happens here.
+    echo 'local all all trust' >/tmp/pg_hba.conf
+    # With an fsGroup (OpenShift's SCC assigns one) the kubelet makes the volume group-writable
+    # on every start, and postgres refuses such a data directory. The images' entrypoints chmod
+    # it before starting postgres; this runs before them, so it does the same.
+    chmod 700 "$PGDATA"
+    # Postgres refuses to run as root (securityContext.enabled=false): start and stop it as
+    # the data owner, as the postgres container and the migration do. The rest stays root,
+    # which owns the directory with the log and markers.
+    as_owner=()
+    [ "$(id -u)" = 0 ] && as_owner=(setpriv --reuid="$(stat -c %u "$PGDATA")" --regid="$(stat -c %g "$PGDATA")" --clear-groups --)
+    if ! "${as_owner[@]}" pg_ctl -s -D "$PGDATA" -l /tmp/pg.log -w -t 3600 \
+        -o "-c config_file=/dev/null -c hba_file=/tmp/pg_hba.conf -c huge_pages=off -c listen_addresses='' -k /tmp" start; then
+      log "temporary server did not start, skipped"; cat /tmp/pg.log; exit 0
+    fi
+    # The superuser initdb created: postgres.user, as for the postgres container.
+    q() { psql -h /tmp -U "$POSTGRES_USER" -v ON_ERROR_STOP=1 "$@"; }
+
+    # Collation. Text indexes are sorted by glibc's rules, which change between glibc
+    # versions, so an index built under another glibc can miss rows. Postgres records the
+    # glibc version per database. After a major-version migration (the migration image's
+    # glibc) or a switch to an image with another glibc it no longer matches: every
+    # connection warns, and no new database can be copied from template1. Rebuild the
+    # indexes, then record the new version; recording it alone would only hide the
+    # warning. template0 records no version, so the <> skips it.
+    for db in $(q -d postgres -Atc "SELECT datname FROM pg_database
+                                    WHERE datcollversion <> pg_database_collation_actual_version(oid)"); do
+      log "$db: collation version changed, rebuilding its indexes"
+      if q -d "$db" -c "REINDEX DATABASE \"$db\"" -c "ALTER DATABASE \"$db\" REFRESH COLLATION VERSION"; then
+        log "$db: done"
+      else
+        log "$db: failed, will retry on next start"
+      fi
+    done
+
+    # Once after a major-version migration: pg_upgrade does not carry planner statistics over.
+    if [ -f "$D/.yba-migration-done" ] && [ ! -f "$D/.yba-post-migration-done" ]; then
+      log "post-migration: gathering planner statistics"
+      vacuumdb -h /tmp -U "$POSTGRES_USER" --all --analyze-only --missing-stats-only &&
+        touch "$D/.yba-post-migration-done"
+    fi
+
+    "${as_owner[@]}" pg_ctl -s -D "$PGDATA" -m fast -w stop
     exit 0
+{{- end }}
 
 {{- end }}
 
