@@ -343,7 +343,12 @@ data:
     PGDATA=$D/pgdata
     # Fresh install: the postgres container has not run initdb yet.
     [ -f "$PGDATA/PG_VERSION" ] || exit 0
-    exec >>"$D/yba-pg-upkeep.log" 2>&1
+    # To the container log (kubectl logs, support bundles) and to a file on the volume that
+    # outlives the pod. On exit, wait for tee: the container's processes are killed once this
+    # script ends, which could cut off the last lines.
+    exec > >(tee -a "$D/yba-pg-upkeep.log") 2>&1
+    tee_pid=$!
+    trap 'exec >&- 2>&-; wait "$tee_pid"' EXIT
     log() { echo "$(date -u +%FT%TZ) $*"; }
 
     # A temporary server reachable only through a socket in /tmp - no TCP, so nothing

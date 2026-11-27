@@ -537,6 +537,14 @@ tests:
   - matchRegex:
       path: data["pg-upkeep.sh"]
       pattern: '-c "REINDEX DATABASE \\"\$db\\"" -c "ALTER DATABASE \\"\$db\\" REFRESH COLLATION VERSION"'
+  # Logs to the container log (kubectl logs, support bundles) as well as the volume, and
+  # waits for tee on exit so the last lines are not lost.
+  - matchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: 'exec > >\(tee -a "\$D/yba-pg-upkeep.log"\) 2>&1'
+  - matchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: trap 'exec >&- 2>&-; wait "\$tee_pid"' EXIT
 
 # Clients that connect mid-upkeep can copy a stale template1 (Perf Advisor's db-init fails
 # for good) or hold locks the rebuild needs, so the temporary server takes none.
