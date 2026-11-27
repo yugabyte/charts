@@ -1,0 +1,350 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/quintush/helm-unittest/master/schema/helm-testsuite.json
+suite: node_exporter sidecar on the headless Services and ServiceMonitors
+tests:
+- it: exposes the sidecar port on the headless master and tserver Services
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+  documentSelector:
+    path: metadata.labels.service-type
+    value: headless
+    matchMany: true
+  asserts:
+  - contains:
+      path: spec.ports
+      content:
+        name: tcp-node-metrics
+        port: 9300
+
+- it: exposes the configured sidecar port on the headless Services, new naming
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: false
+    nodeExporter.enabled: true
+    nodeExporter.port: 9400
+  documentSelector:
+    path: metadata.labels.service-type
+    value: headless
+    matchMany: true
+  asserts:
+  - contains:
+      path: spec.ports
+      content:
+        name: tcp-node-metrics
+        port: 9400
+
+- it: exposes the sidecar port on the headless Services under YBA-shaped overrides
+  template: templates/service.yaml
+  values:
+  - values_yba_overrides.yaml
+  documentSelector:
+    path: metadata.labels.service-type
+    value: headless
+    matchMany: true
+  asserts:
+  - contains:
+      path: spec.ports
+      content:
+        name: tcp-node-metrics
+        port: 9300
+
+- it: adds no sidecar port to the headless Services when the sidecar is disabled
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+  documentSelector:
+    path: metadata.labels.service-type
+    value: headless
+    matchMany: true
+  asserts:
+  - notContains:
+      path: spec.ports
+      content:
+        name: tcp-node-metrics
+      any: true
+
+- it: adds no sidecar port to the headless Services without a nodeExporter block (helm upgrade --reuse-values from an older chart)
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter: null
+  documentSelector:
+    path: metadata.labels.service-type
+    value: headless
+    matchMany: true
+  asserts:
+  - notContains:
+      path: spec.ports
+      content:
+        name: tcp-node-metrics
+      any: true
+
+- it: scrapes the sidecar from the master ServiceMonitor
+  template: templates/master-servicemonitor.yaml
+  release:
+    name: yb-demo
+  set:
+    serviceMonitor.enabled: true
+    nodeExporter.enabled: true
+  asserts:
+  - contains:
+      path: spec.endpoints
+      content:
+        port: tcp-node-metrics
+        path: /metrics
+        interval: 30s
+        relabelings:
+        - targetLabel: group
+          replacement: node
+        - targetLabel: export_type
+          replacement: node_export
+        - targetLabel: node_prefix
+          replacement: yb-demo
+        metricRelabelings:
+        - sourceLabels: ["__name__"]
+          regex: "(.*)"
+          targetLabel: "saved_name"
+          replacement: "$1"
+        - sourceLabels: ["__name__"]
+          regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(.*)"
+          targetLabel: "server_type"
+          replacement: "$1"
+        - sourceLabels: ["__name__"]
+          regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(.*)"
+          targetLabel: "service_type"
+          replacement: "$2"
+        - sourceLabels: ["__name__"]
+          regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(_sum|_count)?"
+          targetLabel: "service_method"
+          replacement: "$3"
+        - sourceLabels: ["__name__"]
+          regex: "handler_latency_(yb_[^_]*)_([^_]*)_([^_]*)(_sum|_count)?"
+          targetLabel: "__name__"
+          replacement: "rpc_latency$4"
+  - lengthEqual:
+      path: spec.endpoints
+      count: 2
+
+- it: scrapes the sidecar from the tserver ServiceMonitor, with its own interval
+  template: templates/tserver-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: true
+    serviceMonitor.nodeExporter.interval: 15s
+    nodeExporter.enabled: true
+  asserts:
+  - equal:
+      path: spec.endpoints[?(@.port=="tcp-node-metrics")].interval
+      value: 15s
+  - equal:
+      path: spec.endpoints[?(@.port=="tcp-node-metrics")].relabelings[0]
+      value:
+        targetLabel: group
+        replacement: node
+  - lengthEqual:
+      path: spec.endpoints
+      count: 5
+
+- it: scrapes the sidecar over HTTPS without verifying its certificate when the sidecar serves TLS
+  templates:
+  - templates/master-servicemonitor.yaml
+  - templates/tserver-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: true
+    nodeExporter.enabled: true
+    nodeExporter.tls.enabled: true
+    tls.enabled: true
+  asserts:
+  - equal:
+      path: spec.endpoints[?(@.port=="tcp-node-metrics")].scheme
+      value: https
+  - equal:
+      path: spec.endpoints[?(@.port=="tcp-node-metrics")].tlsConfig
+      value:
+        insecureSkipVerify: true
+
+- it: scrapes the sidecar over HTTP with nodeExporter.tls on but tls.enabled off
+  templates:
+  - templates/master-servicemonitor.yaml
+  - templates/tserver-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: true
+    nodeExporter.enabled: true
+    nodeExporter.tls.enabled: true
+  asserts:
+  - notExists:
+      path: spec.endpoints[?(@.port=="tcp-node-metrics")].scheme
+  - notExists:
+      path: spec.endpoints[?(@.port=="tcp-node-metrics")].tlsConfig
+
+- it: scrapes the sidecar over HTTP with tls.enabled on but nodeExporter.tls off
+  template: templates/master-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: true
+    nodeExporter.enabled: true
+    tls.enabled: true
+  asserts:
+  - notExists:
+      path: spec.endpoints[?(@.port=="tcp-node-metrics")].scheme
+
+- it: scrapes the sidecar over HTTP, as it serves, for values reused from a chart without nodeExporter.tls
+  template: templates/master-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: true
+    nodeExporter.enabled: true
+    nodeExporter.tls: null
+    tls.enabled: true
+  asserts:
+  - exists:
+      path: spec.endpoints[?(@.port=="tcp-node-metrics")]
+  - notExists:
+      path: spec.endpoints[?(@.port=="tcp-node-metrics")].scheme
+
+- it: has no sidecar TLS env for values reused from a chart without nodeExporter.tls, matching the HTTP scrape
+  template: templates/service.yaml
+  set:
+    oldNamingStyle: true
+    nodeExporter.enabled: true
+    nodeExporter.tls: null
+    tls.enabled: true
+  documentSelector:
+    path: metadata.name
+    value: yb-master
+  asserts:
+  - notContains:
+      path: spec.template.spec.containers[?(@.name=="yb-node-exporter")].env
+      content:
+        name: YB_NODE_EXPORTER_TLS_CERT
+      any: true
+
+- it: renders no sidecar endpoint when the sidecar is disabled
+  templates:
+  - templates/master-servicemonitor.yaml
+  - templates/tserver-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: true
+  asserts:
+  - notContains:
+      path: spec.endpoints
+      content:
+        port: tcp-node-metrics
+      any: true
+
+- it: renders no sidecar endpoint when serviceMonitor.nodeExporter is disabled
+  templates:
+  - templates/master-servicemonitor.yaml
+  - templates/tserver-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: true
+    serviceMonitor.nodeExporter.enabled: false
+    nodeExporter.enabled: true
+  asserts:
+  - notContains:
+      path: spec.endpoints
+      content:
+        port: tcp-node-metrics
+      any: true
+
+- it: renders no sidecar endpoint without a serviceMonitor.nodeExporter block (helm upgrade --reuse-values from an older chart)
+  templates:
+  - templates/master-servicemonitor.yaml
+  - templates/tserver-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: true
+    serviceMonitor.nodeExporter: null
+    nodeExporter.enabled: true
+  asserts:
+  - notContains:
+      path: spec.endpoints
+      content:
+        port: tcp-node-metrics
+      any: true
+
+- it: renders no ServiceMonitors without a nodeExporter block and with serviceMonitor off (helm upgrade --reuse-values from an older chart)
+  templates:
+  - templates/master-servicemonitor.yaml
+  - templates/tserver-servicemonitor.yaml
+  set:
+    nodeExporter: null
+  asserts:
+  - hasDocuments:
+      count: 0
+
+- it: still renders the master ServiceMonitor for the sidecar alone
+  template: templates/master-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: true
+    serviceMonitor.master.enabled: false
+    nodeExporter.enabled: true
+  asserts:
+  - lengthEqual:
+      path: spec.endpoints
+      count: 1
+  - equal:
+      path: spec.endpoints[0].port
+      value: tcp-node-metrics
+
+- it: still renders the tserver ServiceMonitor for the sidecar alone
+  template: templates/tserver-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: true
+    serviceMonitor.tserver.enabled: false
+    serviceMonitor.ycql.enabled: false
+    serviceMonitor.ysql.enabled: false
+    serviceMonitor.yedis.enabled: false
+    nodeExporter.enabled: true
+  asserts:
+  - lengthEqual:
+      path: spec.endpoints
+      count: 1
+  - equal:
+      path: spec.endpoints[0].port
+      value: tcp-node-metrics
+
+- it: renders no ServiceMonitors with serviceMonitor.enabled off, whatever else is on
+  templates:
+  - templates/master-servicemonitor.yaml
+  - templates/tserver-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: false
+    nodeExporter.enabled: true
+  asserts:
+  - hasDocuments:
+      count: 0
+
+- it: renders no master ServiceMonitor with both its endpoints off
+  template: templates/master-servicemonitor.yaml
+  set:
+    serviceMonitor.enabled: true
+    serviceMonitor.master.enabled: false
+    nodeExporter.enabled: true
+    serviceMonitor.nodeExporter.enabled: false
+  asserts:
+  - hasDocuments:
+      count: 0
+
+- it: leaves the database endpoints unchanged
+  template: templates/master-servicemonitor.yaml
+  release:
+    name: yb-demo
+  set:
+    serviceMonitor.enabled: true
+    nodeExporter.enabled: true
+  asserts:
+  - equal:
+      path: spec.endpoints[0].port
+      value: http-ui
+  - equal:
+      path: spec.endpoints[0].path
+      value: /prometheus-metrics
+  - equal:
+      path: spec.endpoints[0].relabelings
+      value:
+      - targetLabel: group
+        replacement: yb-master
+      - targetLabel: export_type
+        replacement: master_export
+      - targetLabel: node_prefix
+        replacement: yb-demo
+  - notExists:
+      path: spec.endpoints[0].scheme
