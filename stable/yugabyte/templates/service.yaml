@@ -386,7 +386,7 @@ spec:
               fi
               chmod u+x /mnt/disk0/certs;
               echo "Creating ephemeral /opt/certs/yugabyte/ as symlink to persisted /mnt/disk0/certs/"
-              ln -sF /mnt/disk0/certs /opt/certs/yugabyte
+              [[ ! -e /opt/certs/yugabyte ]] && ln -sF /mnt/disk0/certs /opt/certs/yugabyte
               # Copy the root CA certificate to the persistent volume
               cp /home/yugabyte/cert-manager/ca.crt /mnt/disk0/certs/ca.crt;
 
