@@ -22,14 +22,15 @@ tests:
         subPath: postgresql.conf.sample
   - exists:
       path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].env[?(@.name == "UPGRADE_REVISION")].value
+  # Only pg-upkeep follows it.
   - equal:
-      path: spec.template.spec.initContainers[-1].name
+      path: spec.template.spec.initContainers[-2].name
       value: pg-major-upgrade
   - equal:
       path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].env[?(@.name == "PG_TARGET_MAJOR")].value
       value: "18"
 
-- it: serves postgres 18 from postgres_data_18 with the post-start hook
+- it: serves postgres 18 from postgres_data_18
   template: statefulset.yaml
   asserts:
   - equal:
@@ -41,9 +42,41 @@ tests:
         name: yugaware-storage
         mountPath: /var/lib/postgresql/data
         subPath: postgres_data_18
+  # Upkeep used to be a postStart hook, which runs alongside a server clients can
+  # already reach. It is the pg-upkeep init container now.
+  - notExists:
+      path: spec.template.spec.containers[?(@.name == "postgres")].lifecycle
+
+- it: runs pg-upkeep last, on the serving image, with the postgres container's view of the volume
+  template: statefulset.yaml
+  asserts:
   - equal:
-      path: spec.template.spec.containers[?(@.name == "postgres")].lifecycle.postStart.exec.command
-      value: ["/bin/bash", "/pg_poststart/pg-poststart.sh"]
+      path: spec.template.spec.initContainers[-1].name
+      value: pg-upkeep
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")].image
+      value: quay.io/yugabyte/hardened-postgres:18.7
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")].command
+      value: ["/bin/bash", "/pg_upkeep/pg-upkeep.sh"]
+  - contains:
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")].volumeMounts
+      content:
+        name: yugaware-storage
+        mountPath: /var/lib/postgresql/data
+        subPath: postgres_data_18
+  - contains:
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")].volumeMounts
+      content:
+        name: pg-upkeep
+        mountPath: /pg_upkeep
+  # postgres.user is the superuser initdb created; it need not be named postgres.
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")].env[?(@.name == "POSTGRES_USER")].valueFrom.secretKeyRef.key
+      value: postgres_user
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")].resources.requests.memory
+      value: 500Mi
 
 - it: postgres-init mounts the whole volume and creates the new data dir
   template: statefulset.yaml
@@ -223,6 +256,9 @@ tests:
       path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext
       value: {runAsUser: 0}
   - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")].securityContext
+      value: {runAsUser: 0}
+  - equal:
       path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
       value: {runAsUser: 0}
   - equal:
@@ -275,6 +311,9 @@ tests:
       value: {runAsUser: 2000, runAsGroup: 3000, runAsNonRoot: true}
   - equal:
       path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")].securityContext
+      value: {runAsUser: 2000, runAsGroup: 3000, runAsNonRoot: true}
+  - equal:
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")].securityContext
       value: {runAsUser: 2000, runAsGroup: 3000, runAsNonRoot: true}
   - equal:
       path: spec.template.spec.containers[?(@.name == "postgres")].securityContext
@@ -371,9 +410,14 @@ tests:
         name: pg-sample-config
         mountPath: /usr/share/pgsql/postgresql.conf.sample
         subPath: postgresql.conf.sample
+  - notExists:
+      path: spec.template.spec.containers[?(@.name == "postgres")].lifecycle
+  # Upkeep runs on Red Hat's image too, and like postgres leaves the UID to the SCC.
   - equal:
-      path: spec.template.spec.containers[?(@.name == "postgres")].lifecycle.postStart.exec.command
-      value: ["/bin/bash", "/pg_poststart/pg-poststart.sh"]
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")].image
+      value: registry.redhat.io/rhel9/postgresql-18:1-1791892090
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")].securityContext
   - exists:
       path: spec.template.spec.containers[?(@.name == "postgres")].env[?(@.name == "POSTGRESQL_USER")]
   - equal:
@@ -438,6 +482,19 @@ tests:
       path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")]
   - notExists:
       path: spec.template.spec.initContainers[?(@.name == "postgres-init")]
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")]
+  - notExists:
+      path: spec.template.spec.volumes[?(@.name == "pg-upkeep")]
+
+- it: renders no upkeep script with an external database
+  template: configs.yaml
+  set:
+    postgres.external.host: db.example
+    perf-advisor-chart.yugaware.enabled: false
+  asserts:
+  - notExists:
+      path: data["pg-upkeep.sh"]
 
 - it: does not need a major version from the tag with an external database
   template: statefulset.yaml
@@ -457,22 +514,79 @@ tests:
   asserts:
   - notExists:
       path: spec.template.spec.initContainers[?(@.name == "pg-major-upgrade")]
+  - notExists:
+      path: spec.template.spec.initContainers[?(@.name == "pg-upkeep")]
 
-- it: renders the post-start script
+- it: renders the upkeep script
   template: configs.yaml
   documentSelector:
     path: metadata.name
-    value: RELEASE-NAME-yugaware-pg-poststart
+    value: RELEASE-NAME-yugaware-pg-upkeep
   asserts:
   - matchRegex:
-      path: data["pg-poststart.sh"]
+      path: data["pg-upkeep.sh"]
       pattern: REFRESH COLLATION VERSION
   - matchRegex:
-      path: data["pg-poststart.sh"]
-      pattern: --missing-stats-only
+      path: data["pg-upkeep.sh"]
+      pattern: --analyze-only --missing-stats-only
   - matchRegex:
-      path: data["pg-poststart.sh"]
-      pattern: pg_isready -q -h /var/run/postgresql -U "\$POSTGRES_USER"
-  - matchRegex:
-      path: data["pg-poststart.sh"]
+      path: data["pg-upkeep.sh"]
       pattern: pg_database_collation_actual_version
+  # Refreshing the collation version without rebuilding the indexes first would only
+  # silence the mismatch warning.
+  - matchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: '-c "REINDEX DATABASE \\"\$db\\"" -c "ALTER DATABASE \\"\$db\\" REFRESH COLLATION VERSION"'
+  # Logs to the container log (kubectl logs, support bundles) as well as the volume, and
+  # waits for tee on exit so the last lines are not lost.
+  - matchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: 'exec > >\(tee -a "\$D/yba-pg-upkeep.log"\) 2>&1'
+  - matchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: trap 'exec >&- 2>&-; wait "\$tee_pid"' EXIT
+
+# Clients that connect mid-upkeep can copy a stale template1 (Perf Advisor's db-init fails
+# for good) or hold locks the rebuild needs, so the temporary server takes none.
+- it: keeps every client out of the temporary server
+  template: configs.yaml
+  documentSelector:
+    path: metadata.name
+    value: RELEASE-NAME-yugaware-pg-upkeep
+  asserts:
+  - matchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: "listen_addresses='' -k /tmp"
+
+- it: runs the temporary server the way the postgres container does
+  template: configs.yaml
+  documentSelector:
+    path: metadata.name
+    value: RELEASE-NAME-yugaware-pg-upkeep
+  asserts:
+  # postgres.sampleConfig's huge_pages=off (PLAT-8563); the default "try" can SIGBUS.
+  - matchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: -c huge_pages=off
+  # An fsGroup leaves the data directory group-writable, which postgres refuses; the
+  # entrypoints fix that, but they run after this init container.
+  - matchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: '(?s)chmod 700 "\$PGDATA".*pg_ctl .* start'
+  # As root (securityContext.enabled=false) postgres must run as the data owner.
+  - matchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: 'setpriv --reuid="\$\(stat -c %u "\$PGDATA"\)"'
+  - matchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: '"\$\{as_owner\[@\]\}" pg_ctl .* stop'
+  - matchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: 'vacuumdb -h /tmp -U "\$POSTGRES_USER"'
+  - notMatchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: -U postgres
+  # Once template1 is current, Perf Advisor and YBA create their own databases.
+  - notMatchRegex:
+      path: data["pg-upkeep.sh"]
+      pattern: CREATE DATABASE

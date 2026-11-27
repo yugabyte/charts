@@ -183,12 +183,14 @@ spec:
             items:
               - key: postgresql.conf.sample
                 path: postgresql.conf.sample
-        - name: pg-poststart
+        {{- if not .Values.postgres.external.host }}
+        - name: pg-upkeep
           configMap:
-            name: {{ .Release.Name }}-yugaware-pg-poststart
+            name: {{ .Release.Name }}-yugaware-pg-upkeep
             items:
-              - key: pg-poststart.sh
-                path: pg-poststart.sh
+              - key: pg-upkeep.sh
+                path: pg-upkeep.sh
+        {{- end }}
           {{- if .Values.postgres.extraVolumes -}}
             {{- include "yugaware.isExtraVolumesMappingExists" .Values.postgres -}}
             {{- .Values.postgres.extraVolumes | toYaml | nindent 8 -}}
@@ -389,6 +391,35 @@ spec:
           - name: pg-sample-config
             mountPath: /usr/pgsql-{{ include "yugaware.pgMajor" . }}/share/postgresql.conf.sample
             subPath: postgresql.conf.sample
+        # Collation rebuild and post-migration statistics, under the serving image, before
+        # postgres accepts any client. Last, so it sees the cluster pg-major-upgrade left.
+        - image: {{ include "full_image" (dict "containerName" "postgres" "root" .) }}
+          name: pg-upkeep
+          {{- if .Values.initContainers.pgUpkeep.resources }}
+          resources: {{- toYaml .Values.initContainers.pgUpkeep.resources | nindent 12 }}
+          {{ end -}}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash", "/pg_upkeep/pg-upkeep.sh"]
+          {{- if .Values.containerSecurityContext.enabled }}
+          {{- include "getSecurityContext" . | indent 10 }}
+          {{- else if eq (include "yugaware.runAsRoot" .) "true" }}
+          securityContext:
+            runAsUser: 0
+          {{- end }}
+          env:
+            # The superuser initdb created (postgres.user).
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-yugaware-global-config
+                  key: postgres_user
+          volumeMounts:
+          # The postgres container's view of the volume: pgdata/ and the migration markers.
+          - name: yugaware-storage
+            mountPath: /var/lib/postgresql/data
+            subPath: postgres_data_{{ include "yugaware.pgMajor" . }}
+          - name: pg-upkeep
+            mountPath: /pg_upkeep
         {{- end }}
       containers:
         {{ if not ( or .Values.useYugabyteDB .Values.postgres.external.host) }}
@@ -446,10 +477,6 @@ spec:
             {{- end }}
             - name: PGDATA
               value: {{ include "yugaware.pgDataDir" . }}
-          lifecycle:
-            postStart:
-              exec:
-                command: ["/bin/bash", "/pg_poststart/pg-poststart.sh"]
           ports:
             - containerPort: 5432
               name: postgres
@@ -460,7 +487,7 @@ spec:
           {{ end }}
 
           volumeMounts:
-            # Holds pgdata/, the migration's done-marker and the post-start state.
+            # Holds pgdata/, the migration's done-marker and pg-upkeep's state.
             - name: yugaware-storage
               mountPath: /var/lib/postgresql/data
               subPath: postgres_data_{{ include "yugaware.pgMajor" . }}
@@ -473,8 +500,6 @@ spec:
             - name: pg-sample-config
               mountPath: {{ .Values.image.postgres.sampleConfLocation }}
               subPath: postgresql.conf.sample
-            - name: pg-poststart
-              mountPath: /pg_poststart
          {{- if .Values.postgres.extraVolumeMounts -}}
           {{- include "yugaware.isExtraVolumesMappingExists" .Values.postgres -}}
           {{- .Values.postgres.extraVolumeMounts | toYaml | nindent 12 -}}

@@ -584,6 +584,14 @@ initContainers:
         cpu: "0.5"
         memory: 500Mi
 
+  ## Bundled Postgres upkeep before it serves: rebuilds text indexes after a change of
+  ## glibc and gathers statistics after a migration, on a temporary server.
+  pgUpkeep:
+    resources:
+      requests:
+        cpu: "0.5"
+        memory: 500Mi
+
 preupgradeChecks:
   enabled: true
 
