@@ -35,7 +35,8 @@ spec:
 {{ .Values.otelCollector.config | indent 4 }}
   # Keep in step with ManageOtelCollector.OtelCollectorVersion; 0.121.0 is the floor (awss3
   # s3_partition_format).
-  image: {{ .Values.otelCollector.image | default "otel/opentelemetry-collector-contrib:0.145.0" | quote }}
+  {{- $defaultImage := "otel/opentelemetry-collector-contrib:0.165.0" }}
+  image: {{ .Values.otelCollector.image | default $defaultImage | quote }}
   ipFamilyPolicy: SingleStack
   managementState: managed
   mode: sidecar
